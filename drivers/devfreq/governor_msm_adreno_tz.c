@@ -407,6 +407,13 @@ extern int simple_gpu_algorithm(int level, int *val,
 				struct devfreq_msm_adreno_tz_data *priv);
 #endif
 
+#if 1
+
+// mapping gpu level calculated linear conservation half curve values into a
+// half bell curve of conservation
+static int conservation_map[] = {0,1,2,5,6,9,14     ,17,20,25};
+#endif
+
 static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 {
 	int result = 0;
@@ -433,7 +440,14 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 #if 1
 	// scale busy time up based on adrenoboost parameter, only if MIN_BUSY exceeded...
 	if ((unsigned int)(priv->bin.busy_time + stats.busy_time) >= MIN_BUSY) {
-		priv->bin.busy_time += stats.busy_time * (1 + (adrenoboost*3)/2);
+		if (adrenoboost <= 1) {
+			priv->bin.busy_time += stats.busy_time * ( 1 + adrenoboost );
+		} else
+		if (adrenoboost == 2) {
+			priv->bin.busy_time += (unsigned int)((stats.busy_time * ( 1 + adrenoboost ) * 7)/10);
+		} else {
+			priv->bin.busy_time += (unsigned int)((stats.busy_time * ( 1 + adrenoboost ) * 7)/10);
+		}
 	} else {
 		priv->bin.busy_time += stats.busy_time;
 	}
@@ -495,11 +509,32 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 	 * If the decision is to move to a different level, make sure the GPU
 	 * frequency changes.
 	 */
-	if (val) {
+#if 1
+	if (!adrenoboost && val) {
 		level += val;
 		level = max(level, 0);
 		level = min_t(int, level, devfreq->profile->max_state - 1);
+		} else {
+		if (val) {
+			priv->bin.cycles_keeping_level += 1 + abs(val/2); // higher value change quantity means more addition to cycles_keeping_level for easier switching
+			// going upwards in frequency -- make it harder on the low and high freqs, middle ground - let it move
+			if (val<0 && priv->bin.cycles_keeping_level < conservation_map[ abs((priv->bin.last_level * 2) - max_state_val) ]) {
+			} else
+			// going downwards in frequency let it happen hard in the middle freqs
+			if (val>0 && priv->bin.cycles_keeping_level < conservation_map[ (max_state_val - abs((priv->bin.last_level * 2) - max_state_val )) ])  {
+			} else
+			{
+				// reset keep cylcles timer
+				priv->bin.cycles_keeping_level = 0;
+				// set new last level
+				priv->bin.last_level = level;
+				level += val;
+				level = max(level, 0);
+				level = min_t(int, level, devfreq->profile->max_state - 1);
+			}
+		}
 	}
+#endif
 
 	*freq = devfreq->profile->freq_table[level];
 	return 0;
