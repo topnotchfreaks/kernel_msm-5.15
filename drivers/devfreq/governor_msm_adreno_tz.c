@@ -414,15 +414,18 @@ extern int simple_gpu_algorithm(int level, int *val,
 static int conservation_map_up[] = {15,15,10,4,5,6,12     ,5,5,5};
 static int conservation_map_down[] = {0,1,6,6,5,0,0     ,5,5,5};
 
-// make boost multiplication/division depending on current lvl (lower is higher freq level)
+// make boost multiplication/division depending on current lvl, dampen the high freq up scaling! (lower is higher freq level)
 static int lvl_multiplicator_map_1[] = {5,5,6,8,9,1,1    ,1,1};
 static int lvl_divider_map_1[] = {10,10,10,10,10,1,1    ,1,1};
 
+// for boost == 2 -- boost divide on the low spectrum, dampen the lower freq values, unneeded to boost the low freq spectrum so much at start
 static int lvl_multiplicator_map_2[] = {6,7,8,1,1,1,1    ,1,1};
 static int lvl_divider_map_2[] = {10,10,10,1,1,1,1    ,1,1};
 
-static int lvl_multiplicator_map_3[] = {7,8,9,1,1,1,1    ,1,1};
-static int lvl_divider_map_3[] = {10,10,10,1,1,1,1    ,1,1};
+// for boost == 3 -- boost divide on the low spectrum, dampen the lower freq values, unneeded to boost the low freq spectrum so much at start
+static int lvl_multiplicator_map_3[] = {9,1,1,1,1,10,8    ,1,1};
+static int lvl_divider_map_3[] = {10,1,1,1,1,14,12    ,1,1};
+
 #endif
 
 static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
@@ -460,7 +463,7 @@ static int tz_get_target_freq(struct devfreq *devfreq, unsigned long *freq)
 		if (adrenoboost == 2) {
 			priv->bin.busy_time += (unsigned int)((stats.busy_time * ( 1 + adrenoboost ) * lvl_multiplicator_map_2[ last_level ]  * 7 ) / (lvl_divider_map_2[ last_level ] * 10));
 		} else {
-			priv->bin.busy_time += (unsigned int)((stats.busy_time * ( 1 + adrenoboost ) * lvl_multiplicator_map_3[ last_level ]  * 7 ) / (lvl_divider_map_3[ last_level ] * 10));
+			priv->bin.busy_time += (unsigned int)((stats.busy_time * ( 1 + adrenoboost ) * lvl_multiplicator_map_3[ last_level ]  * 8 ) / (lvl_divider_map_3[ last_level ] * 10));
 		}
 	} else {
 		priv->bin.busy_time += stats.busy_time;
