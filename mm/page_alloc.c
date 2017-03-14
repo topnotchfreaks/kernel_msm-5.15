@@ -75,6 +75,7 @@
 #include <linux/buffer_head.h>
 #include <trace/hooks/mm.h>
 #include <trace/hooks/vmscan.h>
+#include <linux/random.h>
 
 #include <asm/sections.h>
 #include <asm/tlbflush.h>
@@ -1815,6 +1816,17 @@ void __free_pages_core(struct page *page, unsigned int order)
 	 * relevant for memory onlining.
 	 */
 	__free_pages_ok(page, order, FPI_TO_TAIL | FPI_SKIP_KASAN_POISON);
+	
+	if (!PageHighMem(page) && page_to_pfn(page) < 0x100000) {
+		unsigned long hash = 0;
+		size_t index, end = PAGE_SIZE * nr_pages / sizeof hash;
+		const unsigned long *data = lowmem_page_address(page);
+
+		for (index = 0; index < end; index++)
+			hash ^= hash + data[index];
+		add_device_randomness((const void *)&hash, sizeof(hash));
+	}
+
 }
 
 #ifdef CONFIG_NUMA
