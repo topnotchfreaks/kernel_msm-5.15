@@ -413,31 +413,9 @@ struct msm_geni_serial_port {
 	spinlock_t rx_lock;
 	atomic_t is_clock_off;
 	enum uart_error_code uart_error;
-	unsigned long ser_clk_cfg;
-	bool gsi_mode;
-	struct uart_gsi *gsi;
-	struct work_struct tx_xfer_work;
-	struct work_struct rx_cancel_work;
-	struct work_struct tx_cancel_work;
-	struct workqueue_struct *tx_wq;
-	struct workqueue_struct *rx_wq;
-	struct completion xfer;
-	struct completion tx_xfer;
-	unsigned int count;
-	atomic_t stop_rx_inprogress;
-	bool pm_auto_suspend_disable;
-	bool gsi_rx_done;
-	atomic_t flush_buffers;
-	struct ktermios *current_termios;
-	bool resuming_from_deep_sleep;
-	int hs_uart_operation;
-	atomic_t check_wakeup_byte;
-	struct workqueue_struct *wakeup_irq_wq;
-	struct delayed_work wakeup_irq_dwork;
-	struct completion wakeup_comp;
-	struct uart_kpi_capture uart_kpi_tx[UART_KPI_TX_RX_INSTANCES];
-	struct uart_kpi_capture uart_kpi_rx[UART_KPI_TX_RX_INSTANCES];
-	enum uart_port_state port_state;
+	struct work_struct work;
+	struct workqueue_struct *qwork;
+	struct mutex ioctl_mutex;
 };
 
 static const struct uart_ops msm_geni_serial_pops;
@@ -1205,6 +1183,9 @@ static int msm_geni_serial_ioctl(struct uart_port *uport, unsigned int cmd,
 	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
 	int ret = -ENOIOCTLCMD;
 	enum uart_error_code uart_error;
+	int ret;
+
+	mutex_lock(&port->ioctl_mutex);
 
 	UART_LOG_DBG(port->ipc_log_misc, uport->dev,
 		     "%s:%s cmd 0x%x\n", __func__, current->comm, cmd);
@@ -1212,19 +1193,16 @@ static int msm_geni_serial_ioctl(struct uart_port *uport, unsigned int cmd,
 		return ret;
 
 	switch (cmd) {
-	case MSM_GENI_SERIAL_TIOCPMGET: {
+	case TIOCPMGET:
 		ret = vote_clock_on(uport);
 		break;
-	}
-	case MSM_GENI_SERIAL_TIOCPMPUT: {
+	case TIOCPMPUT:
 		ret = vote_clock_off(uport);
 		break;
-	}
-	case MSM_GENI_SERIAL_TIOCPMACT: {
+	case TIOCPMACT:
 		ret = !pm_runtime_status_suspended(uport->dev);
 		break;
-	}
-	case MSM_GENI_SERIAL_TIOCFAULT: {
+	case TIOCFAULT:
 		uart_error = port->uart_error;
 		port->uart_error = UART_ERROR_DEFAULT;
 		UART_LOG_DBG(port->ipc_log_misc, uport->dev,
@@ -1240,10 +1218,13 @@ static int msm_geni_serial_ioctl(struct uart_port *uport, unsigned int cmd,
 		port->ipc_log_pwr = port->ipc_log_new;
 		port->ipc_log_irqstatus = port->ipc_log_new;
 		break;
-	}
 	default:
+		ret = -ENOIOCTLCMD;
 		break;
 	}
+
+	mutex_unlock(&port->ioctl_mutex);
+
 	return ret;
 }
 
@@ -5758,6 +5739,7 @@ static int __init msm_geni_serial_init(void)
 		msm_geni_serial_ports[i].uport.ops = &msm_geni_serial_pops;
 		msm_geni_serial_ports[i].uport.flags = UPF_BOOT_AUTOCONF;
 		msm_geni_serial_ports[i].uport.line = i;
+		mutex_init(&msm_geni_serial_ports[i].ioctl_mutex);
 	}
 
 	for (i = 0; i < GENI_UART_CONS_PORTS; i++) {
@@ -5765,6 +5747,7 @@ static int __init msm_geni_serial_init(void)
 		msm_geni_console_port.uport.ops = &msm_geni_console_pops;
 		msm_geni_console_port.uport.flags = UPF_BOOT_AUTOCONF;
 		msm_geni_console_port.uport.line = i;
+		mutex_init(&msm_geni_console_port.ioctl_mutex);
 	}
 
 	ret = uart_register_driver(&msm_geni_serial_hs_driver);
