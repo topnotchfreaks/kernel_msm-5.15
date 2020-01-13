@@ -1035,9 +1035,11 @@ int get_nohz_timer_target(void)
 	const struct cpumask *hk_mask;
 	bool done = false;
 
-	trace_android_rvh_get_nohz_timer_target(&cpu, &done);
-	if (done)
-		return cpu;
+	if (is_housekeeping_cpu(cpu)) {
+		if (!idle_cpu(cpu))
+			return cpu;
+		default_cpu = cpu;
+	}
 
 	if (housekeeping_cpu(cpu, HK_FLAG_TIMER)) {
 		if (!idle_cpu(cpu))
@@ -1049,7 +1051,8 @@ int get_nohz_timer_target(void)
 
 	rcu_read_lock();
 	for_each_domain(cpu, sd) {
-		for_each_cpu_and(i, sched_domain_span(sd), hk_mask) {
+		for_each_cpu_and(i, sched_domain_span(sd),
+			housekeeping_cpumask()) {
 			if (cpu == i)
 				continue;
 
@@ -1061,7 +1064,7 @@ int get_nohz_timer_target(void)
 	}
 
 	if (default_cpu == -1)
-		default_cpu = housekeeping_any_cpu(HK_FLAG_TIMER);
+		default_cpu = housekeeping_any_cpu();
 	cpu = default_cpu;
 unlock:
 	rcu_read_unlock();
