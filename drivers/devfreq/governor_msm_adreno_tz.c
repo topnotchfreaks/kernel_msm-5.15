@@ -101,7 +101,7 @@ static ssize_t adrenoboost_save(struct device *dev,
 {
 	int input;
 	sscanf(buf, "%d ", &input);
-	if (input < 0 || input > 4) {
+	if (input < 0 || input > 3) {
 		if (input < 0){
 			adrenoboost = 0;
 		} else {
