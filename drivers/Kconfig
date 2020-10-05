@@ -236,4 +236,11 @@ source "drivers/interconnect/Kconfig"
 source "drivers/counter/Kconfig"
 
 source "drivers/most/Kconfig"
+
+source "drivers/gpu/msm/Kconfig"
+
+source "drivers/energy_model/Kconfig"
+
+source "drivers/video/klapse/Kconfig"
+
 endmenu
