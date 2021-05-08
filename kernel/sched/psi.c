@@ -479,7 +479,7 @@ static void psi_avgs_work(struct work_struct *work)
 		group->avg_next_update = update_averages(group, now);
 
 	if (nonidle) {
-		schedule_delayed_work(dwork, nsecs_to_jiffies(
+		queue_delayed_work(system_power_efficient_wq, dwork, nsecs_to_jiffies(
 				group->avg_next_update - now) + 1);
 	}
 
