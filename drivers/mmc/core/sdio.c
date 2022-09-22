@@ -1110,9 +1110,11 @@ out:
 static int mmc_sdio_runtime_suspend(struct mmc_host *host)
 {
 	/* No references to the card, cut the power to it. */
+	if (!mmc_card_keep_power(host)) {
 	mmc_claim_host(host);
 	mmc_power_off(host);
 	mmc_release_host(host);
+	}
 
 	return 0;
 }
