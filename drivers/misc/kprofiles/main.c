@@ -8,23 +8,38 @@
 #include <linux/moduleparam.h>
 #ifdef CONFIG_AUTO_KPROFILES_MSM_DRM
 #include <linux/msm_drm_notify.h>
+#elif defined(CONFIG_AUTO_KPROFILES_MI_DRM)
+#include <drm/drm_notifier_mi.h>
 #elif defined(CONFIG_AUTO_KPROFILES_FB)
 #include <linux/fb.h>
 #endif
 #include "version.h"
 
-static int kp_mode = 1;
-module_param(kp_mode, int, 0664);
+#ifdef CONFIG_AUTO_KPROFILES_MSM_DRM
+#define KP_EVENT_BLANK MSM_DRM_EVENT_BLANK
+#define KP_BLANK_POWERDOWN MSM_DRM_BLANK_POWERDOWN
+#define KP_BLANK_UNBLANK MSM_DRM_BLANK_UNBLANK
+#elif defined(CONFIG_AUTO_KPROFILES_MI_DRM)
+#define KP_EVENT_BLANK MI_DRM_EVENT_BLANK
+#define KP_BLANK_POWERDOWN MI_DRM_BLANK_POWERDOWN
+#define KP_BLANK_UNBLANK MI_DRM_BLANK_UNBLANK
+#elif defined(CONFIG_AUTO_KPROFILES_FB)
+#define KP_EVENT_BLANK FB_EVENT_BLANK
+#define KP_BLANK_POWERDOWN FB_BLANK_POWERDOWN
+#define KP_BLANK_UNBLANK FB_BLANK_UNBLANK
+#endif
 
 static unsigned int kp_override_mode;
 static bool kp_override = false;
-
-static bool auto_kprofiles = true;
-module_param(auto_kprofiles, bool, 0664);
-
 #ifdef CONFIG_AUTO_KPROFILES
 static bool screen_on = true;
 #endif
+
+static bool auto_kprofiles __read_mostly = true;
+module_param(auto_kprofiles, bool, 0664);
+
+static unsigned int kp_mode = CONFIG_DEFAULT_KP_MODE;
+module_param(kp_mode, int, 0664);
 
 DEFINE_MUTEX(kplock);
 
@@ -42,13 +57,20 @@ void kp_set_mode_rollback(unsigned int level, unsigned int duration_ms)
 		return;
 #endif
 
-	mutex_lock(&kplock);
-	if (level && duration_ms && auto_kprofiles) {
-		kp_override_mode = level;
-		kp_override = true;
-		msleep(duration_ms);
-		kp_override = false;
+	if (!auto_kprofiles)
+		return;
+
+	if (unlikely(level > 3)) {
+		pr_err("%s: Invalid mode requested, Skipping mode change",
+		       __func__);
+		return;
 	}
+
+	mutex_lock(&kplock);
+	kp_override_mode = level;
+	kp_override = true;
+	msleep(duration_ms);
+	kp_override = false;
 	mutex_unlock(&kplock);
 }
 
@@ -67,7 +89,13 @@ void kp_set_mode(unsigned int level)
 		return;
 #endif
 
-	if (level && auto_kprofiles)
+	if (unlikely(level > 3)) {
+		pr_err("%s: Invalid mode requested, Skipping mode change",
+		       __func__);
+		return;
+	}
+
+	if (auto_kprofiles)
 		kp_mode = level;
 }
 
@@ -101,7 +129,7 @@ int kp_active_mode(void)
 	if (kp_override)
 		return kp_override_mode;
 
-	if (kp_mode > 3) {
+	if (unlikely(kp_mode > 3)) {
 		kp_mode = 0;
 		pr_info("Invalid value passed, falling back to level 0\n");
 	}
@@ -117,50 +145,34 @@ static inline int kp_notifier_callback(struct notifier_block *self,
 {
 #ifdef CONFIG_AUTO_KPROFILES_MSM_DRM
 	struct msm_drm_notifier *evdata = data;
-	int *blank;
-
-	if (event != MSM_DRM_EVENT_BLANK)
-		goto out;
-
-	if (!evdata || !evdata->data || evdata->id != MSM_DRM_PRIMARY_DISPLAY)
-		goto out;
-
-	blank = evdata->data;
-	switch (*blank) {
-	case MSM_DRM_BLANK_POWERDOWN:
-		if (!screen_on)
-			break;
-		screen_on = false;
-		break;
-	case MSM_DRM_BLANK_UNBLANK:
-		if (screen_on)
-			break;
-		screen_on = true;
-		break;
-	}
+#elif defined(CONFIG_AUTO_KPROFILES_MI_DRM)
+	struct mi_drm_notifier *evdata = data;
 #elif defined(CONFIG_AUTO_KPROFILES_FB)
 	struct fb_event *evdata = data;
+#endif
 	int *blank;
 
-	if (event != FB_EVENT_BLANK)
-		goto out;
+	if (event != KP_EVENT_BLANK
+#ifdef CONFIG_AUTO_KPROFILES_MSM_DRM
+	    || !evdata || !evdata->data || evdata->id != MSM_DRM_PRIMARY_DISPLAY
+#endif
+	)
+		return NOTIFY_OK;
 
 	blank = evdata->data;
 	switch (*blank) {
-	case FB_BLANK_POWERDOWN:
+	case KP_BLANK_POWERDOWN:
 		if (!screen_on)
 			break;
 		screen_on = false;
 		break;
-	case FB_BLANK_UNBLANK:
+	case KP_BLANK_UNBLANK:
 		if (screen_on)
 			break;
 		screen_on = true;
 		break;
 	}
-#endif
 
-out:
 	return NOTIFY_OK;
 }
 
@@ -168,42 +180,64 @@ static struct notifier_block kp_notifier_block = {
 	.notifier_call = kp_notifier_callback,
 };
 
+static int kprofiles_register_notifier(void)
+{
+	int ret = 0;
+
+#ifdef CONFIG_AUTO_KPROFILES_MSM_DRM
+	ret = msm_drm_register_client(&kp_notifier_block);
+#elif defined(CONFIG_AUTO_KPROFILES_MI_DRM)
+	ret = mi_drm_register_client(&kp_notifier_block);
+#elif defined(CONFIG_AUTO_KPROFILES_FB)
+	ret = fb_register_client(&kp_notifier_block);
+#endif
+
+	return ret;
+}
+
+static void kprofiles_unregister_notifier(void)
+{
+#ifdef CONFIG_AUTO_KPROFILES_MSM_DRM
+	msm_drm_unregister_client(&kp_notifier_block);
+#elif defined(CONFIG_AUTO_KPROFILES_MI_DRM)
+	mi_drm_unregister_client(&kp_notifier_block);
+#elif defined(CONFIG_AUTO_KPROFILES_FB)
+	fb_unregister_client(&kp_notifier_block);
+#endif
+}
+
+#else
+static inline int kprofiles_register_notifier(void)
+{
+	return 0;
+}
+static inline void kprofiles_unregister_notifier(void)
+{
+}
 #endif
 
 static int __init kp_init(void)
 {
 	int ret = 0;
 
-#ifdef CONFIG_AUTO_KPROFILES_MSM_DRM
-	ret = msm_drm_register_client(&kp_notifier_block);
-	if (ret) {
-		pr_err("Failed to register msm_drm notifier, err: %d\n", ret);
-		msm_drm_unregister_client(&kp_notifier_block);
-	}
-#elif defined(CONFIG_AUTO_KPROFILES_FB)
-	ret = fb_register_client(&kp_notifier_block);
-	if (ret) {
-		pr_err("Failed to register fb notifier, err: %d\n", ret);
-		fb_unregister_client(&kp_notifier_block);
-	}
-#endif
+	ret = kprofiles_register_notifier();
+	if (ret)
+		pr_err("Failed to register notifier, err: %d\n", ret);
+
 	pr_info("Kprofiles " KPROFILES_VERSION
 		" loaded. Visit https://github.com/dakkshesh07/Kprofiles/blob/main/README.md for information.\n");
 	pr_info("Copyright (C) 2021-2022 Dakkshesh <dakkshesh5@gmail.com>.\n");
+
 	return ret;
 }
+module_init(kp_init);
 
 static void __exit kp_exit(void)
 {
-#ifdef CONFIG_AUTO_KPROFILES_MSM_DRM
-	msm_drm_unregister_client(&kp_notifier_block);
-#elif defined(CONFIG_AUTO_KPROFILES_FB)
-	fb_unregister_client(&kp_notifier_block);
-#endif
+	kprofiles_unregister_notifier();
 }
-
-module_init(kp_init);
 module_exit(kp_exit);
+
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("KernelSpace Profiles");
 MODULE_AUTHOR("Dakkshesh <dakkshesh5@gmail.com>");
