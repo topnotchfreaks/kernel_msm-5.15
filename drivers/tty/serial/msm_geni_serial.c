@@ -5277,10 +5277,8 @@ static int msm_geni_serial_probe(struct platform_device *pdev)
 		place_marker(boot_marker);
 	}
 exit_geni_serial_probe:
-	if (ret)
-		uart_line_id = prev_line_id;
-	UART_LOG_DBG(dev_port->ipc_log_misc, &pdev->dev, "%s: ret:%d\n",
-		__func__, ret);
+	IPC_LOG_MSG(dev_port->ipc_log_misc, "%s: ret:%d\n", __func__, ret);
+	wakeup_source_unregister(dev_port->geni_wake);
 	return ret;
 }
 
