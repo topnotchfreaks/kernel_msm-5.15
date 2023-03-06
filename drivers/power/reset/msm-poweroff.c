@@ -430,6 +430,14 @@ static void msm_restart_prepare(const char *cmd)
 	else
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
 
+	if (in_panic) {
+		// Reboot to recovery
+		qpnp_pon_set_restart_reason(
+			PON_RESTART_REASON_RECOVERY);
+		__raw_writel(0x77665502, restart_reason);
+		goto finish_set_restart_reason;
+	}
+
 	if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
 			reason = PON_RESTART_REASON_BOOTLOADER;
@@ -463,12 +471,8 @@ static void msm_restart_prepare(const char *cmd)
 			__raw_writel(0x77665501, restart_reason);
 		}
 
-		if (reason && nvmem_cell)
-			nvmem_cell_write(nvmem_cell, &reason, sizeof(reason));
-		else
-			qpnp_pon_set_restart_reason(
-				(enum pon_restart_reason)reason);
-	}
+finish_set_restart_reason:
+	flush_cache_all();
 
 	/*outer_flush_all is not supported by 64bit kernel*/
 #ifndef CONFIG_ARM64
