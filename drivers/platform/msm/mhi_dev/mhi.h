@@ -639,6 +639,8 @@ struct mhi_dev {
 	/* Dont timeout waiting for M0 */
 	bool				no_m0_timeout;
 
+	bool				stop_polling_m0;
+
 	/* Registered client callback list */
 	struct list_head		client_cb_list;
 
