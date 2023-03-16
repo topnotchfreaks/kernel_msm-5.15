@@ -163,7 +163,7 @@ unsigned int dbs_update(struct cpufreq_policy *policy)
 			 */
 			load = j_cdbs->prev_load;
 		} else if (unlikely((int)idle_time > 2 * sampling_rate &&
-				    j_cdbs->prev_load)) {
+				    j_cdbs->copy_prev_load)) {
 			/*
 			 * If the CPU had gone completely idle and a task has
 			 * just woken up on this CPU now, it would be unfair to
@@ -187,7 +187,7 @@ unsigned int dbs_update(struct cpufreq_policy *policy)
 			 * indicates this scenario.
 			 */
 			load = j_cdbs->prev_load;
-			j_cdbs->prev_load = 0;
+			j_cdbs->copy_prev_load = false;
 		} else {
 			if (time_elapsed >= idle_time) {
 				load = 100 * (time_elapsed - idle_time) / time_elapsed;
@@ -210,6 +210,7 @@ unsigned int dbs_update(struct cpufreq_policy *policy)
 				load = (int)idle_time < 0 ? 100 : 0;
 			}
 			j_cdbs->prev_load = load;
+			j_cdbs->copy_prev_load = true;
 		}
 
 		if (unlikely((int)idle_time > 2 * sampling_rate)) {
@@ -527,7 +528,7 @@ int cpufreq_dbs_governor_start(struct cpufreq_policy *policy)
 		/*
 		 * Make the first invocation of dbs_update() compute the load.
 		 */
-		j_cdbs->prev_load = 0;
+		j_cdbs->copy_prev_load = true;
 
 		if (ignore_nice)
 			j_cdbs->prev_cpu_nice = kcpustat_field(&kcpustat_cpu(j), CPUTIME_NICE, j);

@@ -118,6 +118,11 @@ struct cpu_dbs_info {
 	 * wake-up from idle.
 	 */
 	unsigned int prev_load;
+	/*
+	 * Flag to ensure that we copy the previous load only once, upon the
+	 * first wake-up from idle.
+	 */
+	bool copy_prev_load;
 	struct update_util_data update_util;
 	struct policy_dbs_info *policy_dbs;
 };
