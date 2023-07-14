@@ -24,3 +24,4 @@ qcom-smb1390-charger-y += smb1390-charger-psy.o
 obj-$(CONFIG_QTI_QBG)   += qti-qbg-main.o
 qti-qbg-main-y  += qti-qbg.o qbg-sdam.o qbg-battery-profile.o battery-profile-loader.o
 obj-$(CONFIG_SMB358_CHARGER)    += smb358-charger.o
+obj-$(CONFIG_BQ2589X_CHARGER)		+= bq2589x_charger.o

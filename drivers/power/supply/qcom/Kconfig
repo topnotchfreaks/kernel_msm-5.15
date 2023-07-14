@@ -169,6 +169,12 @@ config QTI_QBG
           current to determine the battery state-of-charge (SOC) and supports
           other battery management features.
 
-          To compile this driver as a module, choose M here: the
-          module will be called qti-qbg-main.
+	  	To compile this driver as a module, choose M here: the
+	  	module will be called qti-qbg-main.
+
+config BQ2589X_CHARGER
+	tristate "TI BQ2589X Battery Charger"
+	depends on I2C
+	help
+	  Say Y to include support for BQ2589X Battery Charger.
 endif
