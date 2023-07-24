@@ -25,8 +25,6 @@
 #include <linux/of_gpio.h>
 #include "bq2589x_reg.h"
 #include "bq2589x_iio.h"
-#include <linux/hardware_info.h>
-
 
 enum bq2589x_vbus_type {
 	BQ2589X_VBUS_NONE,
@@ -1745,13 +1743,6 @@ static int bq2589x_charger_probe(struct i2c_client *client,
 	}
 
 	enable_irq_wake(irqn);
-
-#ifdef CONFIG_WT_QGKI
-	if (bq->is_bq25890h)
-		hardwareinfo_set_prop(HARDWARE_CHARGER_IC, "BQ25890H_CHARGER");
-	else
-		hardwareinfo_set_prop(HARDWARE_CHARGER_IC, "SYV690_CHARGER");
-#endif
 
 	bq2589x_usb_switch(bq, true);
 	bq2589x_force_dpdm_done(bq);
