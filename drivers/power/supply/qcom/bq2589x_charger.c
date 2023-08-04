@@ -808,6 +808,7 @@ static bool bq2589x_is_charge_done(struct bq2589x *bq)
 	return (val == BQ2589X_CHRG_STAT_CHGDONE);
 }
 
+#ifdef DEBUG
 static void bq2589x_dump_regs(struct bq2589x *bq)
 {
 	int addr, ret;
@@ -820,6 +821,7 @@ static void bq2589x_dump_regs(struct bq2589x *bq)
 			pr_err("Reg[%.2x] = 0x%.2x ", addr, val);
 	}
 }
+#endif
 
 static int bq2589x_init_device(struct bq2589x *bq)
 {
@@ -1222,7 +1224,9 @@ static void bq2589x_monitor_workfunc(struct work_struct *work)
 	union power_supply_propval val = {0,};
 
 //	bq2589x_reset_watchdog_timer(bq);
+#ifdef DEBUG
 	bq2589x_dump_regs(bq);
+#endif
 	bq->vbus_volt = bq2589x_adc_read_vbus_volt(bq);
 	bq->vbat_volt = bq2589x_adc_read_battery_volt(bq);
 	chg_current = bq2589x_adc_read_charge_current(bq);
