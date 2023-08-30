@@ -418,6 +418,9 @@ struct ep_pcie_dev_t {
 	u16                          device_id;
 	u32                          subsystem_id;
 	u32                          link_speed;
+	/* Stores current link speed and link width */
+	u32                          current_link_speed;
+	u32                          current_link_width;
 	bool                         active_config;
 	bool                         aggregated_irq;
 	bool                         mhi_a7_irq;
@@ -494,6 +497,7 @@ struct ep_pcie_dev_t {
 
 	struct ep_pcie_register_event *event_reg;
 	struct work_struct           handle_bme_work;
+	struct work_struct           handle_clkreq;
 	struct work_struct           handle_d3cold_work;
 
 	struct clk		     *pipe_clk_mux;
