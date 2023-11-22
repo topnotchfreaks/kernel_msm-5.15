@@ -217,9 +217,7 @@
 #define BME_CHECK_MAX_COUNT		      100000
 #define PHY_STABILIZATION_DELAY_US_MIN	      1000
 #define PHY_STABILIZATION_DELAY_US_MAX	      1000
-#define REFCLK_STABILIZATION_DELAY_US_MIN     1000
-#define REFCLK_STABILIZATION_DELAY_US_MAX     1000
-#define PHY_READY_TIMEOUT_COUNT               30000
+#define PHY_READY_TIMEOUT_MS                  30000
 #define MSI_EXIT_L1SS_WAIT	              10
 #define MSI_EXIT_L1SS_WAIT_MAX_COUNT          100
 #define XMLH_LINK_UP                          0x400
@@ -471,6 +469,7 @@ struct ep_pcie_dev_t {
 	ulong                        d3_counter;
 	ulong                        perst_ast_counter;
 	ulong                        perst_deast_counter;
+	ktime_t                      ltssm_detect_ts;
 	ulong                        wake_counter;
 	ulong                        msi_counter;
 	ulong                        msix_counter;

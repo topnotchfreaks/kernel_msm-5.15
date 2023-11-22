@@ -280,6 +280,7 @@ static int ep_pcie_reset_init(struct ep_pcie_dev_t *dev)
 {
 	int i, rc = 0;
 	struct ep_pcie_reset_info_t *reset_info;
+	ktime_t timeout;
 
 	for (i = 0; i < EP_PCIE_MAX_RESET; i++) {
 		reset_info = &dev->reset[i];
@@ -306,8 +307,14 @@ static int ep_pcie_reset_init(struct ep_pcie_dev_t *dev)
 		}
 		EP_PCIE_DBG(dev, "After Reset assert %s\n",
 						reset_info->name);
+
 		/* add a 1ms delay to ensure the reset is asserted */
-		usleep_range(1000, 1005);
+		timeout = ktime_add_us(ktime_get(), 1000);
+		while (1) {
+			if (ktime_after(ktime_get(), timeout))
+				break;
+			udelay(5);
+		}
 
 		rc = reset_control_deassert(reset_info->hdl);
 		if (rc) {
@@ -2135,10 +2142,11 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 	u32 val = 0;
 	u32 retries = 0;
 	u32 bme = 0;
-	bool perst = true;
+	bool perst = true, timedout = false;
 	bool ltssm_en = false;
 	struct ep_pcie_dev_t *dev = &ep_pcie_dev;
-	u32 reg;
+	u32 reg, linkup_ts;
+	ktime_t timeout;
 
 	EP_PCIE_DBG(dev, "PCIe V%d: options input are 0x%x\n", dev->rev, opt);
 
@@ -2340,23 +2348,25 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 	}
 
 	EP_PCIE_DBG(dev, "PCIe V%d: waiting for phy ready...\n", dev->rev);
-	retries = 0;
-	do {
-		if (ep_pcie_phy_is_ready(dev))
+
+	timeout = ktime_add_ms(ktime_get(), PHY_READY_TIMEOUT_MS);
+	while (1) {
+		if (ep_pcie_phy_is_ready(dev)) {
+			ktime_t time = ktime_add_ms(ktime_get(), PHY_READY_TIMEOUT_MS);
+
+			EP_PCIE_DBG(dev, "pcie v%d: phy is up in =%ld us\n",
+					dev->rev, ktime_us_delta(time, timeout));
 			break;
-		retries++;
-		if (retries % 100 == 0)
-			EP_PCIE_DBG(dev,
-				"PCIe V%d: current number of PHY retries:%d\n",
-				dev->rev, retries);
-		usleep_range(REFCLK_STABILIZATION_DELAY_US_MIN,
-				REFCLK_STABILIZATION_DELAY_US_MAX);
-	} while (retries < PHY_READY_TIMEOUT_COUNT);
+		}
 
-	EP_PCIE_DBG(dev, "PCIe V%d: number of PHY retries:%d\n",
-		dev->rev, retries);
+		timedout = ktime_after(ktime_get(), timeout);
+		if (timedout)
+			break;
 
-	if (retries == PHY_READY_TIMEOUT_COUNT) {
+		udelay(5);
+	}
+
+	if (timedout) {
 		EP_PCIE_ERR(dev, "PCIe V%d: PCIe PHY  failed to come up\n",
 			dev->rev);
 		ret = EP_PCIE_ERROR;
@@ -2374,6 +2384,8 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 		ep_pcie_write_mask(dev->parf + PCIE20_PARF_LTSSM, 0, BIT(8));
 	else
 		ep_pcie_write_mask(dev->elbi + PCIE20_ELBI_SYS_CTRL, 0, BIT(0));
+
+	dev->ltssm_detect_ts = ktime_sub(ktime_get(), dev->ltssm_detect_ts);
 
 	EP_PCIE_DBG(dev, "PCIe V%d: check if link is up\n", dev->rev);
 
@@ -2406,13 +2418,20 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 	} else {
 		dev->link_status = EP_PCIE_LINK_UP;
 		dev->l23_ready = false;
-		EP_PCIE_DBG(dev,
-			"PCIe V%d: link is up after %d checkings (%d ms)\n",
-			dev->rev, retries,
-			LINK_UP_TIMEOUT_US_MIN * retries / 1000);
+
+		linkup_ts = LINK_UP_TIMEOUT_US_MIN * retries / 1000;
 		EP_PCIE_INFO(dev,
-			"PCIe V%d: link initialized for LE PCIe endpoint\n",
-			dev->rev);
+			"PCIe V%d: PERST#-deast to LTSSM_Detect took %ld ms, linkup took %ld ms\n",
+			dev->rev, ktime_to_ms(dev->ltssm_detect_ts), linkup_ts);
+		EP_PCIE_INFO(dev, "PCIe V%d: link initialized for LE PCIe endpoint\n", dev->rev);
+
+		/*
+		 * PCIe spec (Chapter - PCI Express Rest - Rules) mandates device must enter the
+		 * LTSSM_Detect state within 20ms of the end of the fundamental reset (which
+		 * includes reset based on PERST#).
+		 */
+		if (ktime_to_ms(dev->ltssm_detect_ts) > 20)
+			WARN_ON(1);
 	}
 
 checkbme:
@@ -2974,6 +2993,7 @@ static irqreturn_t ep_pcie_handle_perst_irq(int irq, void *data)
 		EP_PCIE_DBG(dev,
 			"PCIe V%d: No. %ld PERST deassertion\n",
 			dev->rev, dev->perst_deast_counter);
+		dev->ltssm_detect_ts = ktime_get();
 		result = IRQ_WAKE_THREAD;
 	} else {
 		atomic_set(&dev->perst_deast, 0);
