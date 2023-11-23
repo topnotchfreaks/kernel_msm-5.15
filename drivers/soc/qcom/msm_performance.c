@@ -325,11 +325,13 @@ static int touchboost = 1;
 /*******************************sysfs start************************************/
 static int set_touchboost(const char *buf, const struct kernel_param *kp)
 {
-	int val;
-	if (sscanf(buf, "%d\n", &val) != 1)
+	int cnt, val;
+	
+	cnt = sscanf(buf, "%d\n", &val);
+	if (cnt != 1)
 		return -EINVAL;
 	touchboost = val;
-	return 0;
+	return cnt;
 }
 
 static int get_touchboost(char *buf, const struct kernel_param *kp)
