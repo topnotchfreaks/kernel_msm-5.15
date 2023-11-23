@@ -320,7 +320,28 @@ cleanup:
 	return ret;
 }
 
+static int touchboost = 1;
+
 /*******************************sysfs start************************************/
+static int set_touchboost(const char *buf, const struct kernel_param *kp)
+{
+	int val;
+	if (sscanf(buf, "%d\n", &val) != 1)
+		return -EINVAL;
+	touchboost = val;
+	return 0;
+}
+
+static int get_touchboost(char *buf, const struct kernel_param *kp)
+{
+	return snprintf(buf, PAGE_SIZE, "%d", touchboost);
+}
+static const struct kernel_param_ops param_ops_touchboost = {
+	.set = set_touchboost,
+	.get = get_touchboost,
+};
+device_param_cb(touchboost, &param_ops_touchboost, NULL, 0644);
+static int set_cpu_min_freq(const char *buf, const struct kernel_param *kp)
 static ssize_t set_cpu_min_freq(struct kobject *kobj,
 	struct kobj_attribute *attr, const char *buf, size_t count)
 {
@@ -347,6 +368,11 @@ static ssize_t set_cpu_min_freq(struct kobject *kobj,
 
 	if (is_battery_saver_on())
 		cp = disable;
+
+	if (!touchboost) {
+		pr_info("Ignored touchboost event!\n");
+		return ret;
+	}
 
 	while ((cp = strpbrk(cp + 1, " :")))
 		ntokens++;
