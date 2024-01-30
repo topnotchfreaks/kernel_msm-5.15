@@ -104,4 +104,6 @@ source "drivers/staging/wfx/Kconfig"
 
 source "drivers/staging/kshrink_slabd/Kconfig"
 
+source "drivers/staging/binder_prio/Kconfig"
+
 endif # STAGING
