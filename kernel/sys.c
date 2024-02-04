@@ -44,6 +44,10 @@
 #include <linux/ctype.h>
 #include <linux/syscall_user_dispatch.h>
 
+#ifdef CONFIG_UNAME_OVERRIDE
+#include <linux/string_helpers.h>
+#endif
+
 #include <linux/compat.h>
 #include <linux/syscalls.h>
 #include <linux/kprobes.h>
@@ -1259,6 +1263,25 @@ DECLARE_RWSEM(uts_sem);
 #define override_architecture(name)	0
 #endif
 
+#ifdef CONFIG_UNAME_OVERRIDE
+static void override_custom_release(char __user *release, size_t len)
+{
+	char *buf;
+
+	buf = kstrdup_quotable_cmdline(current, GFP_KERNEL);
+	if (buf == NULL)
+		return;
+
+	if (strstr(buf, CONFIG_UNAME_OVERRIDE_TARGET)) {
+		copy_to_user(release, CONFIG_UNAME_OVERRIDE_STRING,
+			       strlen(CONFIG_UNAME_OVERRIDE_STRING) + 1);
+	}
+
+	kfree(buf);
+
+}
+#endif
+
 /*
  * Work around broken programs that cannot handle "Linux 3.0".
  * Instead we map 3.x to 2.6.40+x, so e.g. 3.0 would be 2.6.40
@@ -1301,6 +1324,9 @@ SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
 	if (copy_to_user(name, &tmp, sizeof(tmp)))
 		return -EFAULT;
 
+#ifdef CONFIG_UNAME_OVERRIDE	
+	override_custom_release(name->release, sizeof(name->release));
+#endif
 	if (override_release(name->release, sizeof(name->release)))
 		return -EFAULT;
 	if (override_architecture(name))

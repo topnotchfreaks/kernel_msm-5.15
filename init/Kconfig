@@ -210,6 +210,22 @@ config BUILD_SALT
 	  This is mostly useful for distributions which want to ensure the
 	  build is unique between builds. It's safe to leave the default.
 
+menuconfig UNAME_OVERRIDE
+	bool "Override uname output for specific processes"
+	help
+	  This will modify struct new_utsname->release string's return value
+	  to another string on a specified process.
+
+if UNAME_OVERRIDE
+
+config UNAME_OVERRIDE_TARGET
+	string "Target process' cmdline for uname override"
+
+config UNAME_OVERRIDE_STRING
+	string "New uname's release string for uname override"
+
+endif
+
 config HAVE_KERNEL_GZIP
 	bool
 
