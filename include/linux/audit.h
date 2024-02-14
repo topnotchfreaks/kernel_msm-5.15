@@ -250,17 +250,10 @@ static inline int audit_log_task_context(struct audit_buffer *ab)
 }
 static inline void audit_log_task_info(struct audit_buffer *ab)
 { }
-
-static inline kuid_t audit_get_loginuid(struct task_struct *tsk)
+static inline int audit_update_lsm_rules(void)
 {
-	return INVALID_UID;
+	return 0;
 }
-
-static inline unsigned int audit_get_sessionid(struct task_struct *tsk)
-{
-	return AUDIT_SID_UNSET;
-}
-
 #define audit_enabled AUDIT_OFF
 
 static inline int audit_signal_info(int sig, struct task_struct *t)
