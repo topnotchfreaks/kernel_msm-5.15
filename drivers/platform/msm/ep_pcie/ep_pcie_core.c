@@ -313,7 +313,8 @@ static int ep_pcie_reset_init(struct ep_pcie_dev_t *dev)
 		while (1) {
 			if (ktime_after(ktime_get(), timeout))
 				break;
-			udelay(5);
+			udelay(1);
+			cpu_relax();
 		}
 
 		rc = reset_control_deassert(reset_info->hdl);
@@ -2142,11 +2143,11 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 	u32 val = 0;
 	u32 retries = 0;
 	u32 bme = 0;
-	bool perst = true, timedout = false;
+	bool perst = true;
 	bool ltssm_en = false;
 	struct ep_pcie_dev_t *dev = &ep_pcie_dev;
 	u32 reg, linkup_ts;
-	ktime_t timeout;
+	int timedout = false;
 
 	EP_PCIE_DBG(dev, "PCIe V%d: options input are 0x%x\n", dev->rev, opt);
 
@@ -2349,23 +2350,8 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 
 	EP_PCIE_DBG(dev, "PCIe V%d: waiting for phy ready...\n", dev->rev);
 
-	timeout = ktime_add_ms(ktime_get(), PHY_READY_TIMEOUT_MS);
-	while (1) {
-		if (ep_pcie_phy_is_ready(dev)) {
-			ktime_t time = ktime_add_ms(ktime_get(), PHY_READY_TIMEOUT_MS);
-
-			EP_PCIE_DBG(dev, "pcie v%d: phy is up in =%ld us\n",
-					dev->rev, ktime_us_delta(time, timeout));
-			break;
-		}
-
-		timedout = ktime_after(ktime_get(), timeout);
-		if (timedout)
-			break;
-
-		udelay(5);
-	}
-
+	timedout = read_poll_timeout_atomic(ep_pcie_phy_is_ready,
+			val, val == true, 1, PHY_READY_TIMEOUT_MS, false, dev);
 	if (timedout) {
 		EP_PCIE_ERR(dev, "PCIe V%d: PCIe PHY  failed to come up\n",
 			dev->rev);
