@@ -12,6 +12,8 @@ SCHED_FEAT(GENTLE_FAIR_SLEEPERS, false)
  */
 SCHED_FEAT(START_DEBIT, true)
 
+#define SCHED_FEAT_PLACE_LAG 0
+
 /*
  * Prefer to schedule the task we woke last (assuming it failed
  * wakeup-preemption), since its likely going to consume data we
