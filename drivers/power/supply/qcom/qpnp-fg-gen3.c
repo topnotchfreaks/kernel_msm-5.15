@@ -1457,13 +1457,15 @@ static int fg_charge_full_update(struct fg_dev *fg)
 	}
 	msoc = DIV_ROUND_CLOSEST(msoc_raw * FULL_CAPACITY, FULL_SOC_RAW);
 
-	fg_dbg(fg, FG_STATUS, "msoc: %d bsoc: %x health: %d status: %d full: %d\n",
-		msoc, bsoc, fg->health, fg->charge_status,
-		fg->charge_full);
-	if (fg->charge_done && !fg->charge_full) {
-		if (msoc >= 99 && fg->health == POWER_SUPPLY_HEALTH_GOOD) {
-			fg_dbg(fg, FG_STATUS, "Setting charge_full to true\n");
-			fg->charge_full = true;
+	fg_dbg(chip, FG_STATUS, "msoc: %d bsoc: %x health: %d status: %d full: %d\n",
+		msoc, bsoc, chip->health, chip->charge_status,
+		chip->charge_full);
+	if (chip->charge_done && !chip->charge_full) {
+		if (msoc >= 99 && (chip->health == POWER_SUPPLY_HEALTH_GOOD
+				|| chip->health == POWER_SUPPLY_HEALTH_COOL
+				|| chip->health == POWER_SUPPLY_HEALTH_WARM)) {
+			fg_dbg(chip, FG_STATUS, "Setting charge_full to true\n");
+			chip->charge_full = true;
 			/*
 			 * Lower the recharge voltage so that VBAT_LT_RECHG
 			 * signal will not be asserted soon.
