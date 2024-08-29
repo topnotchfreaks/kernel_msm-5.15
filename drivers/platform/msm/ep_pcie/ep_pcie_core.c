@@ -59,6 +59,9 @@
 #define LODWORD(addr)             (addr & 0xFFFFFFFF)
 #define HIDWORD(addr)             ((addr >> 32) & 0xFFFFFFFF)
 
+#define GEN_1_2_LTSSM_DETECT_TIMEOUT_MS	20 /* in msec */
+#define GEN_3_ABOVE_LTSSM_DETECT_TIMEOUT_MS	100 /* in msec */
+
 /* debug mask sys interface */
 static int ep_pcie_debug_mask;
 static int ep_pcie_debug_keep_resource;
@@ -2137,6 +2140,27 @@ static void ep_pcie_core_toggle_wake_gpio(bool is_on)
 
 }
 
+static int check_ltssm_detect_timeout(struct ep_pcie_dev_t *dev)
+{
+	/*
+	 * PCIe Base Spec Version 6.0, Section 6.6 PCI Express Reset - Rules,
+	 * Sub Section 6.6.1 Convectional Reset mandates device must enter the
+	 * LTSSM_Detect state, within 20ms(for Gen 1 and Gen 2 Devices) and
+	 * within 100ms (for other Gen devices) of the end of the fundamental reset
+	 * (which includes reset based on PERST#).
+	 */
+	int timeout = GEN_1_2_LTSSM_DETECT_TIMEOUT_MS;
+	int ret = 0;
+
+	if (dev->link_speed > PCI_EXP_LNKSTA_CLS_5_0GB)
+		timeout = GEN_3_ABOVE_LTSSM_DETECT_TIMEOUT_MS;
+
+	ret = ((ktime_to_ms(dev->ltssm_detect_ts) > timeout) ? 1 : 0);
+	dev->ltssm_detect_ts = 0;
+
+	return ret;
+}
+
 int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 {
 	int ret = 0;
@@ -2411,12 +2435,7 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 			dev->rev, ktime_to_ms(dev->ltssm_detect_ts), linkup_ts);
 		EP_PCIE_INFO(dev, "PCIe V%d: link initialized for LE PCIe endpoint\n", dev->rev);
 
-		/*
-		 * PCIe spec (Chapter - PCI Express Rest - Rules) mandates device must enter the
-		 * LTSSM_Detect state within 20ms of the end of the fundamental reset (which
-		 * includes reset based on PERST#).
-		 */
-		if (ktime_to_ms(dev->ltssm_detect_ts) > 20)
+		if (check_ltssm_detect_timeout(dev))
 			WARN_ON(1);
 	}
 
