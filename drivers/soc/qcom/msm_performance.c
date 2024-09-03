@@ -371,6 +371,8 @@ static ssize_t set_cpu_min_freq(struct kobject *kobj,
 	if (is_battery_saver_on())
 		cp = disable;
 
+	int ret = 0;
+
 	if (!touchboost) {
 		pr_info("Ignored touchboost event!\n");
 		return ret;
