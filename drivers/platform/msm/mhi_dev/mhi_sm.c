@@ -1201,7 +1201,7 @@ static void mhi_sm_pcie_event_manager(struct work_struct *work)
 		 * ring_init_cb_work has bailed from M0 polling, let's requeue
 		 * it so that it can complete its job.
 		 */
-		if (mhi->ctrl_info == MHI_STATE_DISCONNECTED) {
+		if (mhi->ctrl_info == MHI_STATE_INVAL) {
 			MHI_SM_DBG(mhi->vf_id, "mhi_dev_enable() got interrupted, re-start it\n");
 			queue_work(mhi->ring_init_wq, &mhi->ring_init_cb_work);
 		}

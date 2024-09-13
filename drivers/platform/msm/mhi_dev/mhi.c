@@ -4297,6 +4297,11 @@ static void mhi_dev_enable(struct work_struct *work)
 				"Failed to initialize mhi_dev_net iface\n");
 	return;
 exit:
+	/*
+	 * since mhi_dev_enable() is unsuccessful, mhi is not in disconnected
+	 * state as well, so updating MHI state info to invalid state.
+	 */
+	mhi_update_state_info(mhi, MHI_STATE_INVAL);
 	mutex_unlock(&mhi->mhi_lock);
 	return;
 }
