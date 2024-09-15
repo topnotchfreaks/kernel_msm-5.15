@@ -133,10 +133,6 @@ bool cass_cpu_better(const struct cass_cpu_cand *a,
 	if (sync && (cass_eq(a->cpu, this_cpu) || !cass_cmp(b->cpu, this_cpu)))
 		goto done;
 
-	/* Prefer the CPU with higher capacity */
-	if (cass_cmp(a->cap, b->cap))
-		goto done;
-
 	/* Prefer the CPU with lower idle exit latency */
 	if (cass_cmp(b->exit_lat, a->exit_lat))
 		goto done;
