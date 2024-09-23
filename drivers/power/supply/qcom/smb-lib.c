@@ -38,7 +38,7 @@
 				__func__, ##__VA_ARGS__);	\
 	} while (0)
 
-int disable_thermal = 0;
+int disable_thermal = 1;
 module_param(disable_thermal, int, 0644);
 
 static bool off_charge_flag;
