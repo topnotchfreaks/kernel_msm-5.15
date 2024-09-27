@@ -1059,6 +1059,15 @@ config SM_DISPCC_SCUBA
 	  Say Y if you want to support display devices and functionality such as
 	  splash screen.
 
+config SM_LPASS_AUDIOCC_SCUBA
+	tristate "SCUBA Audio Clock Controllers"
+	select SM_GCC_SCUBA
+	help
+	  Support for the LPASS(Low-Power Audio Subsytem) aon & audio clock
+	  controllers on Qualcomm Technologies, Inc SCUBA devices.
+	  Say Y if you want to use LPASS AUDIOCC and AONCC clocks required
+	  to support audio devices and its functionalities.
+
 config SM_DEBUGCC_SCUBA
 	tristate "SCUBA Debug Clock Controller"
 	depends on SM_GCC_SCUBA
