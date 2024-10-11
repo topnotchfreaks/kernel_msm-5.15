@@ -374,6 +374,8 @@ static int gpu_cc_sm8150_probe(struct platform_device *pdev)
 	if (ret)
 		dev_err(&pdev->dev, "Failed to register for pm ops\n");
 
+	regmap_update_bits(regmap, gpu_cc_cx_gmu_clk.clkr.enable_reg, 0xFF0, 0xFF0);
+
 	dev_info(&pdev->dev, "Registered GPU CC clocks\n");
 
 	return ret;

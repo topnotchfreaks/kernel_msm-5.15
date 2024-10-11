@@ -18,20 +18,26 @@
 
 #define GH_TLMM_MEM_LABEL 0x8
 
-struct gh_tlmm_vm_info {
-	struct notifier_block guest_memshare_nb;
-	enum gh_vm_names vm_name;
+struct gh_tlmm_mem_info {
 	gh_memparcel_handle_t vm_mem_handle;
 	u32 *iomem_bases;
 	u32 *iomem_sizes;
 	u32 iomem_list_size;
+};
+
+struct gh_tlmm_vm_info {
+	struct notifier_block guest_memshare_nb;
+	enum gh_vm_names vmid;
+	struct gh_tlmm_mem_info mem_info;
+	struct gh_tlmm_mem_info lend_mem_info;
 	void *mem_cookie;
 };
 
 static struct gh_tlmm_vm_info gh_tlmm_vm_info_data;
 static struct device *gh_tlmm_dev;
 
-static struct gh_acl_desc *gh_tlmm_vm_get_acl(enum gh_vm_names vm_name)
+static struct gh_acl_desc *gh_tlmm_alloc_acl(enum gh_vm_names vm_name,
+						bool lend_gpio)
 {
 	struct gh_acl_desc *acl_desc;
 	gh_vmid_t vmid;
@@ -40,70 +46,97 @@ static struct gh_acl_desc *gh_tlmm_vm_get_acl(enum gh_vm_names vm_name)
 	gh_rm_get_vmid(vm_name, &vmid);
 	gh_rm_get_vmid(GH_PRIMARY_VM, &primary_vmid);
 
-	acl_desc = kzalloc(offsetof(struct gh_acl_desc, acl_entries[2]),
+	if (lend_gpio) {
+		acl_desc = kzalloc(struct_size(acl_desc, acl_entries, 1),
 			GFP_KERNEL);
+		if (!acl_desc)
+			return ERR_PTR(-ENOMEM);
 
-	if (!acl_desc)
-		return ERR_PTR(ENOMEM);
+		acl_desc->n_acl_entries = 1;
+		acl_desc->acl_entries[0].vmid = vmid;
+		acl_desc->acl_entries[0].perms = GH_RM_ACL_R | GH_RM_ACL_W;
+	} else {
+		acl_desc = kzalloc(struct_size(acl_desc, acl_entries, 2),
+			GFP_KERNEL);
+		if (!acl_desc)
+			return ERR_PTR(-ENOMEM);
 
-	acl_desc->n_acl_entries = 2;
-	acl_desc->acl_entries[0].vmid = vmid;
-	acl_desc->acl_entries[0].perms = GH_RM_ACL_R;
-	acl_desc->acl_entries[1].vmid = primary_vmid;
-	acl_desc->acl_entries[1].perms = GH_RM_ACL_R | GH_RM_ACL_W;
+		acl_desc->n_acl_entries = 2;
+		acl_desc->acl_entries[0].vmid = vmid;
+		acl_desc->acl_entries[0].perms = GH_RM_ACL_R;
+		acl_desc->acl_entries[1].vmid = primary_vmid;
+		acl_desc->acl_entries[1].perms = GH_RM_ACL_R | GH_RM_ACL_W;
+	}
 
 	return acl_desc;
 }
 
-static struct gh_sgl_desc *gh_tlmm_vm_get_sgl(
-				struct gh_tlmm_vm_info *vm_info)
+static struct gh_sgl_desc *gh_tlmm_alloc_sgl(struct gh_tlmm_mem_info
+						*shared_mem_info)
 {
 	struct gh_sgl_desc *sgl_desc;
 	int i;
 
-	sgl_desc = kzalloc(offsetof(struct gh_sgl_desc,
-			sgl_entries[vm_info->iomem_list_size]), GFP_KERNEL);
+	sgl_desc = kzalloc(struct_size(sgl_desc, sgl_entries,
+				shared_mem_info->iomem_list_size), GFP_KERNEL);
 	if (!sgl_desc)
-		return ERR_PTR(ENOMEM);
+		return ERR_PTR(-ENOMEM);
 
-	sgl_desc->n_sgl_entries = vm_info->iomem_list_size;
+	sgl_desc->n_sgl_entries = shared_mem_info->iomem_list_size;
 
-	for (i = 0; i < vm_info->iomem_list_size; i++) {
-		sgl_desc->sgl_entries[i].ipa_base = vm_info->iomem_bases[i];
-		sgl_desc->sgl_entries[i].size = vm_info->iomem_sizes[i];
+	for (i = 0; i < shared_mem_info->iomem_list_size; i++) {
+		sgl_desc->sgl_entries[i].ipa_base = shared_mem_info->iomem_bases[i];
+		sgl_desc->sgl_entries[i].size = shared_mem_info->iomem_sizes[i];
 	}
 
 	return sgl_desc;
 }
 
-static int gh_tlmm_vm_mem_share(struct gh_tlmm_vm_info *gh_tlmm_vm_info_data)
+static int gh_tlmm_vm_mem_share(struct gh_tlmm_vm_info *gh_tlmm_vm_info_data,
+			struct gh_tlmm_mem_info *mem_info)
 {
 	struct gh_acl_desc *acl_desc;
 	struct gh_sgl_desc *sgl_desc;
 	gh_memparcel_handle_t mem_handle;
+	int num_regs = 0;
 	int rc = 0;
+	bool is_lend;
 
-	acl_desc = gh_tlmm_vm_get_acl(GH_TRUSTED_VM);
+	if (mem_info == &gh_tlmm_vm_info_data->mem_info)
+		is_lend = false;
+	else
+		is_lend = true;
+
+	num_regs = mem_info->iomem_list_size;
+	if (num_regs <= 0)
+		return rc;
+
+	acl_desc = gh_tlmm_alloc_acl(gh_tlmm_vm_info_data->vmid, is_lend);
+
 	if (IS_ERR(acl_desc)) {
 		dev_err(gh_tlmm_dev, "Failed to get acl of IO memories for TLMM\n");
 		return PTR_ERR(acl_desc);
 	}
 
-	sgl_desc = gh_tlmm_vm_get_sgl(gh_tlmm_vm_info_data);
+	sgl_desc = gh_tlmm_alloc_sgl(mem_info);
 	if (IS_ERR(sgl_desc)) {
 		dev_err(gh_tlmm_dev, "Failed to get sgl of IO memories for TLMM\n");
 		rc = PTR_ERR(sgl_desc);
 		goto sgl_error;
 	}
 
-	rc = gh_rm_mem_share(GH_RM_MEM_TYPE_IO, 0, GH_TLMM_MEM_LABEL,
-			acl_desc, sgl_desc, NULL, &mem_handle);
+	if (!is_lend)
+		rc = gh_rm_mem_share(GH_RM_MEM_TYPE_IO, 0, GH_TLMM_MEM_LABEL,
+				acl_desc, sgl_desc, NULL, &mem_handle);
+	else
+		rc = gh_rm_mem_lend(GH_RM_MEM_TYPE_IO, 0, GH_TLMM_MEM_LABEL,
+				acl_desc, sgl_desc, NULL, &mem_handle);
 	if (rc) {
 		dev_err(gh_tlmm_dev, "Failed to share IO memories for TLMM rc:%d\n", rc);
 		goto error;
 	}
 
-	gh_tlmm_vm_info_data->vm_mem_handle = mem_handle;
+	mem_info->vm_mem_handle = mem_handle;
 
 error:
 	kfree(sgl_desc);
@@ -135,8 +168,10 @@ static int __maybe_unused gh_guest_memshare_nb_handler(struct notifier_block *th
 	 * Listen to STATUS_READY notification from RM.
 	 * These notifications come from RM after PIL loading the VM images.
 	 */
-	if (vm_status == GH_RM_VM_STATUS_READY)
-		gh_tlmm_vm_mem_share(&gh_tlmm_vm_info_data);
+	if (vm_status == GH_RM_VM_STATUS_READY) {
+		gh_tlmm_vm_mem_share(&gh_tlmm_vm_info_data, &gh_tlmm_vm_info_data.mem_info);
+		gh_tlmm_vm_mem_share(&gh_tlmm_vm_info_data, &gh_tlmm_vm_info_data.lend_mem_info);
+	}
 
 	return NOTIFY_DONE;
 }
@@ -144,55 +179,102 @@ static int __maybe_unused gh_guest_memshare_nb_handler(struct notifier_block *th
 static int gh_tlmm_vm_mem_release(struct gh_tlmm_vm_info *gh_tlmm_vm_info_data)
 {
 	int rc = 0;
+	gh_memparcel_handle_t vm_mem_handle;
 
-	if (!gh_tlmm_vm_info_data->vm_mem_handle) {
+	vm_mem_handle = gh_tlmm_vm_info_data->mem_info.vm_mem_handle;
+	if (!vm_mem_handle) {
 		dev_err(gh_tlmm_dev, "Invalid memory handle\n");
 		return -EINVAL;
 	}
 
-	rc = gh_rm_mem_release(gh_tlmm_vm_info_data->vm_mem_handle, 0);
+	rc = gh_rm_mem_release(vm_mem_handle, 0);
 	if (rc)
 		dev_err(gh_tlmm_dev, "VM mem release failed rc:%d\n", rc);
 
-	rc = gh_rm_mem_notify(gh_tlmm_vm_info_data->vm_mem_handle,
+	rc = gh_rm_mem_notify(vm_mem_handle,
 		GH_RM_MEM_NOTIFY_OWNER_RELEASED,
 		GH_MEM_NOTIFIER_TAG_TLMM, 0);
 	if (rc)
 		dev_err(gh_tlmm_dev, "Failed to notify mem release to PVM rc:%d\n",
 							rc);
 
-	gh_tlmm_vm_info_data->vm_mem_handle = 0;
+	gh_tlmm_vm_info_data->mem_info.vm_mem_handle = 0;
 	return rc;
 }
 
 static int gh_tlmm_vm_mem_reclaim(struct gh_tlmm_vm_info *gh_tlmm_vm_info_data)
 {
 	int rc = 0;
+	gh_memparcel_handle_t vm_mem_handle;
 
-	if (!gh_tlmm_vm_info_data->vm_mem_handle) {
+	vm_mem_handle = gh_tlmm_vm_info_data->mem_info.vm_mem_handle;
+	if (!vm_mem_handle) {
 		dev_err(gh_tlmm_dev, "Invalid memory handle\n");
 		return -EINVAL;
 	}
 
-	rc = gh_rm_mem_reclaim(gh_tlmm_vm_info_data->vm_mem_handle, 0);
+	rc = gh_rm_mem_reclaim(vm_mem_handle, 0);
 	if (rc)
 		dev_err(gh_tlmm_dev, "VM mem reclaim failed rc:%d\n", rc);
 
-	gh_tlmm_vm_info_data->vm_mem_handle = 0;
+	gh_tlmm_vm_info_data->mem_info.vm_mem_handle = 0;
 
 	return rc;
 }
 
+static int gh_tlmm_prepare_iomem(struct platform_device *dev, struct gh_tlmm_mem_info
+					*mem_info, char *list_name)
+{
+	int i, gpio, ret, num_regs = 0;
+	struct resource res;
+	struct device_node *np = dev->dev.of_node;
+
+	mem_info->iomem_list_size = 0;
+
+	num_regs = of_gpio_named_count(np, list_name);
+	if (num_regs < 0)
+		return 0;
+
+	mem_info->iomem_list_size = num_regs;
+
+	mem_info->iomem_bases = devm_kcalloc(&dev->dev, num_regs, sizeof(*mem_info->iomem_bases),
+							GFP_KERNEL);
+	if (!mem_info->iomem_bases)
+		return -ENOMEM;
+
+	mem_info->iomem_sizes = devm_kcalloc(&dev->dev, num_regs, sizeof(*mem_info->iomem_sizes),
+					GFP_KERNEL);
+	if (!mem_info->iomem_sizes)
+		return -ENOMEM;
+
+	for (i = 0; i < num_regs; i++)  {
+		gpio = of_get_named_gpio(np, list_name, i);
+
+		if (gpio < 0) {
+			dev_err(gh_tlmm_dev, "Failed to read gpio list %d\n", gpio);
+			return gpio;
+		}
+
+		ret = msm_gpio_get_pin_address(gpio, &res);
+		if (!ret) {
+			dev_err(gh_tlmm_dev, "Invalid gpio = %d\n", gpio);
+			return -EINVAL;
+		}
+
+		mem_info->iomem_bases[i] = res.start;
+		mem_info->iomem_sizes[i] = resource_size(&res);
+	}
+
+	return 0;
+}
+
 static int gh_tlmm_vm_populate_vm_info(struct platform_device *dev, struct gh_tlmm_vm_info *vm_info)
 {
-	int rc = 0, i, gpio;
+	int rc = 0;
 	struct device_node *np = dev->dev.of_node;
-	int num_regs = 0;
-	struct resource *res;
-	u32 *gpios;
-	bool ret;
 	gh_memparcel_handle_t __maybe_unused vm_mem_handle;
 	bool master;
+	u32 peer_vmid;
 
 	master = of_property_read_bool(np, "qcom,master");
 	if (!master) {
@@ -203,75 +285,38 @@ static int gh_tlmm_vm_populate_vm_info(struct platform_device *dev, struct gh_tl
 			goto vm_error;
 		}
 
-		vm_info->vm_mem_handle = vm_mem_handle;
+		vm_info->mem_info.vm_mem_handle = vm_mem_handle;
 	}
 
-	vm_info->vm_name = GH_TRUSTED_VM;
-	num_regs = of_gpio_named_count(np,
-			"tlmm-vm-gpio-list");
-	if (num_regs < 0) {
+	rc = of_property_read_u32(np, "peer-name", &peer_vmid);
+	if (rc) {
+		dev_dbg(gh_tlmm_dev, "peer-name not found rc=%x using default\n", rc);
+		peer_vmid = GH_TRUSTED_VM;
+	}
+
+	vm_info->vmid = peer_vmid;
+
+	rc = gh_tlmm_prepare_iomem(dev, &vm_info->mem_info, "tlmm-vm-gpio-list");
+	if (rc < 0) {
+		dev_err(gh_tlmm_dev, "Failed to prepare iomem for gpio list %d\n", rc);
+		return rc;
+	}
+
+	rc = gh_tlmm_prepare_iomem(dev, &vm_info->lend_mem_info, "tlmm-vm-gpio-lend-list");
+	if (rc < 0) {
+		dev_err(gh_tlmm_dev, "Failed to prepare iomem for gpio lend list%d\n", rc);
+		return rc;
+	}
+
+	if (vm_info->mem_info.iomem_list_size == 0 &&
+		vm_info->lend_mem_info.iomem_list_size == 0) {
 		dev_err(gh_tlmm_dev, "Invalid number of gpios specified\n");
 		rc = -EINVAL;
 		goto vm_error;
 	}
 
-	gpios = kmalloc_array(num_regs, sizeof(*gpios), GFP_KERNEL);
-	if (!gpios)
-		return -ENOMEM;
-
-	for (i = 0; i < num_regs; i++) {
-		gpio = of_get_named_gpio(np, "tlmm-vm-gpio-list", i);
-		if (gpio < 0) {
-			rc = gpio;
-			dev_err(gh_tlmm_dev, "Failed to receive shared gpios %d\n", rc);
-			goto gpios_error;
-		}
-		gpios[i] = gpio;
-	}
-
-	vm_info->iomem_list_size = num_regs;
-
-	vm_info->iomem_bases = kcalloc(num_regs, sizeof(*vm_info->iomem_bases),
-								GFP_KERNEL);
-	if (!vm_info->iomem_bases) {
-		rc = -ENOMEM;
-		goto gpios_error;
-	}
-
-	vm_info->iomem_sizes = kzalloc(
-			sizeof(*vm_info->iomem_sizes) * num_regs, GFP_KERNEL);
-	if (!vm_info->iomem_sizes) {
-		rc = -ENOMEM;
-		goto io_bases_error;
-	}
-
-	res = kzalloc(sizeof(*res), GFP_KERNEL);
-	if (!res) {
-		rc = -ENOMEM;
-		goto io_sizes_error;
-	}
-
-	for (i = 0; i < num_regs; i++)  {
-		ret = msm_gpio_get_pin_address(gpios[i], res);
-		if (!ret) {
-			dev_err(gh_tlmm_dev, "Invalid gpio\n");
-			rc = -EINVAL;
-			goto io_sizes_error;
-		}
-		vm_info->iomem_bases[i] = res->start;
-		vm_info->iomem_sizes[i] = resource_size(res);
-	}
-
-	kfree(gpios);
-	kfree(res);
 	return rc;
-io_sizes_error:
-	kfree(res);
-	kfree(vm_info->iomem_sizes);
-io_bases_error:
-	kfree(vm_info->iomem_bases);
-gpios_error:
-	kfree(gpios);
+
 vm_error:
 	return rc;
 }
@@ -304,7 +349,8 @@ static void __maybe_unused gh_tlmm_vm_mem_on_release_handler(enum gh_mem_notifie
 	}
 
 	release_payload = (struct gh_rm_notif_mem_released_payload  *)notif_msg;
-	if (release_payload->mem_handle != vm_info->vm_mem_handle) {
+	if (release_payload->mem_handle != vm_info->mem_info.vm_mem_handle &&
+	    release_payload->mem_handle != vm_info->lend_mem_info.vm_mem_handle) {
 		dev_err(gh_tlmm_dev, "Invalid mem handle detected\n");
 		return;
 	}
@@ -358,8 +404,8 @@ static int gh_tlmm_vm_mem_access_probe(struct platform_device *pdev)
 		if (ret)
 			return ret;
 
-
-		gh_tlmm_vm_mem_release(&gh_tlmm_vm_info_data);
+		if (gh_tlmm_vm_info_data.mem_info.iomem_list_size > 0)
+			gh_tlmm_vm_mem_release(&gh_tlmm_vm_info_data);
 	}
 
 	return 0;

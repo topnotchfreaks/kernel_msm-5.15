@@ -258,33 +258,26 @@ static int slatecom_tx_msg(struct slatedaemon_priv *dev, void  *msg, size_t len)
 		goto err_ret;
 	}
 	rc = slatecom_rpmsg_tx_msg(msg, len);
-
-	/* wait for sending command to SLATE */
-	rc = wait_event_timeout(dev->link_state_wait,
-			(rc == 0), msecs_to_jiffies(TIMEOUT_MS));
-	if (rc == 0) {
-		pr_err("failed to send command to SLATE %d\n", rc);
+	if (rc != 0) {
+		pr_err("failed to send command to slate %d\n", rc);
 		goto err_ret;
 	}
-
 	/* wait for getting response from SLATE */
-	rc = wait_event_timeout(dev->link_state_wait,
-			dev->slate_resp_cmplt,
-				 msecs_to_jiffies(TIMEOUT_MS));
-	if (rc == 0) {
-		pr_err("failed to get SLATE response %d\n", rc);
+	if (wait_event_timeout(dev->link_state_wait,
+					dev->slate_resp_cmplt,
+					msecs_to_jiffies(TIMEOUT_MS)) == 0) {
+		pr_err("failed to get response from slate: %d\n", rc);
 		goto err_ret;
 	}
 	dev->slate_resp_cmplt = false;
 	/* check SLATE response */
 	resp = *(uint8_t *)dev->rx_buf;
 	if (resp == 0x01) {
-		pr_err("Bad SLATE response\n");
+		pr_err("BAD SLATE response\n");
 		rc = -EINVAL;
 		goto err_ret;
 	}
 	rc = 0;
-
 err_ret:
 	__pm_relax(&dev->slatecom_ws);
 	mutex_unlock(&dev->glink_mutex);

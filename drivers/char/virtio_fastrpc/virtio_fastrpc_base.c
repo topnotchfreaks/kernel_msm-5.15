@@ -727,21 +727,20 @@ static int recv_single(struct virt_msg_hdr *rsp, unsigned int len)
 {
 	struct vfastrpc_apps *me = &gfa;
 	struct virt_fastrpc_msg *msg = NULL;
-	unsigned long flags;
 
 	if (len != rsp->len) {
 		dev_err(me->dev, "msg %u len mismatch,expected %u but %d found\n",
 				rsp->cmd, rsp->len, len);
 		return -EINVAL;
 	}
-	spin_lock_irqsave(&me->msglock, flags);
+	spin_lock(&me->msglock);
 
 	msg = me->msgtable[rsp->msgid];
-	spin_unlock_irqrestore(&me->msglock, flags);
 
 	if (!msg) {
 		dev_err(me->dev, "msg %u already free in table[%u]\n",
 				rsp->cmd, rsp->msgid);
+		spin_unlock(&me->msglock);
 		return -EINVAL;
 	}
 	msg->rxbuf = (void *)rsp;
@@ -754,6 +753,7 @@ static int recv_single(struct virt_msg_hdr *rsp, unsigned int len)
 	else
 		complete(&msg->work);
 
+	spin_unlock(&me->msglock);
 	return 0;
 }
 

@@ -6,19 +6,22 @@
 
 #include <linux/bitmap.h>
 #include <linux/bitops.h>
+#include <linux/console.h>
 #include <linux/debugfs.h>
 #include <linux/delay.h>
-#include <linux/console.h>
-#include <linux/dma-mapping.h>
 #include <linux/dmaengine.h>
+#include <linux/dma-mapping.h>
 #include <linux/io.h>
+#include <linux/ioctl.h>
 #include <linux/ipc_logging.h>
 #include <linux/irq.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/msm_gpi.h>
+#include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/pinctrl/consumer.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/qcom-geni-se.h>
@@ -29,11 +32,9 @@
 #include <linux/suspend.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
-#include <linux/ioctl.h>
-#include <linux/pinctrl/consumer.h>
-#include <linux/dma-mapping.h>
-#include <uapi/linux/msm_geni_serial.h>
 #include <soc/qcom/boot_stats.h>
+#include <uapi/linux/msm_geni_serial.h>
+
 
 static bool con_enabled = IS_ENABLED(CONFIG_SERIAL_MSM_GENI_CONSOLE_DEFAULT_ENABLED);
 
@@ -50,6 +51,9 @@ static bool con_enabled = IS_ENABLED(CONFIG_SERIAL_MSM_GENI_CONSOLE_DEFAULT_ENAB
 #define SE_UART_TX_PARITY_CFG		(0x2A4)
 #define SE_UART_RX_PARITY_CFG		(0x2A8)
 #define SE_UART_MANUAL_RFR		(0x2AC)
+#define SE_UART_IO_MACRO_CTRL		(0x240)
+#define SE_UART_IO3_VAL			(0x248)
+#define SE_UART_TX_TRANS_CFG		(0x25C)
 
 /* SE_UART_LOOPBACK_CFG */
 #define NO_LOOPBACK		(0)
@@ -439,6 +443,13 @@ struct msm_geni_serial_port {
 	struct uart_kpi_capture uart_kpi_rx[UART_KPI_TX_RX_INSTANCES];
 	enum uart_port_state port_state;
 	bool is_le_vm;
+
+	/**
+	 * mutex to prevent race condition between runtime
+	 * suspend and get_mctrl which tries to access IOS registers
+	 * when runtime suspend was in progress
+	 */
+	struct mutex suspend_resume_lock;
 };
 
 static const struct uart_ops msm_geni_serial_pops;
@@ -507,13 +518,19 @@ static bool device_pending_suspend(struct uart_port *uport)
  */
 void geni_se_dump_dbg_regs(struct uart_port *uport)
 {
-	u32 m_cmd0 = 0, m_irq_status = 0, s_cmd0 = 0;
-	u32 s_irq_status = 0, geni_status = 0, geni_ios = 0;
-	u32 dma_rx_irq = 0, dma_tx_irq = 0, rx_fifo_status = 0;
-	u32 tx_fifo_status = 0, se_dma_dbg = 0, m_cmd_ctrl = 0;
-	u32 se_dma_rx_len = 0, se_dma_rx_len_in = 0, se_dma_tx_len = 0;
-	u32 se_dma_tx_len_in = 0, geni_m_irq_en = 0, geni_s_irq_en = 0;
-	u32 geni_dma_tx_irq_en = 0, geni_dma_rx_irq_en = 0;
+	u32 m_cmd0, m_irq_status, s_cmd0, s_irq_status, geni_status, geni_ios;
+	u32 dma_rx_irq, dma_tx_irq, rx_fifo_status, tx_fifo_status, se_dma_dbg;
+	u32 m_cmd_ctrl, se_dma_rx_len, se_dma_rx_len_in, se_dma_tx_len;
+	u32 se_dma_tx_len_in, geni_m_irq_en, geni_s_irq_en, geni_dma_tx_irq_en;
+	u32 geni_dma_rx_irq_en, ser_m_clk_cfg, ser_s_clk_cfg, loopback_cfg;
+	u32 io_macro_ctrl, io3_val, tx_trans_cfg, rx_trans_cfg, tx_word_len;
+	u32 stop_bit_len, tx_trans_len, rx_word_len, rx_stale_cnt, tx_parity_cfg;
+	u32 rx_parity_cfg, manual_rfr, tx_watermark, rx_watermark, rx_watermark_rfr;
+	u32 se_geni_general_cfg, m_cmd_err, m_fw_err, rx_len_in, m_gp_length;
+	u32 s_gp_length, dma_tx_ptr_l, dma_tx_ptr_h, dma_tx_attr;
+	u32 dma_tx_max_burst_size, dma_rx_ptr_l, dma_rx_ptr_h, dma_rx_attr;
+	u32 dma_rx_max_burst_size, dma_if_en, geni_clk_ctrl, fifo_if_disable;
+
 	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
 	void __iomem *base = uport->membase;
 
@@ -543,6 +560,41 @@ void geni_se_dump_dbg_regs(struct uart_port *uport)
 	geni_s_irq_en = geni_read_reg(base, SE_GENI_S_IRQ_EN);
 	geni_dma_tx_irq_en = geni_read_reg(base, SE_DMA_TX_IRQ_EN);
 	geni_dma_rx_irq_en = geni_read_reg(base, SE_DMA_RX_IRQ_EN);
+	ser_m_clk_cfg = geni_read_reg(base, GENI_SER_M_CLK_CFG);
+	ser_s_clk_cfg = geni_read_reg(base, GENI_SER_S_CLK_CFG);
+	loopback_cfg = geni_read_reg(base, SE_UART_LOOPBACK_CFG);
+	io_macro_ctrl = geni_read_reg(base, SE_UART_IO_MACRO_CTRL);
+	io3_val = geni_read_reg(base, SE_UART_IO3_VAL);
+	tx_trans_cfg = geni_read_reg(base, SE_UART_TX_TRANS_CFG);
+	rx_trans_cfg = geni_read_reg(base, SE_UART_RX_TRANS_CFG);
+	tx_word_len = geni_read_reg(base, SE_UART_TX_WORD_LEN);
+	stop_bit_len = geni_read_reg(base, SE_UART_TX_STOP_BIT_LEN);
+	tx_trans_len = geni_read_reg(base, SE_UART_TX_TRANS_LEN);
+	rx_word_len = geni_read_reg(base, SE_UART_RX_WORD_LEN);
+	rx_stale_cnt = geni_read_reg(base, SE_UART_RX_STALE_CNT);
+	tx_parity_cfg = geni_read_reg(base, SE_UART_TX_PARITY_CFG);
+	rx_parity_cfg = geni_read_reg(base, SE_UART_RX_PARITY_CFG);
+	manual_rfr = geni_read_reg(base, SE_UART_MANUAL_RFR);
+	tx_watermark = geni_read_reg(base, SE_GENI_TX_WATERMARK_REG);
+	rx_watermark = geni_read_reg(base, SE_GENI_RX_WATERMARK_REG);
+	rx_watermark_rfr = geni_read_reg(base, SE_GENI_RX_RFR_WATERMARK_REG);
+	se_geni_general_cfg = geni_read_reg(base, SE_GENI_GENERAL_CFG);
+	m_cmd_err = geni_read_reg(base, M_CMD_ERR_STATUS);
+	m_fw_err = geni_read_reg(base, M_FW_ERR_STATUS);
+	rx_len_in = geni_read_reg(base, SE_DMA_RX_LEN_IN);
+	m_gp_length  = geni_read_reg(base, M_GP_LENGTH);
+	s_gp_length = geni_read_reg(base, S_GP_LENGTH);
+	dma_tx_ptr_l = geni_read_reg(base, SE_DMA_TX_PTR_L);
+	dma_tx_ptr_h = geni_read_reg(base, SE_DMA_TX_PTR_H);
+	dma_tx_attr = geni_read_reg(base, SE_DMA_TX_ATTR);
+	dma_tx_max_burst_size = geni_read_reg(base, SE_DMA_TX_MAX_BURST);
+	dma_rx_ptr_l = geni_read_reg(base, SE_DMA_RX_PTR_L);
+	dma_rx_ptr_h = geni_read_reg(base, SE_DMA_RX_PTR_H);
+	dma_rx_attr = geni_read_reg(base, SE_DMA_RX_ATTR);
+	dma_rx_max_burst_size = geni_read_reg(base, SE_DMA_RX_MAX_BURST);
+	dma_if_en = geni_read_reg(base, SE_DMA_IF_EN);
+	geni_clk_ctrl = geni_read_reg(base, SE_GENI_CLK_CTRL);
+	fifo_if_disable = geni_read_reg(base, SE_FIFO_IF_DISABLE);
 
 	UART_LOG_DBG(port->ipc_log_misc, uport->dev,
 		     "%s: m_cmd0:0x%x, m_irq_status:0x%x, geni_status:0x%x, geni_ios:0x%x\n",
@@ -558,8 +610,34 @@ void geni_se_dump_dbg_regs(struct uart_port *uport)
 		     se_dma_tx_len, se_dma_tx_len_in, s_irq_status);
 	UART_LOG_DBG(port->ipc_log_misc, uport->dev,
 		     "dma_txirq_en:0x%x, dma_rxirq_en:0x%x geni_m_irq_en:0x%x geni_s_irq_en:0x%x\n",
-		     geni_dma_tx_irq_en, geni_dma_rx_irq_en, geni_m_irq_en,
-		     geni_s_irq_en);
+		     geni_dma_tx_irq_en, geni_dma_rx_irq_en, geni_m_irq_en, geni_s_irq_en);
+	UART_LOG_DBG(port->ipc_log_misc, uport->dev,
+		     "ser_m_clk_cfg:0x%x, ser_s_clk_cfg:0x%x loopback_cfg:0x%x io_macro_ctrl:0x%x\n",
+		     ser_m_clk_cfg, ser_s_clk_cfg, loopback_cfg, io_macro_ctrl);
+	UART_LOG_DBG(port->ipc_log_misc, uport->dev,
+		     "io3_val:0x%x, tx_trans_cfg:0x%x rx_trans_cfg:0x%x tx_word_len:0x%x\n",
+		     io3_val, tx_trans_cfg, rx_trans_cfg, tx_word_len);
+	UART_LOG_DBG(port->ipc_log_misc, uport->dev,
+		     "stop_bit_len:0x%x, tx_trans_len:0x%x rx_word_len:0x%x rx_stale_cnt:0x%x\n",
+		     stop_bit_len, tx_trans_len, rx_word_len, rx_stale_cnt);
+	UART_LOG_DBG(port->ipc_log_misc, uport->dev,
+		     "tx_parity_cfg:0x%x, rx_parity_cfg:0x%x manual_rfr:0x%x tx_watermark:0x%x\n",
+		     tx_parity_cfg, rx_parity_cfg, manual_rfr, tx_watermark);
+	UART_LOG_DBG(port->ipc_log_misc, uport->dev,
+		     "rx_watermark:0x%x, rx_watermark_rfr:0x%x se_geni_general_cfg:0x%x m_cmd_err:0x%x\n",
+		     rx_watermark, rx_watermark_rfr, se_geni_general_cfg, m_cmd_err);
+	UART_LOG_DBG(port->ipc_log_misc, uport->dev,
+		     "m_fw_err:0x%x, rx_len_in:0x%x m_gp_length:0x%x s_gp_length:0x%x\n",
+		     m_fw_err, rx_len_in, m_gp_length, s_gp_length);
+	UART_LOG_DBG(port->ipc_log_misc, uport->dev,
+		     "dma_tx_ptr_l:0x%x, dma_tx_ptr_h:0x%x dma_tx_attr:0x%x dma_tx_max_burst_size:0x%x\n",
+		     dma_tx_ptr_l, dma_tx_ptr_h, dma_tx_attr, dma_tx_max_burst_size);
+	UART_LOG_DBG(port->ipc_log_misc, uport->dev,
+		     "dma_rx_ptr_l:0x%x, dma_rx_ptr_h:0x%x dma_rx_attr:0x%x dma_rx_max_burst_size:0x%x\n",
+		     dma_rx_ptr_l, dma_rx_ptr_h, dma_rx_attr, dma_rx_max_burst_size);
+	UART_LOG_DBG(port->ipc_log_misc, uport->dev,
+		     "dma_if_en:0x%x, geni_clk_ctrl:0x%x fifo_if_disable:0x%x\n",
+		     dma_if_en, geni_clk_ctrl, fifo_if_disable);
 }
 
 int msm_geni_serial_resources_on(struct msm_geni_serial_port *port)
@@ -1285,17 +1363,26 @@ static unsigned int msm_geni_serial_get_mctrl(struct uart_port *uport)
 	unsigned int mctrl = TIOCM_DSR | TIOCM_CAR;
 	struct msm_geni_serial_port *port = GET_DEV_PORT(uport);
 
-	if (!uart_console(uport) && device_pending_suspend(uport)) {
-		UART_LOG_DBG(port->ipc_log_misc, uport->dev,
-				"%s.Device is suspended, %s\n",
-				__func__, current->comm);
-		return TIOCM_DSR | TIOCM_CAR | TIOCM_CTS;
+	if (!uart_console(uport)) {
+		if (!mutex_trylock(&port->suspend_resume_lock)) {
+			UART_LOG_DBG(port->ipc_log_misc, uport->dev,
+					"%s.Device is being suspended, %s\n",
+					__func__, current->comm);
+			return mctrl;
+		}
+		if (device_pending_suspend(uport)) {
+			UART_LOG_DBG(port->ipc_log_misc, uport->dev,
+					"%s.Device is suspended, %s\n",
+					__func__, current->comm);
+			mutex_unlock(&port->suspend_resume_lock);
+			return mctrl | TIOCM_CTS;
+		}
 	}
 
 	geni_ios = geni_read_reg(uport->membase, SE_GENI_IOS);
 	if (!(geni_ios & IO2_DATA_IN))
 		mctrl |= TIOCM_CTS;
-	else
+	else if (!uart_console(uport))
 		msm_geni_update_uart_error_code(port, SOC_ERROR_START_TX_IOS_SOC_RFR_HIGH);
 
 	if (!port->manual_flow)
@@ -1303,6 +1390,10 @@ static unsigned int msm_geni_serial_get_mctrl(struct uart_port *uport)
 
 	UART_LOG_DBG(port->ipc_log_misc, uport->dev, "%s: geni_ios:0x%x, mctrl:0x%x\n",
 		__func__, geni_ios, mctrl);
+
+	if (!uart_console(uport))
+		mutex_unlock(&port->suspend_resume_lock);
+
 	return mctrl;
 }
 
@@ -5334,6 +5425,8 @@ static int msm_geni_serial_probe(struct platform_device *pdev)
 	if (!dev_port->is_console)
 		spin_lock_init(&dev_port->rx_lock);
 
+	mutex_init(&dev_port->suspend_resume_lock);
+
 	ret = uart_add_one_port(drv, uport);
 	if (ret)
 		dev_err(&pdev->dev, "Failed to register uart_port: %d\n", ret);
@@ -5436,6 +5529,7 @@ static int msm_geni_serial_runtime_suspend(struct device *dev)
 		return 0;
 
 	geni_status = geni_read_reg(port->uport.membase, SE_GENI_STATUS);
+	mutex_lock(&port->suspend_resume_lock);
 	UART_LOG_DBG(port->ipc_log_pwr, dev,
 		     "%s: Start geni_status : 0x%x\n", __func__, geni_status);
 
@@ -5461,7 +5555,8 @@ static int msm_geni_serial_runtime_suspend(struct device *dev)
 			 */
 			if (port->wakeup_byte && port->wakeup_irq)
 				msm_geni_serial_allow_rx(port);
-			return -EBUSY;
+			ret = -EBUSY;
+			goto exit_runtime_suspend;
 		}
 	}
 	/*
@@ -5478,7 +5573,8 @@ static int msm_geni_serial_runtime_suspend(struct device *dev)
 		 */
 		if (port->wakeup_byte && port->wakeup_irq)
 			msm_geni_serial_allow_rx(port);
-		return -EBUSY;
+		ret = -EBUSY;
+		goto exit_runtime_suspend;
 	}
 
 	geni_status = geni_read_reg(port->uport.membase, SE_GENI_STATUS);
@@ -5509,7 +5605,8 @@ static int msm_geni_serial_runtime_suspend(struct device *dev)
 			UART_LOG_DBG(port->ipc_log_pwr, dev,
 				     "%s: return, stop_rx_seq busy\n", __func__);
 			enable_irq(port->uport.irq);
-			return -EBUSY;
+			ret = -EBUSY;
+			goto exit_runtime_suspend;
 		}
 	}
 	if (count)
@@ -5545,6 +5642,7 @@ static int msm_geni_serial_runtime_suspend(struct device *dev)
 	UART_LOG_DBG(port->ipc_log_pwr, dev, "%s: End %d\n", __func__, ret);
 	__pm_relax(port->geni_wake);
 exit_runtime_suspend:
+	mutex_unlock(&port->suspend_resume_lock);
 	return ret;
 }
 

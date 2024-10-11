@@ -2317,6 +2317,32 @@ static void spi_get_dt_property(struct platform_device *pdev,
 	geni_mas->slave_cross_connected =
 	of_property_read_bool(pdev->dev.of_node, "slv-cross-connected");
 }
+/**
+ * geni_se_handle_common_resources: Load common resources.
+ * @pdev: structure to platform driver.
+ * @spi_rsc: structure to geni_se.
+ *
+ * This function will read clock read the clock vote values from
+ * the DTSI file and configure and initialize the resources
+ * accordingly. If the resources are not explicitly mentioned
+ * in the DTSI, they will be initialized with default values.
+ *
+ * return: 0 on success else error code on failure.
+ */
+static int geni_se_handle_common_resources(struct platform_device *pdev, struct geni_se *spi_rsc)
+{
+	int ret;
+
+	ret = geni_se_get_common_resources(pdev, spi_rsc);
+	if (ret) {
+		/*error in loading vote values from dts, try loading default vote values*/
+		ret = geni_se_common_resources_init(spi_rsc,
+							SPI_CORE2X_VOTE,
+							APPS_PROC_TO_QUP_VOTE,
+							DEFAULT_SE_CLK * DEFAULT_BUS_WIDTH);
+	}
+	return ret;
+}
 static int spi_geni_probe(struct platform_device *pdev)
 {
 	int ret;
@@ -2377,11 +2403,9 @@ static int spi_geni_probe(struct platform_device *pdev)
 	if (!geni_mas->is_le_vm) {
 		/* set voting values for path: core, config and DDR */
 		spi_rsc = &geni_mas->spi_rsc;
-		ret = geni_se_common_resources_init(spi_rsc,
-			SPI_CORE2X_VOTE, APPS_PROC_TO_QUP_VOTE,
-			(DEFAULT_SE_CLK * DEFAULT_BUS_WIDTH));
+		ret = geni_se_handle_common_resources(pdev, spi_rsc);
 		if (ret) {
-			dev_err(&pdev->dev, "Error geni_se_resources_init\n");
+			dev_err(&pdev->dev, "Could not load common resource ret: %d\n", ret);
 			goto spi_geni_probe_err;
 		}
 

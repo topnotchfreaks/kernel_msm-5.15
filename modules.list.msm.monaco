@@ -70,6 +70,5 @@ nvmem_qcom-spmi-sdam.ko
 rtc-pm8xxx.ko
 cqhci-crypto-qti.ko
 crypto-qti-common.ko
-crypto-qti-hwkm.ko
-hwkm_v1.ko
+crypto-qti-tz.ko
 sdhci-msm-scaling.ko

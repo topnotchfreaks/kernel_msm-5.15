@@ -1791,7 +1791,7 @@ static struct led_classdev *trigger_to_lcdev(struct led_trigger *trig)
 	return NULL;
 }
 
-int qpnp_flash_leds_prepare(struct led_trigger *trig, int options,
+int qpnp_flash_led_prepare(struct led_trigger *trig, int options,
 					int *max_current)
 {
 	struct led_classdev *led_cdev;
@@ -1812,7 +1812,7 @@ int qpnp_flash_leds_prepare(struct led_trigger *trig, int options,
 
 	return rc;
 }
-EXPORT_SYMBOL_GPL(qpnp_flash_leds_prepare);
+EXPORT_SYMBOL_GPL(qpnp_flash_led_prepare);
 
 static void qpnp_flash_led_brightness_set(struct led_classdev *led_cdev,
 						enum led_brightness value)
@@ -3109,13 +3109,6 @@ static int qpnp_flash_led_probe(struct platform_device *pdev)
 				goto sysfs_fail;
 			}
 		}
-	}
-
-	rc = qpnp_flash_register_led_prepare(&pdev->dev,
-					     qpnp_flash_leds_prepare);
-	if (rc < 0) {
-		pr_err("Failed to register flash_led_prepare, rc=%d\n", rc);
-		goto sysfs_fail;
 	}
 
 	dev_set_drvdata(&pdev->dev, led);

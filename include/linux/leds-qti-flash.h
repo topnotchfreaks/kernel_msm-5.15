@@ -23,24 +23,22 @@ struct flash_led_param {
 	u64 off_time_ms;
 };
 
-int qpnp_flash_register_led_prepare(struct device *dev, void *data);
-
-#if (IS_ENABLED(CONFIG_LEDS_QTI_FLASH) || IS_ENABLED(CONFIG_LEDS_QPNP_FLASH_V2))
-int qpnp_flash_led_prepare(struct led_trigger *trig, int options,
-					int *max_current);
+#if IS_ENABLED(CONFIG_LEDS_QTI_FLASH)
+int qti_flash_led_prepare(struct led_trigger *trig,
+			int options, int *max_current);
 int qti_flash_led_set_param(struct led_trigger *trig,
 			struct flash_led_param param);
 #else
-static inline int qpnp_flash_led_prepare(struct led_trigger *trig, int options,
-					int *max_current)
+static inline int qti_flash_led_prepare(struct led_trigger *trig,
+					int options, int *max_current)
 {
-	return -ENODEV;
+	return -EINVAL;
 }
 
 static inline int qti_flash_led_set_param(struct led_trigger *trig,
 			struct flash_led_param param)
 {
-	return -ENODEV;
+	return -EINVAL;
 }
 #endif
 #endif

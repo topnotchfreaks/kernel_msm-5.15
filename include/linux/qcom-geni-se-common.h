@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _LINUX_QCOM_GENI_SE_COMMON
@@ -70,6 +70,20 @@ if (print) { \
 #define SE_DMA_RX_LEN			(0xD3C)
 #define SE_DMA_RX_IRQ_EN                (0xD48)
 #define SE_DMA_RX_LEN_IN                (0xD54)
+#define M_IRQ_ENABLE			(0x614)
+#define M_CMD_ERR_STATUS		(0x624)
+#define M_FW_ERR_STATUS			(0x628)
+#define M_GP_LENGTH			(0x910)
+#define S_GP_LENGTH			(0x914)
+#define SE_DMA_DEBUG_REG0		(0xE40)
+#define SE_DMA_IF_EN			(0x004)
+#define SE_GENI_CLK_CTRL		(0x2000)
+#define SE_FIFO_IF_DISABLE		(0x2008)
+#define SE_GENI_GENERAL_CFG		(0x10)
+#define SE_DMA_TX_ATTR			(0xC38)
+#define SE_DMA_TX_MAX_BURST		(0xC5C)
+#define SE_DMA_RX_MAX_BURST		(0xD5C)
+
 
 #define SE_DMA_TX_IRQ_EN_SET	(0xC4C)
 #define SE_DMA_TX_IRQ_EN_CLR	(0xC50)
@@ -136,6 +150,13 @@ if (print) { \
 #define IO_MACRO_IO2_SEL	BIT(5)
 #define IO_MACRO_IO0_SEL_BIT	BIT(0)
 
+#define TOTAL_VOTE_INDEX	3
+#define VOTE_INDEX_PROP_NAME "qcom,vote-index"
+#define GENI_TO_CORE_VOTE_PROP_NAME "qcom,geni-to-core-vote"
+#define CPU_TO_GENI_VOTE_PROP_NAME "qcom,cpu-to-geni-vote"
+#define GENI_TO_DDR_VOTE_PROP_NAME "qcom,geni-to-ddr-vote"
+#define INVALID_VOTE	0xFFFFFFFF
+
 /**
  * struct kpi_time - Help to capture KPI information
  * @len: length of the request
@@ -163,6 +184,134 @@ static inline int geni_se_common_resources_init(struct geni_se *se, u32 geni_to_
 	se->icc_paths[GENI_TO_DDR].avg_bw = geni_to_ddr;
 
 	return ret;
+}
+
+/**
+ * geni_se_read_vote: Function to read dt properties
+ * from dtsi and returns respective vote values.
+ * @wrapper_node: wrapper device node.
+ * @path: path value describing geni to core, cpu to geni or geni to ddr.
+ * @vote_index_value: index values for spi.
+ * @dev: Associated device.
+ * This function reads vote values correspond to path .
+ *
+ * return: vote value read from dtsi or Invalid vote value 0xFFFFFFFF in case of failure.
+ */
+static u32 geni_se_read_vote(struct device_node *wrapper_node, enum geni_icc_path_index path,
+							 u32  *vote_index_value, struct device *dev)
+{
+	char *vote_property_name[TOTAL_VOTE_INDEX] = {
+		GENI_TO_CORE_VOTE_PROP_NAME,
+		CPU_TO_GENI_VOTE_PROP_NAME,
+		GENI_TO_DDR_VOTE_PROP_NAME
+	};
+	const __be32 *perf_values;
+	int len, i, no_of_entries;
+	u32 vote_value = INVALID_VOTE;
+
+	if (path >= TOTAL_VOTE_INDEX)
+		return vote_value;
+
+	perf_values =
+	of_get_property(wrapper_node, vote_property_name[path], &len);
+
+	if (!perf_values || len % sizeof(u32)) {
+		dev_err(dev, "Property %s not found or invalid\n",
+			vote_property_name[path]);
+		return vote_value;
+	}
+
+	no_of_entries = len / sizeof(u32);
+	dev_dbg(dev, "no_of_entries: %d Property: %s\n",
+		no_of_entries, vote_property_name[path]);
+	if (vote_index_value[path] >= no_of_entries) {
+		dev_err(dev, "Invalid Index: %d Number of values: %d property: %s\n",
+			vote_index_value[path], no_of_entries,
+			vote_property_name[path]);
+		return vote_value;
+	}
+
+	for (i = 0; i < no_of_entries; i++) {
+		if (i == vote_index_value[path]) {
+			vote_value = be32_to_cpup(perf_values + i);
+			dev_info(dev, "Index %d: vote_value value: %u\n", i, vote_value);
+			break;
+		}
+	}
+	return vote_value;
+}
+
+/**
+ * geni_se_get_common_resources: Function to read dt properties
+ * from dtsi and set respective vote values.
+ * @pdev: structure to platform driver.
+ * @spi_rsc: structure to spi geni.
+ *
+ * This function reads all possible clock vote values for Geni
+ * to Core, CPU to Geni, and Geni to DDR, as per hardware support.
+ * It also reads the vote index property and selects the respective
+ * vote values from the list of values based on the index passed.
+ * If these properties are not mentioned or are only partially
+ * mentioned in the device tree source (DTSI), it will initialize
+ * them with default vote values. Once it finds the correct value
+ * for each property, it will initialize those values using the
+ * geni_se_common_resources_init function.
+ *
+ * return: 0 on Success and negative value on Failure.
+ */
+static inline int geni_se_get_common_resources(struct platform_device *pdev,
+					       struct geni_se *spi_rsc)
+{
+	u32  vote_index_value[TOTAL_VOTE_INDEX] = {0};
+	const __be32 *vote_index_list;
+	int len, i, no_of_entries;
+	u32 geni_to_core;
+	u32 cpu_to_geni;
+	u32 geni_to_ddr;
+	struct device_node *wrapper_node = pdev->dev.parent->of_node;
+
+	/*vote index*/
+	vote_index_list =
+	of_get_property(pdev->dev.of_node, VOTE_INDEX_PROP_NAME, &len);
+
+	if (!vote_index_list || len % sizeof(u32)) {
+		dev_err(&pdev->dev, "Property %s not found or invalid\n",
+			VOTE_INDEX_PROP_NAME);
+		goto dts_err;
+	}
+
+	no_of_entries = len / sizeof(u32);
+	dev_dbg(&pdev->dev, "no_of_entries: %d VOTE_INDEX_PROP_NAME: %s\n",
+		no_of_entries, VOTE_INDEX_PROP_NAME);
+	if (no_of_entries != TOTAL_VOTE_INDEX) {
+		dev_err(&pdev->dev, "Invalid Index list Number of entries: %d property: %s\n",
+			no_of_entries, VOTE_INDEX_PROP_NAME);
+		goto dts_err;
+	}
+
+	for (i = 0; i < no_of_entries; i++)
+		vote_index_value[i] = be32_to_cpup(vote_index_list + i);
+
+	geni_to_core = geni_se_read_vote(wrapper_node, GENI_TO_CORE, vote_index_value, &pdev->dev);
+	if (geni_to_core == INVALID_VOTE)
+		goto dts_err;
+
+	cpu_to_geni = geni_se_read_vote(wrapper_node, CPU_TO_GENI, vote_index_value, &pdev->dev);
+	if (cpu_to_geni == INVALID_VOTE)
+		goto dts_err;
+
+	geni_to_ddr = geni_se_read_vote(wrapper_node, GENI_TO_DDR, vote_index_value, &pdev->dev);
+	if (geni_to_ddr == INVALID_VOTE)
+		goto dts_err;
+
+	dev_dbg(&pdev->dev, "Voting with geni_to_core: %u cpu_to_geni: %u geni_to_ddr: %u\n",
+		geni_to_core, cpu_to_geni, geni_to_ddr);
+
+	return geni_se_common_resources_init(spi_rsc, geni_to_core, cpu_to_geni, geni_to_ddr);
+
+dts_err:
+	dev_dbg(&pdev->dev, "vote property not found, will load default vote\n");
+	return -1;
 }
 
 static inline int geni_se_common_get_proto(void __iomem *base)

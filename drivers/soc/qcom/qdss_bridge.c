@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define KMSG_COMPONENT "QDSS diag bridge"
@@ -337,6 +337,8 @@ static void mhi_read_work_fn(struct work_struct *work)
 					     struct qdss_bridge_drvdata,
 					     read_work);
 
+	if (!bridge_drvdata)
+		return;
 	do {
 		spin_lock_bh(&drvdata->lock);
 		if (drvdata->opened != ENABLE) {
@@ -461,7 +463,10 @@ static void usb_write_done(struct qdss_bridge_drvdata *drvdata,
 		pr_err_ratelimited("USB write failed err:%d\n", d_req->status);
 
 	qdss_buf_tbl_remove(drvdata, d_req->buf);
-	mhi_queue_read(drvdata);
+	spin_lock_bh(&drvdata->lock);
+	if (drvdata->opened == ENABLE)
+		mhi_queue_read(drvdata);
+	spin_unlock_bh(&drvdata->lock);
 }
 
 static void usb_notifier(void *priv, unsigned int event,
@@ -852,6 +857,7 @@ static void qdss_mhi_remove(struct mhi_device *mhi_dev)
 	device_destroy(mhi_class, drvdata->cdev->dev);
 	unregister_chrdev_region(drvdata->cdev->dev, 1);
 	cdev_del(drvdata->cdev);
+	bridge_drvdata = NULL;
 }
 
 int qdss_mhi_init(struct qdss_bridge_drvdata *drvdata)

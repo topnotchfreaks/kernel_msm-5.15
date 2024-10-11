@@ -6278,6 +6278,12 @@ static int fg_gen4_probe(struct platform_device *pdev)
 		goto exit;
 	}
 
+	rc = fg_gen4_init_iio_psy(chip, pdev);
+	if (rc < 0) {
+		pr_err("Failed to initialize FG IIO PSY, rc=%d\n", rc);
+		goto exit;
+	}
+
 	fg->nb.notifier_call = fg_notifier_cb;
 	rc = power_supply_reg_notifier(&fg->nb);
 	if (rc < 0) {
@@ -6345,12 +6351,6 @@ static int fg_gen4_probe(struct platform_device *pdev)
 		schedule_delayed_work(&fg->profile_load_work, 0);
 
 	fg_gen4_post_init(chip);
-
-	rc = fg_gen4_init_iio_psy(chip, pdev);
-	if (rc < 0) {
-		pr_err("Failed to initialize FG IIO PSY, rc=%d\n", rc);
-		goto exit;
-	}
 
 	pr_debug("FG GEN4 driver probed successfully\n");
 	return 0;

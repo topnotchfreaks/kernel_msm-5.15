@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/debugfs.h>
@@ -21,7 +21,7 @@
 
 #define EUSB2_3P0_VOL_MIN			3075000 /* uV */
 #define EUSB2_3P0_VOL_MAX			3300000 /* uV */
-#define EUSB2_3P0_HPM_LOAD			3500	/* uA */
+#define EUSB2_3P0_HPM_LOAD			12000	/* uA */
 
 #define EUSB2_1P8_VOL_MIN			1800000 /* uV */
 #define EUSB2_1P8_VOL_MAX			1800000 /* uV */
@@ -67,13 +67,36 @@
 #define INT_STATUS_1			0xA3
 #define INT_STATUS_2			0xA4
 
+/* Diodes eUSB2 repeater PI3EUSB1100 registers */
+#define DIODES_PI3EUSB1100_M_F_CONTROL				0x00
+#define DIODES_PI3EUSB1100_USB2_TX_EQ_CONTROL			0x01
+#define DIODES_PI3EUSB1100_USB2_TX_EQ_OUT_CURRENT_CONTROL	0x02
+#define DIODES_PI3EUSB1100_USB2_RX_EQ_CONTROL			0x03
+#define DIODES_PI3EUSB1100_USB2_RX_EQ_SSS_CONTROL		0x04
+#define DIODES_PI3EUSB1100_USB2_SDO_CONTROL			0x05
+#define DIODES_PI3EUSB1100_USB2_TX_OUT_SWING_CONTROL		0x06
+#define DIODES_PI3EUSB1100_USB2_FS_OUT_DDSS_CONTROL		0x07
+#define DIODES_PI3EUSB1100_REV_ID				0x14
+#define DIODES_PI3EUSB1100_DEV_ID_LO				0x15
+#define DIODES_PI3EUSB1100_DEV_ID_HI				0x16
+
 enum eusb2_repeater_type {
 	TI_REPEATER,
 	NXP_REPEATER,
+	DIODES_REPEATER_PI3EUSB1100,
 };
 
 struct i2c_repeater_chip {
 	enum eusb2_repeater_type repeater_type;
+};
+
+#define MAX_PROP_SIZE 32
+
+struct repeater_vreg {
+	struct regulator *reg;
+	int min_uV;
+	int max_uV;
+	int max_uA;
 };
 
 struct eusb2_repeater {
@@ -82,8 +105,8 @@ struct eusb2_repeater {
 	struct regmap			*regmap;
 	const struct i2c_repeater_chip	*chip;
 	u16				reg_base;
-	struct regulator		*vdd18;
-	struct regulator		*vdd3;
+	struct repeater_vreg		*vdd18;
+	struct repeater_vreg		*vdd3;
 	bool				power_enabled;
 
 	struct gpio_desc		*reset_gpiod;
@@ -129,6 +152,106 @@ static int eusb2_i2c_write_reg(struct eusb2_repeater *er, u8 reg, u8 val)
 	return 0;
 }
 
+static int repeater_parse_vreg_info(struct device *dev, char *name,
+				    struct repeater_vreg **out_vreg)
+{
+	struct device_node *np = dev->of_node;
+	struct repeater_vreg *vreg = NULL;
+	char prop_name[MAX_PROP_SIZE];
+	int ret = 0;
+
+	snprintf(prop_name, MAX_PROP_SIZE, "%s-supply", name);
+	if (!of_parse_phandle(np, prop_name, 0)) {
+		dev_err(dev, "Unable to parse the phandle of %s supply\n", name);
+		return -ENODEV;
+	}
+
+	vreg = devm_kzalloc(dev, sizeof(*vreg), GFP_KERNEL);
+	if (!vreg)
+		return -ENOMEM;
+
+	snprintf(prop_name, MAX_PROP_SIZE, "%s", name);
+	vreg->reg = devm_regulator_get(dev, prop_name);
+	if (IS_ERR(vreg->reg)) {
+		dev_err(dev, "Unable to get %s supply\n", name);
+		ret = PTR_ERR(vreg->reg);
+		return ret;
+	}
+	dev_dbg(dev, "get %s supply OK\n", name);
+
+	snprintf(prop_name, MAX_PROP_SIZE, "%s-hpm-load", name);
+	ret = of_property_read_u32(np, prop_name, &vreg->max_uA);
+	if (ret) {
+		if (!strcmp(name, "vdd3")) {
+			vreg->max_uA = EUSB2_3P0_HPM_LOAD;
+		} else if (!strcmp(name, "vdd18")) {
+			vreg->max_uA = EUSB2_1P8_HPM_LOAD;
+		} else {
+			dev_err(dev, "Failed to parse hpm load for %s supply\n", name);
+			return ret;
+		}
+		dev_info(dev, "Unable to get %s-hpm-load, using default\n", name);
+		ret = 0;
+	}
+	dev_dbg(dev, "get vreg->max_uA %u OK\n", vreg->max_uA);
+
+	snprintf(prop_name, MAX_PROP_SIZE, "%s-vol-min", name);
+	ret = of_property_read_u32(np, prop_name, &vreg->min_uV);
+	if (ret) {
+		if (!strcmp(name, "vdd3")) {
+			vreg->min_uV = EUSB2_3P0_VOL_MIN;
+		} else if (!strcmp(name, "vdd18")) {
+			vreg->min_uV = EUSB2_1P8_VOL_MIN;
+		} else {
+			dev_err(dev, "Failed to parse min voltage for %s supply\n", name);
+			return ret;
+		}
+		dev_info(dev, "Unable to get %s-min-uV, using default\n", name);
+		ret = 0;
+	}
+	dev_dbg(dev, "get vreg->min_uV %u OK\n", vreg->min_uV);
+
+	snprintf(prop_name, MAX_PROP_SIZE, "%s-vol-max", name);
+	ret = of_property_read_u32(np, prop_name, &vreg->max_uV);
+	if (ret) {
+		if (!strcmp(name, "vdd3")) {
+			vreg->max_uV = EUSB2_3P0_VOL_MAX;
+		} else if (!strcmp(name, "vdd18")) {
+			vreg->max_uV = EUSB2_1P8_VOL_MAX;
+		} else {
+			dev_err(dev, "Failed to parse max voltage for %s supply\n", name);
+			return ret;
+		}
+		dev_info(dev, "Unable to get %s-max_uV, using default\n", name);
+		ret = 0;
+	}
+	dev_dbg(dev, "get vreg->max_uV %u OK\n", vreg->max_uV);
+
+	*out_vreg = vreg;
+
+	return ret;
+}
+
+static int repeater_setup_vreg(struct eusb2_repeater *er)
+{
+	struct device *dev = er->dev;
+	int ret = 0;
+
+	ret = repeater_parse_vreg_info(dev, "vdd3", &er->vdd3);
+	if (ret) {
+		dev_err(dev, "Failed to parse vdd3 vreg\n");
+		return ret;
+	}
+
+	ret = repeater_parse_vreg_info(dev, "vdd18", &er->vdd18);
+	if (ret) {
+		dev_err(dev, "Failed to parse vdd18 vreg\n");
+		return ret;
+	}
+
+	return ret;
+}
+
 static void eusb2_repeater_update_seq(struct eusb2_repeater *er, u32 *seq, u8 cnt)
 {
 	int i;
@@ -142,6 +265,8 @@ static void eusb2_repeater_update_seq(struct eusb2_repeater *er, u32 *seq, u8 cn
 
 static int eusb2_repeater_power(struct eusb2_repeater *er, bool on)
 {
+	struct repeater_vreg *vdd18 = er->vdd18;
+	struct repeater_vreg *vdd3 = er->vdd3;
 	int ret = 0;
 
 	dev_dbg(er->ur.dev, "%s turn %s regulators. power_enabled:%d\n",
@@ -155,79 +280,77 @@ static int eusb2_repeater_power(struct eusb2_repeater *er, bool on)
 	if (!on)
 		goto disable_vdd3;
 
-	ret = regulator_set_load(er->vdd18, EUSB2_1P8_HPM_LOAD);
+	ret = regulator_set_load(vdd18->reg, vdd18->max_uA);
 	if (ret < 0) {
-		dev_err(er->ur.dev, "Unable to set HPM of vdd12:%d\n", ret);
+		dev_err(er->ur.dev, "Unable to set HPM of vdd18:%d\n", ret);
 		goto err_vdd18;
 	}
 
-	ret = regulator_set_voltage(er->vdd18, EUSB2_1P8_VOL_MIN,
-						EUSB2_1P8_VOL_MAX);
+	ret = regulator_set_voltage(vdd18->reg, vdd18->min_uV, vdd18->max_uV);
 	if (ret) {
 		dev_err(er->ur.dev,
 				"Unable to set voltage for vdd18:%d\n", ret);
 		goto put_vdd18_lpm;
 	}
 
-	ret = regulator_enable(er->vdd18);
+	ret = regulator_enable(vdd18->reg);
 	if (ret) {
 		dev_err(er->ur.dev, "Unable to enable vdd18:%d\n", ret);
 		goto unset_vdd18;
 	}
 
-	ret = regulator_set_load(er->vdd3, EUSB2_3P0_HPM_LOAD);
+	ret = regulator_set_load(vdd3->reg, vdd3->max_uA);
 	if (ret < 0) {
 		dev_err(er->ur.dev, "Unable to set HPM of vdd3:%d\n", ret);
 		goto disable_vdd18;
 	}
 
-	ret = regulator_set_voltage(er->vdd3, EUSB2_3P0_VOL_MIN,
-						EUSB2_3P0_VOL_MAX);
+	ret = regulator_set_voltage(vdd3->reg, vdd3->min_uV, vdd3->max_uV);
 	if (ret) {
 		dev_err(er->ur.dev,
 				"Unable to set voltage for vdd3:%d\n", ret);
 		goto put_vdd3_lpm;
 	}
 
-	ret = regulator_enable(er->vdd3);
+	ret = regulator_enable(vdd3->reg);
 	if (ret) {
 		dev_err(er->ur.dev, "Unable to enable vdd3:%d\n", ret);
 		goto unset_vdd3;
 	}
 
 	er->power_enabled = true;
-	pr_debug("%s(): eUSB2 repeater egulators are turned ON.\n", __func__);
+	dev_dbg(er->ur.dev, "eUSB2 repeater regulators are turned ON.\n");
 	return ret;
 
 disable_vdd3:
-	ret = regulator_disable(er->vdd3);
+	ret = regulator_disable(vdd3->reg);
 	if (ret)
 		dev_err(er->ur.dev, "Unable to disable vdd3:%d\n", ret);
 
 unset_vdd3:
-	ret = regulator_set_voltage(er->vdd3, 0, EUSB2_3P0_VOL_MAX);
+	ret = regulator_set_voltage(vdd3->reg, 0, vdd3->max_uV);
 	if (ret)
 		dev_err(er->ur.dev,
 			"Unable to set (0) voltage for vdd3:%d\n", ret);
 
 put_vdd3_lpm:
-	ret = regulator_set_load(er->vdd3, 0);
+	ret = regulator_set_load(vdd3->reg, 0);
 	if (ret < 0)
 		dev_err(er->ur.dev, "Unable to set (0) HPM of vdd3\n");
 
 disable_vdd18:
-	ret = regulator_disable(er->vdd18);
+	ret = regulator_disable(vdd18->reg);
 	if (ret)
 		dev_err(er->ur.dev, "Unable to disable vdd18:%d\n", ret);
 
 unset_vdd18:
-	ret = regulator_set_voltage(er->vdd18, 0, EUSB2_1P8_VOL_MAX);
+	ret = regulator_set_voltage(vdd18->reg, 0, vdd18->max_uV);
 	if (ret)
 		dev_err(er->ur.dev,
 			"Unable to set (0) voltage for vdd18:%d\n", ret);
 
 put_vdd18_lpm:
-	ret = regulator_set_load(er->vdd18, 0);
+	ret = regulator_set_load(vdd18->reg, 0);
 	if (ret < 0)
 		dev_err(er->ur.dev, "Unable to set LPM of vdd18\n");
 
@@ -257,6 +380,9 @@ static int eusb2_repeater_init(struct usb_repeater *ur)
 		break;
 	case NXP_REPEATER:
 		eusb2_i2c_read_reg(er, REVISION_ID, &reg_val);
+		break;
+	case DIODES_REPEATER_PI3EUSB1100:
+		eusb2_i2c_read_reg(er, DIODES_PI3EUSB1100_REV_ID, &reg_val);
 		break;
 	default:
 		dev_err(er->ur.dev, "Invalid repeater\n");
@@ -307,6 +433,9 @@ static struct i2c_repeater_chip repeater_chip[] = {
 	},
 	[TI_REPEATER] = {
 		.repeater_type = TI_REPEATER,
+	},
+	[DIODES_REPEATER_PI3EUSB1100] = {
+		.repeater_type = DIODES_REPEATER_PI3EUSB1100,
 	}
 };
 
@@ -318,6 +447,10 @@ static const struct of_device_id eusb2_repeater_id_table[] = {
 	{
 		.compatible = "ti,eusb2-repeater",
 		.data = &repeater_chip[TI_REPEATER]
+	},
+	{
+		.compatible = "diodes,eusb2-repeater-PI3EUSB1100",
+		.data = &repeater_chip[DIODES_REPEATER_PI3EUSB1100]
 	},
 	{ },
 };
@@ -361,19 +494,9 @@ static int eusb2_repeater_i2c_probe(struct i2c_client *client)
 		goto err_probe;
 	}
 
-	er->vdd3 = devm_regulator_get(dev, "vdd3");
-	if (IS_ERR(er->vdd3)) {
-		dev_err(dev, "unable to get vdd3 supply\n");
-		ret = PTR_ERR(er->vdd3);
+	ret = repeater_setup_vreg(er);
+	if (ret)
 		goto err_probe;
-	}
-
-	er->vdd18 = devm_regulator_get(dev, "vdd18");
-	if (IS_ERR(er->vdd18)) {
-		dev_err(dev, "unable to get vdd18 supply\n");
-		ret = PTR_ERR(er->vdd18);
-		goto err_probe;
-	}
 
 	er->reset_gpiod = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(er->reset_gpiod)) {

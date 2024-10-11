@@ -52,7 +52,7 @@ static struct mem_buf_vm vm_robotics_gvm1 = {
 };
 
 static struct mem_buf_vm vm_robotics_gvm2 = {
-		.name = "qcom,roboticsvm2",
+		.name = "qcom,rdcapvm",
 		.vmid = VMID_ROBOTICSVM2,
 		.allowed_api = MEM_BUF_API_GUNYAH,
 };
