@@ -2578,6 +2578,9 @@ int ep_pcie_core_disable_endpoint(void)
 		goto out;
 	}
 
+	/* Masking IRQs to stop Global IRQ from triggering during suspend sequence */
+	ep_pcie_write_reg(dev->parf, PCIE20_PARF_INT_ALL_MASK, 0x0);
+
 	dev->power_on = false;
 	/*
 	 * In some cases, the device is requesting for an inband pme
@@ -3145,6 +3148,15 @@ static irqreturn_t ep_pcie_handle_global_irq(int irq, void *data)
 	unsigned long irqsave_flags;
 
 	spin_lock_irqsave(&dev->isr_lock, irqsave_flags);
+	if (dev->power_on) {
+		status = readl_relaxed(dev->parf + PCIE20_PARF_INT_ALL_STATUS);
+		ep_pcie_write_reg(dev->parf, PCIE20_PARF_INT_ALL_CLEAR, status);
+		dev->global_irq_counter++;
+		EP_PCIE_DUMP(dev,
+			"PCIe V%d: No. %ld Global IRQ %d received; status:0x%x\n",
+			dev->rev, dev->global_irq_counter, irq, status);
+	}
+
 	if (!atomic_read(&dev->perst_deast)) {
 		EP_PCIE_ERR(dev,
 			"PCIe V%d: Global irq not processed as PERST# is asserted\n",
@@ -3152,14 +3164,6 @@ static irqreturn_t ep_pcie_handle_global_irq(int irq, void *data)
 		spin_unlock_irqrestore(&dev->isr_lock, irqsave_flags);
 		return IRQ_HANDLED;
 	}
-
-	status = readl_relaxed(dev->parf + PCIE20_PARF_INT_ALL_STATUS);
-	ep_pcie_write_reg(dev->parf, PCIE20_PARF_INT_ALL_CLEAR, status);
-
-	dev->global_irq_counter++;
-	EP_PCIE_DUMP(dev,
-		"PCIe V%d: No. %ld Global IRQ %d received; status:0x%x\n",
-		dev->rev, dev->global_irq_counter, irq, status);
 
 	if (!status)
 		goto sriov_irq;
