@@ -1194,6 +1194,10 @@ static int mhi_init_timesync(struct mhi_controller *mhi_cntrl,
 
 	/* save time_offset for obtaining time via MMIO register reads */
 	mhi_tsync->time_reg = mhi_cntrl->regs + time_offset;
+	mhi_tsync->int_sequence = 0;
+	mhi_tsync->local_time = 0;
+	mhi_tsync->remote_time = 0;
+	mhi_tsync->db_pending = false;
 
 	mutex_init(&mhi_tsync->mutex);
 
