@@ -219,6 +219,8 @@ static ssize_t select_store(struct device *dev,
 	if (!pdata)
 		return -EINVAL;
 
+	gpio_direction_output(pdata->hdmi_select_gpio, 1);
+
 	if (strncmp(buf, "typec", 5) == 0) {
 		pdata->hdmi_src = TYPEC;
 		gpio_set_value(pdata->hdmi_select_gpio, HDMI_INPUT_TYPEC);
