@@ -190,7 +190,7 @@ void ethqos_reset_phy_enable_interrupt(struct qcom_ethqos *ethqos)
 			ETHQOSERR("config_phy_intr successful after phy on\n");
 		}
 		priv->plat->request_phy_wol(priv->plat);
-	} else if (phydev && !priv->plat->phy_intr_en_extn_stm) {
+	} else if (!priv->plat->phy_intr_en_extn_stm) {
 		phydev->irq = PHY_POLL;
 		ETHQOSDBG("PHY Polling Mode enabled\n");
 	} else {

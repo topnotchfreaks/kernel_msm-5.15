@@ -8,9 +8,11 @@
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
+#include <linux/suspend.h>
 #include <linux/thermal.h>
 #include <linux/iio/consumer.h>
 
+#include "thermal_zone_internal.h"
 #include "../thermal_core.h"
 
 #define MBG_TEMP_MON_MM_MON2_FAULT_STATUS 0x50
@@ -167,9 +169,17 @@ static int mbg_tm_set_trip_temp(void *data, int low_thresh, int temp)
 	return ret;
 }
 
+static int mbg_tm_get_trend(void *data, int trip, enum thermal_trend *trend)
+{
+	struct mbg_tm_chip *chip = data;
+
+	return qti_tz_get_trend(chip->tz_dev, trip, trend);
+}
+
 static const struct thermal_zone_of_device_ops mbg_tm_ops = {
 	.get_temp = mbg_tm_get_temp,
 	.set_trips = mbg_tm_set_trip_temp,
+	.get_trend = mbg_tm_get_trend,
 };
 
 static irqreturn_t mbg_tm_isr(int irq, void *data)
@@ -214,6 +224,7 @@ static int mbg_tm_probe(struct platform_device *pdev)
 	if (!chip)
 		return -ENOMEM;
 
+	dev_set_drvdata(&pdev->dev, chip);
 	chip->dev = &pdev->dev;
 
 	mutex_init(&chip->lock);
@@ -249,6 +260,45 @@ static int mbg_tm_probe(struct platform_device *pdev)
 	return ret;
 }
 
+static int mbg_tm_suspend(struct device *dev)
+{
+#ifdef CONFIG_DEEPSLEEP
+	struct mbg_tm_chip *chip = dev_get_drvdata(dev);
+
+	if (pm_suspend_via_firmware())
+		if (chip->irq > 0) {
+			disable_irq(chip->irq);
+			devm_free_irq(dev, chip->irq, chip);
+		}
+#endif
+
+	return 0;
+}
+
+static int mbg_tm_resume(struct device *dev)
+{
+#ifdef CONFIG_DEEPSLEEP
+	struct mbg_tm_chip *chip = dev_get_drvdata(dev);
+	struct device_node *node = dev->of_node;
+	int ret;
+
+	if (pm_suspend_via_firmware())
+		if (chip->irq > 0) {
+			ret = devm_request_threaded_irq(dev, chip->irq, NULL,
+				mbg_tm_isr, IRQF_ONESHOT, node->name, chip);
+			if (ret < 0)
+				return ret;
+		}
+#endif
+
+	return 0;
+}
+
+static const struct dev_pm_ops mbg_tm_pm_ops = {
+	.suspend = mbg_tm_suspend,
+	.resume = mbg_tm_resume,
+};
+
 static const struct of_device_id mbg_tm_match_table[] = {
 	{ .compatible = "qcom,spmi-mgb-tm" },
 	{ }
@@ -259,6 +309,7 @@ static struct platform_driver mbg_tm_driver = {
 	.driver = {
 		.name = "qcom-spmi-mbg-tm",
 		.of_match_table = mbg_tm_match_table,
+		.pm = &mbg_tm_pm_ops,
 	},
 	.probe  = mbg_tm_probe,
 };

@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  */
 
@@ -18,6 +18,7 @@ enum hdcp2_app_cmd {
 	HDCP2_CMD_TIMEOUT,
 	HDCP2_CMD_EN_ENCRYPTION,
 	HDCP2_CMD_QUERY_STREAM,
+	HDCP2_CMD_DELETE_PAIRING_INFO,
 };
 
 struct hdcp2_buffer {
@@ -58,6 +59,8 @@ static inline const char *hdcp2_app_cmd_str(enum hdcp2_app_cmd cmd)
 		return HDCP_QSEECOM_ENUM_STR(HDCP2_CMD_EN_ENCRYPTION);
 	case HDCP2_CMD_QUERY_STREAM:
 		return HDCP_QSEECOM_ENUM_STR(HDCP2_CMD_QUERY_STREAM);
+	case HDCP2_CMD_DELETE_PAIRING_INFO:
+		return HDCP_QSEECOM_ENUM_STR(HDCP2_CMD_DELETE_PAIRING_INFO);
 	default:			return "???";
 	}
 }

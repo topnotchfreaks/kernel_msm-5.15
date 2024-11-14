@@ -72,6 +72,15 @@ config EXTCON_INTEL_MRFLD
 	  Say Y here to enable extcon support for charger detection / control
 	  on the Intel Merrifield Basin Cove PMIC.
 
+config EXTCON_LT8711UXE2
+	tristate "Lontium LT8711UXE2 CC LOGIC USB EXTCON support"
+	select REGMAP_I2C
+	help
+	  This option enables the 'Lontium LT8711UXE2 CC LOGIC USB EXTCON support'
+	  in the kernel.
+	  Say Y here to enable support for USB peripheral and USB host detection
+	  by Lontium LT8711UXE2 CC (Configuration Channel) logic chip.
+
 config EXTCON_MAX14577
 	tristate "Maxim MAX14577/77836 EXTCON Support"
 	depends on MFD_MAX14577
@@ -185,5 +194,14 @@ config EXTCON_USBC_TUSB320
 	help
 	  Say Y here to enable support for USB Type C cable detection extcon
 	  support using a TUSB320.
+
+config EXTCON_KTM5030
+	tristate "KINET KTM5030 support"
+	select REGMAP_I2C
+	help
+	  This option enables the 'KINET KTM5030 support'
+	  in the kernel.
+	  Say Y here to enable support for USB pin
+	  assignment D by KINET KTM5030 CC logic chip.
 
 endif

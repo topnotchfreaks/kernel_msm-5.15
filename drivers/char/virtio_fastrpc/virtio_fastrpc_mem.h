@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only
  *
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __VIRTIO_FASTRPC_MEM_H__
@@ -31,6 +31,8 @@ struct vfastrpc_mmap {
 	 */
 	unsigned int attr;
 	int ctx_refs; /* Indicates reference count for context map */
+	/* Map in use for dma handle */
+	int dma_handle_refs;
 };
 
 struct vfastrpc_buf {

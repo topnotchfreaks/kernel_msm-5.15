@@ -3399,8 +3399,6 @@ static int qcom_ethqos_hib_restore(struct device *dev)
 
 	ethqos_set_func_clk_en(ethqos);
 
-	ethqos_reset_phy_enable_interrupt(ethqos);
-
 #ifdef DWC_ETH_QOS_CONFIG_PTP
 	if (priv->plat->clk_ptp_ref) {
 		ret = clk_prepare_enable(priv->plat->clk_ptp_ref);

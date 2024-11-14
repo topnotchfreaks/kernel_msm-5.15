@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/atomic.h>
@@ -257,6 +257,11 @@
 #define HAP_PTN_FIFO_PLAY_RATE_REG		0x24
 #define PAT_MEM_PLAY_RATE_MASK			GENMASK(7, 4)
 #define FIFO_PLAY_RATE_MASK			GENMASK(3, 0)
+
+#define HAP_PTN_AUTORES_CAL_CFG_REG		0x28
+#define AUTORES_CAL_TRIG_BIT			BIT(7)
+#define AUTORES_CAL_TIMER_4_HALF_CYCLES		4
+#define AUTORES_CAL_TIMER_6_HALF_CYCLES		6
 
 #define HAP_PTN_FIFO_EMPTY_CFG_REG		0x2A
 #define EMPTY_THRESH_MASK			GENMASK(3, 0)
@@ -581,6 +586,7 @@ struct haptics_hw_config {
 	enum drv_sig_shape	drv_wf;
 	bool			is_erm;
 	bool			measure_lra_impedance;
+	bool			sw_cmd_freq_det;
 };
 
 struct custom_fifo_data {
@@ -4495,6 +4501,8 @@ static int haptics_parse_lra_dt(struct haptics_chip *chip)
 		config->measure_lra_impedance = of_property_read_bool(node,
 				"qcom,rt-imp-detect");
 
+	config->sw_cmd_freq_det = of_property_read_bool(node, "qcom,sw-cmd-freq-detect");
+
 	return 0;
 }
 
@@ -5237,11 +5245,27 @@ restore:
 	return rc;
 }
 
+static int haptics_enable_autores_cal(struct haptics_chip *chip, bool enable)
+{
+	u8 val = 0;
+	int rc;
+
+	if (enable)
+		val = AUTORES_CAL_TRIG_BIT | AUTORES_CAL_TIMER_6_HALF_CYCLES;
+	else
+		val = AUTORES_CAL_TIMER_4_HALF_CYCLES;
+
+	rc = haptics_write(chip, chip->ptn_addr_base,
+			HAP_PTN_AUTORES_CAL_CFG_REG, &val, 1);
+
+	return rc;
+}
+
 #define LRA_CALIBRATION_VMAX_HDRM_MV	500
 static int haptics_detect_lra_frequency(struct haptics_chip *chip)
 {
 	int rc;
-	u8 autores_cfg, drv_duty_cfg, amplitude, mask, val;
+	u8 autores_cfg, drv_duty_cfg, amplitude, mask, val = 0;
 	u32 vmax_mv = chip->config.vmax_mv;
 
 	rc = haptics_read(chip, chip->cfg_addr_base,
@@ -5258,12 +5282,15 @@ static int haptics_detect_lra_frequency(struct haptics_chip *chip)
 		return rc;
 	}
 
-	if (chip->hw_type == HAP525_HV)
-		val = AUTORES_EN_DLY_7_CYCLES << AUTORES_EN_DLY_SHIFT|
-			AUTORES_ERR_WINDOW_25_PERCENT | AUTORES_EN_BIT;
+	if (!chip->config.sw_cmd_freq_det)
+		val = AUTORES_EN_BIT;
+
+	if (chip->hw_type >= HAP525_HV)
+		val |= AUTORES_EN_DLY_7_CYCLES << AUTORES_EN_DLY_SHIFT |
+			AUTORES_ERR_WINDOW_25_PERCENT;
 	else
-		val = AUTORES_EN_DLY_6_CYCLES << AUTORES_EN_DLY_SHIFT|
-			AUTORES_ERR_WINDOW_50_PERCENT | AUTORES_EN_BIT;
+		val |= AUTORES_EN_DLY_6_CYCLES << AUTORES_EN_DLY_SHIFT |
+			AUTORES_ERR_WINDOW_50_PERCENT;
 
 	rc = haptics_masked_write(chip, chip->cfg_addr_base,
 			HAP_CFG_AUTORES_CFG_REG, AUTORES_EN_BIT |
@@ -5316,16 +5343,54 @@ static int haptics_detect_lra_frequency(struct haptics_chip *chip)
 	if (rc < 0)
 		goto restore;
 
-	/* wait for ~150ms to get the LRA calibration result */
-	usleep_range(150000, 155000);
+	if (chip->config.sw_cmd_freq_det) {
+		msleep(60);
+		/* Enable SW based auto resonance */
+		rc = haptics_enable_autores_cal(chip, true);
+		if (rc < 0)
+			goto restore;
 
-	rc = haptics_get_closeloop_lra_period(chip, false);
-	if (rc < 0)
-		goto restore;
+		msleep(20);
+
+		/* Get the 1st detected frequency */
+		rc = haptics_get_closeloop_lra_period(chip, false);
+		if (rc < 0)
+			goto restore;
+
+		msleep(50);
+
+		/* Reset SW based auto resonance */
+		rc = haptics_enable_autores_cal(chip, false);
+		if (rc < 0)
+			goto restore;
+
+		rc = haptics_enable_autores_cal(chip, true);
+		if (rc < 0)
+			goto restore;
+
+		msleep(20);
+
+		/* Get the 2nd detected frequency */
+		rc = haptics_get_closeloop_lra_period(chip, false);
+		if (rc < 0)
+			goto restore;
+
+		usleep_range(4000, 4001);
+
+	} else {
+		/* Wait for ~150ms to get the LRA calibration result */
+		msleep(150);
+		rc = haptics_get_closeloop_lra_period(chip, false);
+		if (rc < 0)
+			goto restore;
+	}
 
 	rc = haptics_enable_play(chip, false);
 	if (rc < 0)
 		goto restore;
+
+	if (chip->config.sw_cmd_freq_det)
+		haptics_enable_autores_cal(chip, false);
 
 	haptics_config_openloop_lra_period(chip, chip->config.cl_t_lra_us);
 
