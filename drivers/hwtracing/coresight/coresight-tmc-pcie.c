@@ -10,6 +10,7 @@
 #include <linux/qcom-iommu-util.h>
 #include <linux/time.h>
 #include <linux/slab.h>
+#include <linux/math64.h>
 #include "coresight-priv.h"
 #include "coresight-common.h"
 #include "coresight-tmc.h"
@@ -134,20 +135,6 @@ static void tmc_pcie_write_complete_cb(void *req)
 	kfree(req);
 }
 
-static void tmc_pcie_mhi_dev_event_cb(struct mhi_dev_client_cb_reason *reason)
-{
-	struct tmc_pcie_data *pcie_data;
-
-	pcie_data = tmc_pcie_data;
-	if (!pcie_data)
-		return;
-
-	if (reason->reason == MHI_DEV_TRE_AVAILABLE) {
-		queue_work(pcie_data->pcie_wq, &pcie_data->pcie_write_work);
-		dev_dbg(pcie_data->dev, "mhi tre available\n");
-	}
-}
-
 static void tmc_pcie_open_work_fn(struct work_struct *work)
 {
 	int ret = 0;
@@ -159,8 +146,7 @@ static void tmc_pcie_open_work_fn(struct work_struct *work)
 
 	/* Open write channel*/
 	ret = mhi_dev_open_channel(pcie_data->pcie_out_chan,
-			&pcie_data->out_handle,
-			tmc_pcie_mhi_dev_event_cb);
+			&pcie_data->out_handle, NULL);
 	if (ret < 0) {
 		dev_err(pcie_data->dev, "%s: open pcie out channel fail %d\n",
 						__func__, ret);
@@ -181,6 +167,7 @@ static void tmc_pcie_write_work_fn(struct work_struct *work)
 	size_t actual;
 	int bytes_to_write;
 	char *buf;
+	u64 remainder;
 
 	struct tmc_pcie_data *pcie_data = container_of(work,
 						struct tmc_pcie_data,
@@ -234,7 +221,10 @@ static void tmc_pcie_write_work_fn(struct work_struct *work)
 				"Write error %d\n", bytes_to_write);
 			kfree(req);
 			req = NULL;
-			break;
+			if (bytes_to_write == 0)
+				continue;
+			else
+				break;
 		}
 
 		if (pcie_data->offset + actual >= etr_buf->size)
@@ -243,8 +233,9 @@ static void tmc_pcie_write_work_fn(struct work_struct *work)
 			pcie_data->offset += actual;
 
 		pcie_data->total_size += actual;
+		div64_u64_rem(pcie_data->total_size, PCIE_BLK_SIZE, &remainder);
 		if (actual == PCIE_BLK_SIZE ||
-				pcie_data->total_size % PCIE_BLK_SIZE == 0)
+				remainder == 0)
 			atomic_dec(&pcie_data->irq_cnt);
 	}
 }
