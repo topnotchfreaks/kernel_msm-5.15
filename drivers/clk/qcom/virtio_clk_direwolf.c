@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -239,6 +239,10 @@ static const struct virtio_clk_init_data direwolf_gcc_virtio_clocks[] = {
 	[GCC_EMAC1_SLV_AHB_CLK] = {.name = "gcc_emac1_slv_ahb_clk",},
 	[GCC_EMAC1_PTP_CLK] = {.name = "gcc_emac1_ptp_clk",},
 	[GCC_EMAC1_RGMII_CLK] = {.name = "gcc_emac1_rgmii_clk",},
+	[GCC_EMAC0_AXI_CLK] = {.name = "gcc_emac0_axi_clk",},
+	[GCC_EMAC0_SLV_AHB_CLK] = {.name = "gcc_emac0_slv_ahb_clk",},
+	[GCC_EMAC0_PTP_CLK] = {.name = "gcc_emac0_ptp_clk",},
+	[GCC_EMAC0_RGMII_CLK] = {.name = "gcc_emac0_rgmii_clk",},
 };
 
 static const char * const direwolf_gcc_virtio_resets[] = {
