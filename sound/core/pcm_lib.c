@@ -17,6 +17,7 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/timer.h>
+#include <trace/hooks/alsacore.h>
 
 #include "pcm_local.h"
 
@@ -2095,6 +2096,8 @@ static int pcm_sanity_check(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime;
 	if (PCM_RUNTIME_CHECK(substream))
 		return -ENXIO;
+
+	trace_android_vh_pcm_sanity_check_extn(substream);
 	runtime = substream->runtime;
 	if (snd_BUG_ON(!substream->ops->copy_user && !runtime->dma_area))
 		return -EINVAL;
