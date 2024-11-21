@@ -7741,7 +7741,8 @@ static int fastrpc_restart_notifier_cb(struct notifier_block *nb,
 		pr_info("adsprpc: %s: subsystem %s is about to start\n",
 			__func__, gcinfo[cid].subsys);
 		if (cid == CDSP_DOMAIN_ID && dump_enabled() &&
-				ctx->ssrcount) {
+				ctx->ssrcount &&
+				me->channel[cid].hib_state == NORMAL_STATE) {
 			fastrpc_update_ramdump_status(cid);
 			mutex_lock(&me->channel[cid].smd_mutex);
 			fastrpc_print_debug_data(cid);
@@ -7750,7 +7751,8 @@ static int fastrpc_restart_notifier_cb(struct notifier_block *nb,
 		fastrpc_notify_drivers(me, cid);
 		/* Skip ram dump collection in first boot */
 		if (cid == CDSP_DOMAIN_ID && dump_enabled() &&
-				ctx->ssrcount) {
+				ctx->ssrcount &&
+				me->channel[cid].hib_state == NORMAL_STATE) {
 			ktime_get_real_ts64(&startT);
 			fastrpc_ramdump_collection(cid);
 			pr_info("adsprpc: %s: fastrpc ramdump finished in %lu (us)\n",
