@@ -15,3 +15,41 @@ elif [ "${VARIANT}" = consolidate ]; then
 
 fi
 
+
+################################################################################
+OPENSSL_DIR=${KERNEL_DIR}/../build/build-tools/path/linux-x86
+OPENSSL_BIN=${KERNEL_DIR}/../build/build-tools/path/linux-x86/openssl
+# Configuration options to build images for MSM targets
+# Must be included AFTER build.config.msm.<target>
+
+append_cmd POST_DEFCONFIG_CMDS 'update_signing_keys_config'
+
+function update_signing_keys_config() {
+    if [ -f "${OPENSSL_BIN}" ]; then
+        "${OPENSSL_BIN}" req -new -nodes -utf8 -newkey rsa:4096 -days 36500 \
+                     -batch -x509 -config "${KERNEL_DIR}/../msm-kernel/certs/qcom_x509.genkey" \
+                     -outform PEM -out "${OUT_DIR}/verity_cert.pem" -keyout "${OUT_DIR}/verity_key.pem"
+
+        "${OPENSSL_BIN}" req -new -nodes -utf8 -sha256 -days 36500 \
+                     -batch -x509 -config "${KERNEL_DIR}/../msm-kernel/certs/qcom_x509.genkey" \
+                     -outform PEM -out "${OUT_DIR}/signing_key.pem" -keyout "${OUT_DIR}/signing_key.pem"
+
+        "${KERNEL_DIR}/scripts/config" --file "${OUT_DIR}/.config" \
+        --set-str CONFIG_MODULE_SIG_KEY "${OUT_DIR}/signing_key.pem" \
+        --set-str CONFIG_SYSTEM_TRUSTED_KEYS "${OUT_DIR}/verity_cert.pem"
+
+        make_command="make O=${OUT_DIR} olddefconfig"
+        [ -n "${CC_LD_ARG}" ] && make_command="${CC_LD_ARG} ${make_command}"
+        [ -n "${MAKE_ARGS}" ] && make_command="${make_command} ${MAKE_ARGS}"
+
+        (cd "${OUT_DIR}" && eval "${make_command}")
+    fi
+}
+
+append_cmd POST_KERNEL_BUILD_CMDS 'move_signing_keys'
+
+function move_signing_keys() {
+  cp "${OUT_DIR}/signing_key.pem" "${OUT_DIR}/certs"
+  cp "${OUT_DIR}/verity_key.pem" "${OUT_DIR}/certs"
+  cp "${OUT_DIR}/verity_cert.pem" "${OUT_DIR}/certs"
+}
