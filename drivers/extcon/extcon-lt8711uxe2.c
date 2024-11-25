@@ -54,12 +54,14 @@ static const unsigned int lt8711uxe2_extcon_cable_with_redriver[] = {
 	EXTCON_USB,
 	EXTCON_USB_HOST,
 	EXTCON_DISP_DP,
+	EXTCON_MECHANICAL,
 	EXTCON_NONE,
 };
 
 static const unsigned int lt8711uxe2_extcon_cable[] = {
 	EXTCON_USB,
 	EXTCON_USB_HOST,
+	EXTCON_MECHANICAL,
 	EXTCON_NONE,
 };
 
@@ -88,6 +90,8 @@ struct lt8711uxe2 {
 	struct mutex mutex;
 	bool usb_ss_support;
 	bool with_redriver;
+	bool with_hdmi_switch;
+	struct extcon_dev *hdmi_sw_edev;
 
 	unsigned int chip_fw_version;
 	unsigned int image_fw_version;
@@ -100,6 +104,7 @@ struct lt8711uxe2 {
 };
 
 static void lt8711uxe2_check_state(struct lt8711uxe2 *pdata);
+static void lt8711uxe2_set_hdmi_switch_state(struct lt8711uxe2 *pdata, bool enabled);
 
 /*
  * Write one reg with more values;
@@ -1164,6 +1169,16 @@ static void lt8711uxe2_check_state(struct lt8711uxe2 *pdata)
 	extcon_sync(pdata->edev, EXTCON_USB_HOST);
 }
 
+static void lt8711uxe2_set_hdmi_switch_state(struct lt8711uxe2 *pdata,
+		bool enabled)
+{
+	if (pdata->with_hdmi_switch) {
+		extcon_set_state(pdata->edev, EXTCON_MECHANICAL,
+				enabled);
+		extcon_sync(pdata->edev, EXTCON_MECHANICAL);
+	}
+}
+
 static irqreturn_t lt8711uxe2_irq_thread_handler(int irq, void *dev_id)
 {
 	struct lt8711uxe2 *pdata = (struct lt8711uxe2 *)dev_id;
@@ -1194,6 +1209,8 @@ static irqreturn_t lt8711uxe2_irq_thread_handler(int irq, void *dev_id)
 	if (IRQ_TYPE_EQUALS(irq_type, LT8711UXE2_IRQ_HDMI_OUTPUT_CHANGE)) {
 		lt8711uxe2_read(pdata, 0x85, &alt_mode_stat, 1);
 		pdata->alt_mode = alt_mode_stat;
+		lt8711uxe2_set_hdmi_switch_state(pdata,
+			!!(alt_mode_stat & BIT(0)));
 		if (alt_mode_stat & BIT(1))
 			pr_debug("HDMI output enabled.\n");
 		else
@@ -1267,6 +1284,10 @@ static int lt8711uxe2_probe(struct i2c_client *client,
 	if (of_property_read_bool(pdata->dev->of_node, "with-redriver"))
 		pdata->with_redriver = true;
 
+	if (of_property_read_bool(pdata->dev->of_node, "with-hdmi-switch")) {
+		pdata->with_hdmi_switch = true;
+	}
+
 	/* Allocate extcon device */
 	if (pdata->with_redriver)
 		pdata->edev = devm_extcon_dev_allocate(pdata->dev,
@@ -1314,6 +1335,12 @@ static int lt8711uxe2_probe(struct i2c_client *client,
 	}
 	lt8711uxe2_check_state(pdata);
 	lt8711uxe2_read_alt_mode(pdata);
+
+	ret = lt8711uxe2_read_alt_mode(pdata);
+	if (!ret) {
+		lt8711uxe2_set_hdmi_switch_state(pdata,
+			!!(pdata->alt_mode & BIT(0)));
+	}
 
 	/* Make sure LT8711UXE2 initialized, then enable irq. */
 	pdata->irq = gpio_to_irq(pdata->irq_gpio);
