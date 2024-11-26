@@ -10321,5 +10321,9 @@ int msm_pcie_deregister_event(struct msm_pcie_register_event *reg)
 }
 EXPORT_SYMBOL(msm_pcie_deregister_event);
 
+#ifdef CONFIG_I2C
+MODULE_SOFTDEP("pre: i2c_msm_geni");
+#endif
+
 MODULE_DESCRIPTION("Qualcomm Technologies, Inc. PCIe RC driver");
 MODULE_LICENSE("GPL v2");
