@@ -515,6 +515,18 @@ config PROFILER
 	  It exposes APIs for userspace to get system profiling
 	  information.
 
+config HDMI_INPUT_MUX
+	tristate "HDMI input mux driver support"
+	help
+	  This driver supports PI3WVR12412 HDMI input mux.
+
+	  This driver can used for switch Type-C DP and TMDS HDMI port.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called hdmi_input_mux.
+
+	  If unsure, say N.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
