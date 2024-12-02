@@ -3185,6 +3185,7 @@ void dwc3_msm_notify_event(struct dwc3 *dwc,
 {
 	struct dwc3_msm *mdwc = dev_get_drvdata(dwc->dev->parent);
 	struct dwc3_event_buffer *evt;
+	u32 saved_config = 0x00;
 	u32 reg;
 	int i;
 
@@ -3313,6 +3314,28 @@ void dwc3_msm_notify_event(struct dwc3 *dwc,
 		break;
 	case DWC3_GSI_EVT_BUF_CLEAR:
 		dev_dbg(mdwc->dev, "DWC3_GSI_EVT_BUF_CLEAR\n");
+
+		/*
+		 * GSI_EVT_BUF_CLEAR is invoked during run_stop(0).
+		 * Ensure that during run_stop(0), UTMI clock is not suspended
+		 * since it is observed that if the SUSPHY bit of USB2PFYCFG(0)
+		 * is set, then DSTS_CtrlDevHalt bit is not getting set to "1"
+		 * causing LPM entry issues.
+		 */
+		reg = dwc3_msm_read_reg(mdwc->base, DWC3_GUSB2PHYCFG(0));
+		if (unlikely(reg & DWC3_GUSB2PHYCFG_SUSPHY)) {
+			saved_config |= DWC3_GUSB2PHYCFG_SUSPHY;
+			reg &= ~DWC3_GUSB2PHYCFG_SUSPHY;
+		}
+
+		if (reg & DWC3_GUSB2PHYCFG_ENBLSLPM) {
+			saved_config |= DWC3_GUSB2PHYCFG_ENBLSLPM;
+			reg &= ~DWC3_GUSB2PHYCFG_ENBLSLPM;
+		}
+
+		if (saved_config)
+			dwc3_msm_write_reg(mdwc->base, DWC3_GUSB2PHYCFG(0), reg);
+
 		for (i = 0; i < mdwc->num_gsi_event_buffers; i++) {
 			reg = dwc3_msm_read_reg(mdwc->base,
 					DWC3_GEVNTCOUNT((i+1)));
@@ -3321,6 +3344,7 @@ void dwc3_msm_notify_event(struct dwc3 *dwc,
 					DWC3_GEVNTCOUNT((i+1)), reg);
 			dbg_log_string("remaining EVNTCOUNT(%d)=%d", i+1, reg);
 		}
+
 		break;
 	case DWC3_CONTROLLER_NOTIFY_DISABLE_UPDXFER:
 		dwc3_msm_dbm_disable_updxfer(dwc, value);
