@@ -329,7 +329,6 @@
 #define PCIE_PHY_MISC_OSC_DTCT_CONFIG6                 0x63C
 #define PCIE_PHY_MISC_OSC_DTCT_CONFIG7                 0x640
 #define PCIE_PHY_SW_RESET                              0x800
-#define PCIE_PHY_POWER_DOWN_CONTROL                    0x804
 #define PCIE_PHY_START_CONTROL                         0x808
 #define PCIE_PHY_TXMGN_V0                              0x80C
 #define PCIE_PHY_TXMGN_V1                              0x810
@@ -467,4 +466,5 @@
 #define PCIE20_PHY_QSERDES_RX0_RX_MARG_CTRL3           0x3C0
 #define PCIE20_PHY_QSERDES_RX0_IA_ERROR_COUNTER_LOW    0x470
 #define PCIE20_PHY_QSERDES_RX0_IA_ERROR_COUNTER_HIGH   0x474
+#define PCIE_PHY_POWER_DOWN_CONTROL                    0x1240
 #endif

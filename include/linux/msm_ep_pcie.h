@@ -338,6 +338,14 @@ int ep_pcie_configure_inactivity_timer(struct ep_pcie_hw *phandle,
 int ep_pcie_core_l1ss_sleep_config_enable(void);
 
 /*
+ * ep_pcie_core_l1ss_sleep_config_disable - Disable L1ss sleep configuration
+ *		to ungate the CLKREQ#.
+ *
+ * Return: 0 on success, negative value on error
+ */
+int ep_pcie_core_l1ss_sleep_config_disable(void);
+
+/*
  * ep_pcie_core_get_capability - Exposes EP PCIE capability.
  * @phandle:    PCIe endpoint HW driver handle
  * @ep_cap:	Structure member to have capabilities
