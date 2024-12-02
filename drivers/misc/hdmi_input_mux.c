@@ -17,8 +17,9 @@
 #include <linux/of_irq.h>
 #include <linux/extcon.h>
 
-#define HDMI_INPUT_HDMI_IN 0
-#define HDMI_INPUT_TYPEC 1
+#define HDMI_INPUT_HDMI_IN 1
+#define HDMI_INPUT_TYPEC 0
+
 enum hdmi_input_t {
 	NONE,
 	TYPEC,
@@ -217,6 +218,8 @@ static ssize_t select_store(struct device *dev,
 
 	if (!pdata)
 		return -EINVAL;
+
+	gpio_direction_output(pdata->hdmi_select_gpio, 1);
 
 	if (strncmp(buf, "typec", 5) == 0) {
 		pdata->hdmi_src = TYPEC;
