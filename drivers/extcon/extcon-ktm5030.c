@@ -563,7 +563,7 @@ static void ktm5030_reset(struct ktm5030 *pdata, bool on_off)
 		msleep(20);
 		gpio_set_value(pdata->reset_gpio, KTM5030_GPIO_HIGH);
 		pr_debug("ktm5030 reset GPIO_HIGH\n");
-		msleep(200);
+		msleep(800);
 	} else {
 		gpio_set_value(pdata->reset_gpio, KTM5030_GPIO_HIGH);
 	}
@@ -798,6 +798,8 @@ static int ktm5030_probe(struct i2c_client *client,
 	}
 
 	mutex_init(&pdata->mutex);
+
+	ktm5030_reset(pdata, true);
 
 	pdata->fw_status = UPDATE_DONE;
 
