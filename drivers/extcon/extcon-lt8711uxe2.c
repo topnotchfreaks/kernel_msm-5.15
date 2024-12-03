@@ -101,6 +101,11 @@ struct lt8711uxe2 {
 	u32 dp_alt_en_gpio;
 	int irq;
 	u8 alt_mode;
+
+	u32 cc_finished_gpio;
+	int cc_irq;
+	bool usb_role;
+	bool is_cc_finished;
 };
 
 static void lt8711uxe2_check_state(struct lt8711uxe2 *pdata);
@@ -265,6 +270,13 @@ static int lt8711uxe2_parse_dt(struct lt8711uxe2 *pdata)
 	else
 		pr_debug("dp_alt_en_gpio=%d\n", pdata->dp_alt_en_gpio);
 
+	pdata->cc_finished_gpio = of_get_named_gpio(pdata->dev->of_node,
+					"lt,cc-gpio", 0);
+	if (!gpio_is_valid(pdata->cc_finished_gpio))
+		pr_err("cc_finished_gpio not specified\n");
+	else
+		pr_debug("cc_finished_gpio=%d\n", pdata->cc_finished_gpio);
+
 	return ret;
 }
 
@@ -329,7 +341,22 @@ static int lt8711uxe2_gpio_configure(struct lt8711uxe2 *pdata, bool on)
 			}
 		}
 
+		if (gpio_is_valid(pdata->cc_finished_gpio)) {
+			ret = gpio_request(pdata->cc_finished_gpio, "lt8711uxe2-cc-gpio");
+			if (ret) {
+				dev_err(pdata->dev, "lt8711uxe2 cc gpio request failed\n");
+				goto dp_alt_en_err;
+			}
+
+			ret = gpio_direction_input(pdata->cc_finished_gpio);
+			if (ret) {
+				dev_err(pdata->dev, "lt8711uxe2 cc gpio direction failed\n");
+				goto cc_finished_err;
+			}
+		}
+
 	} else {
+		gpio_free(pdata->cc_finished_gpio);
 		if (gpio_is_valid(pdata->dp_lane_sel_gpio))
 			gpio_free(pdata->dp_alt_en_gpio);
 		if (gpio_is_valid(pdata->dp_alt_en_gpio))
@@ -340,6 +367,9 @@ static int lt8711uxe2_gpio_configure(struct lt8711uxe2 *pdata, bool on)
 	}
 	return ret;
 
+cc_finished_err:
+	if (gpio_is_valid(pdata->cc_finished_gpio))
+		gpio_free(pdata->cc_finished_gpio);
 dp_alt_en_err:
 	if (gpio_is_valid(pdata->dp_lane_sel_gpio))
 		gpio_free(pdata->dp_alt_en_gpio);
@@ -1101,9 +1131,6 @@ static void lt8711uxe2_check_state(struct lt8711uxe2 *pdata)
 	union extcon_property_value flip;
 	union extcon_property_value ss_func;
 	u8 flip_reg_val = 0;
-	bool host_mode = false;
-	bool device_mode = false;
-	bool connected = false;
 	bool flipped = false;
 	unsigned int extcon_id = EXTCON_NONE;
 	u32 dp_lane = gpio_get_value(pdata->dp_lane_sel_gpio);
@@ -1119,31 +1146,30 @@ static void lt8711uxe2_check_state(struct lt8711uxe2 *pdata)
 	switch (data_role) {
 	case LT8711UXE2_DISCONNECTED:
 		pr_debug("%s LT8711UXE2_DISCONNECTED\n", __func__);
-		host_mode = false;
-		device_mode = false;
-		connected = false;
 		break;
 	case LT8711UXE2_DFP_ATTACHED:
 		pr_debug("%s LT8711UXE2_DFP_ATTACH (device mode)\n", __func__);
 		extcon_id = EXTCON_USB;
-		host_mode = false;
-		device_mode = true;
-		connected = true;
+		pdata->usb_role = false;
 		break;
 	case LT8711UXE2_UFP_ATTACHED:
 		pr_debug("%s LT8711UXE2_UFP_ATTACH (host mode)\n", __func__);
 		extcon_id = EXTCON_USB_HOST;
-		host_mode = true;
-		device_mode = false;
-		connected = true;
+		pdata->usb_role = true;
 		break;
 	default:
 		dev_err(pdata->dev, "Unknown state: %#x\n", data_role);
 		return;
 	}
 
-	extcon_set_state(pdata->edev, EXTCON_USB_HOST, host_mode);
-	extcon_set_state(pdata->edev, EXTCON_USB, device_mode);
+	if (gpio_is_valid(pdata->cc_finished_gpio) &&
+			(!pdata->is_cc_finished)) {
+		pr_err("cc communicate not finish wait it!\n");
+		return;
+	}
+
+	extcon_set_state(pdata->edev, EXTCON_USB_HOST, pdata->usb_role);
+	extcon_set_state(pdata->edev, EXTCON_USB, !pdata->usb_role);
 	if (pdata->usb_ss_support) {
 		if (dp_lane == LT8711UXE2_DP_2LANE)
 			ss_func.intval = 1;
@@ -1219,6 +1245,18 @@ static irqreturn_t lt8711uxe2_irq_thread_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static irqreturn_t lt8711uxe2_cc_irq_thread_handler(int irq, void *dev_id)
+{
+	struct lt8711uxe2 *pdata = (struct lt8711uxe2 *)dev_id;
+
+	if (!pdata->is_cc_finished) {
+		pdata->is_cc_finished = true;
+		lt8711uxe2_reset(pdata, true);
+	}
+
+	return IRQ_HANDLED;
+}
+
 static int lt8711uxe2_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
@@ -1252,7 +1290,10 @@ static int lt8711uxe2_probe(struct i2c_client *client,
 
 	mutex_init(&pdata->mutex);
 
-	lt8711uxe2_reset(pdata, true);
+	if (gpio_is_valid(pdata->cc_finished_gpio))
+		lt8711uxe2_reset(pdata, false);
+	else
+		lt8711uxe2_reset(pdata, true);
 
 	ret = lt8711uxe2_read_firmware_version(pdata);
 	if (ret)
@@ -1353,6 +1394,19 @@ static int lt8711uxe2_probe(struct i2c_client *client,
 		goto remove_group;
 	}
 	enable_irq_wake(pdata->irq);
+
+	if (gpio_is_valid(pdata->cc_finished_gpio)) {
+		pdata->cc_irq = gpio_to_irq(pdata->cc_finished_gpio);
+		ret = devm_request_threaded_irq(&client->dev, pdata->cc_irq, NULL,
+					lt8711uxe2_cc_irq_thread_handler,
+					IRQF_TRIGGER_RISING | IRQF_ONESHOT,
+					"lt8711uxe2_cc_irq", pdata);
+		if (ret) {
+			pr_err("failed to request cc_irq\n");
+			goto remove_group;
+		}
+		enable_irq_wake(pdata->cc_finished_gpio);
+	}
 
 	return 0;
 
