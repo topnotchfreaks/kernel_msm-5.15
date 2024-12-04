@@ -510,6 +510,7 @@ struct ep_pcie_dev_t {
 	u32				tcsr_perst_enable_offset;
 	u32				perst_raw_rst_status_mask;
 	u32				pcie_disconnect_req_reg_mask;
+	u32				tcsr_hot_reset_en_offset;
 };
 
 extern struct ep_pcie_dev_t ep_pcie_dev;

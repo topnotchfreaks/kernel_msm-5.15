@@ -44,6 +44,7 @@
 #define TCSR_PERST_SEPARATION_ENABLE		0x270
 #define TCSR_PCIE_RST_SEPARATION		0x3F8
 #define TCSR_PCIE_PERST_EN			0x258
+#define TCSR_HOT_RESET_EN			0x3e8
 
 #define PCIE_ISSUE_WAKE				1
 #define PCIE_MHI_FWD_STATUS_MIN			5000
@@ -2239,6 +2240,13 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 			 */
 			writel_relaxed(0, dev->tcsr_perst_en +
 						ep_pcie_dev.tcsr_perst_separation_en_offset);
+
+			/*
+			 * Re-enable hot reset before link up since we disable it
+			 * in pm_turnoff irq.
+			 */
+			ep_pcie_write_reg_field(dev->tcsr_perst_en,
+					ep_pcie_dev.tcsr_hot_reset_en_offset, BIT(0), BIT(0));
 		}
 
 		 /* check link status during initial bootup */
@@ -2729,6 +2737,10 @@ static irqreturn_t ep_pcie_handle_linkdown_irq(int irq, void *data)
 		EP_PCIE_DBG(dev,
 			"PCIe V%d:Linkdown IRQ happened when PERST asserted\n",
 			dev->rev);
+	} else if (dev->link_status == EP_PCIE_LINK_IN_L23READY) {
+		EP_PCIE_DBG(dev,
+			"PCIe V%d:Linkdown IRQ happened when link goes to l23ready\n",
+			dev->rev);
 	} else {
 		dev->link_status = EP_PCIE_LINK_DISABLED;
 		EP_PCIE_DBG(dev, "PCIe V%d:PCIe link is down for %ld times\n",
@@ -2769,13 +2781,29 @@ static irqreturn_t ep_pcie_handle_pm_turnoff_irq(int irq, void *data)
 
 	spin_lock_irqsave(&dev->isr_lock, irqsave_flags);
 
+	if (!dev->tcsr_not_supported)
+		/*
+		 * Some hosts will try to recovery link if it doesn't receive PM_L23_Enter
+		 * within 10ms after sending PME turn off, in which case if Hot reset is
+		 * enabled, PERST# timeout circuit will start to work. If it measures that
+		 * the link doesn't enter L0 within a predetermined time, device will crash
+		 * with PERST_TIMEOUT_RESET_STATUS set to 1.
+		 *
+		 * Note that PERST# timeout circuit monitors the Detect to L0 transition and
+		 * it gets activated in two scenario:
+		 * 1) When PERST# gets de-asserted and perst-separation is enabled.
+		 * 2) When hot-reset is enabled and link training is initiated.
+		 */
+		ep_pcie_write_reg_field(dev->tcsr_perst_en,
+					ep_pcie_dev.tcsr_hot_reset_en_offset, BIT(0), 0);
+
 	dev->pm_to_counter++;
 	EP_PCIE_DBG2(dev,
 		"PCIe V%d: No. %ld PM_TURNOFF is received\n",
 		dev->rev, dev->pm_to_counter);
 	EP_PCIE_DBG2(dev, "PCIe V%d: Put the link into L23\n",	dev->rev);
 	ep_pcie_write_mask(dev->parf + PCIE20_PARF_PM_CTRL, 0, BIT(2));
-
+	dev->link_status = EP_PCIE_LINK_IN_L23READY;
 	spin_unlock_irqrestore(&dev->isr_lock, irqsave_flags);
 
 	return IRQ_HANDLED;
@@ -3439,6 +3467,11 @@ enum ep_pcie_link_status ep_pcie_core_get_linkstatus(void)
 			"PCIe V%d: PCIe endpoint is not powered on\n",
 			dev->rev);
 		return EP_PCIE_LINK_DISABLED;
+	}
+
+	if (dev->link_status == EP_PCIE_LINK_IN_L23READY) {
+		EP_PCIE_DBG(dev, "PCIe V%d: PCIe endpoint has sent PM_ENTER_L23\n", dev->rev);
+		return EP_PCIE_LINK_IN_L23READY;
 	}
 
 	bme = readl_relaxed(dev->dm_core +
@@ -4224,6 +4257,19 @@ static void ep_pcie_tcsr_aoss_data_dt(struct platform_device *pdev)
 		EP_PCIE_DBG(&ep_pcie_dev,
 			"PCIe V%d: TCSR Perst Enable Offset: 0x%x\n",
 			ep_pcie_dev.rev, ep_pcie_dev.tcsr_perst_enable_offset);
+
+		ret = of_property_read_u32((&pdev->dev)->of_node, "qcom,tcsr-hot-reset-en-offset",
+					&ep_pcie_dev.tcsr_hot_reset_en_offset);
+		if (ret) {
+			EP_PCIE_DBG(&ep_pcie_dev,
+				"PCIe V%d: TCSR Hot Reset Enable Offset is not supplied from DT",
+				ep_pcie_dev.rev);
+			ep_pcie_dev.tcsr_hot_reset_en_offset = TCSR_HOT_RESET_EN;
+		}
+
+		EP_PCIE_DBG(&ep_pcie_dev,
+			"PCIe V%d: TCSR Hot Reset Enable Offset: 0x%x\n",
+			ep_pcie_dev.rev, ep_pcie_dev.tcsr_hot_reset_en_offset);
 	}
 
 	ep_pcie_dev.aoss_rst_clear = of_property_read_bool((&pdev->dev)->of_node,
