@@ -97,7 +97,7 @@
 #define CGCTL_REG		(QSCRATCH_REG_OFFSET + 0x28)
 #define PWR_EVNT_IRQ_STAT_REG    (QSCRATCH_REG_OFFSET + 0x58)
 #define PWR_EVNT_IRQ_MASK_REG    (QSCRATCH_REG_OFFSET + 0x5C)
-#define EXTRA_INP_REG		(QSCRATCH_REG_OFFSET + 0x1e4)
+#define DWC_EXTRA_INPUT_6		(QSCRATCH_REG_OFFSET + 0x1e4)
 
 #define PWR_EVNT_POWERDOWN_IN_P3_MASK		BIT(2)
 #define PWR_EVNT_POWERDOWN_OUT_P3_MASK		BIT(3)
@@ -106,7 +106,7 @@
 #define PWR_EVNT_LPM_OUT_RX_ELECIDLE_IRQ_MASK	BIT(12)
 #define PWR_EVNT_LPM_OUT_L1_MASK		BIT(13)
 
-#define EXTRA_INP_SS_DISABLE	BIT(5)
+#define DWC_EXTRA_INPUT_6_HOST_U3_PORT_DISABLE	BIT(5)
 
 /* QSCRATCH_GENERAL_CFG register bit offset */
 #define PIPE_UTMI_CLK_SEL	BIT(0)
@@ -6502,9 +6502,9 @@ static int dwc3_msm_host_ss_powerdown(struct dwc3_msm *mdwc)
 		dwc3_msm_get_max_speed(mdwc) < USB_SPEED_SUPER)
 		return 0;
 
-	reg = dwc3_msm_read_reg(mdwc->base, EXTRA_INP_REG);
-	reg |= EXTRA_INP_SS_DISABLE;
-	dwc3_msm_write_reg(mdwc->base, EXTRA_INP_REG, reg);
+	reg = dwc3_msm_read_reg(mdwc->base, DWC_EXTRA_INPUT_6);
+	reg |= DWC_EXTRA_INPUT_6_HOST_U3_PORT_DISABLE;
+	dwc3_msm_write_reg(mdwc->base, DWC_EXTRA_INPUT_6, reg);
 	dwc3_msm_switch_utmi(mdwc, 1);
 
 	usb_phy_notify_disconnect(mdwc->ss_phy,
@@ -6529,9 +6529,9 @@ static int dwc3_msm_host_ss_powerup(struct dwc3_msm *mdwc)
 					USB_SPEED_SUPER);
 
 	dwc3_msm_switch_utmi(mdwc, 0);
-	reg = dwc3_msm_read_reg(mdwc->base, EXTRA_INP_REG);
-	reg &= ~EXTRA_INP_SS_DISABLE;
-	dwc3_msm_write_reg(mdwc->base, EXTRA_INP_REG, reg);
+	reg = dwc3_msm_read_reg(mdwc->base, DWC_EXTRA_INPUT_6);
+	reg &= ~DWC_EXTRA_INPUT_6_HOST_U3_PORT_DISABLE;
+	dwc3_msm_write_reg(mdwc->base, DWC_EXTRA_INPUT_6, reg);
 
 	return 0;
 }
