@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -1567,8 +1567,6 @@ static int npu_set_fw_state(struct npu_client *client, uint32_t enable)
 	int rc = 0;
 
 	if (host_ctx->network_num > 0) {
-		pr_err("Need to unload network first\n");
-		mutex_unlock(&npu_dev->dev_lock);
 		return -EINVAL;
 	}
 
