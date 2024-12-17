@@ -1201,6 +1201,11 @@ static int fastrpc_mmap_create(struct fastrpc_file *fl, int fd, struct dma_buf *
 				goto bail;
 		}
 	} else if (mflags == FASTRPC_MAP_FD_NOMAP) {
+		if (map->attr & FASTRPC_ATTR_KEEP_MAP) {
+			ADSPRPC_ERR("Invalid attribute 0x%x for fd %d\n", map->attr, fd);
+			err = -EINVAL;
+			goto bail;
+		}
 		VERIFY(err, !IS_ERR_OR_NULL(map->buf = dma_buf_get(fd)));
 		if (err) {
 			ADSPRPC_ERR("dma_buf_get failed for fd %d ret %ld\n",
@@ -4047,6 +4052,8 @@ static int fastrpc_init_create_dynamic_process(struct fastrpc_file *fl,
 		mutex_lock(&fl->map_mutex);
 		err = fastrpc_mmap_create(fl, fl->sharedbuf_info.buf_fd, NULL, 0,
 			0, fl->sharedbuf_info.buf_size, mflags, &sharedbuf_map);
+		if (sharedbuf_map)
+			sharedbuf_map->is_filemap = true;
 		mutex_unlock(&fl->map_mutex);
 		if (err)
 			goto bail;
