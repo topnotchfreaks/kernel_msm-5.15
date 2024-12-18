@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (c) 2011-2017, 2020-2021, The Linux Foundation. All rights reserved.
 // Copyright (c) 2018, Linaro Limited
-// Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+// Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
 
 #include <linux/irq.h>
 #include <linux/kernel.h>
@@ -85,7 +85,6 @@
 
 #define QCOM_SLIM_NGD_AUTOSUSPEND	(MSEC_PER_SEC / 10)
 #define SLIM_RX_MSGQ_TIMEOUT_VAL	0x10000
-#define SLIM_QMI_TIMEOUT_MS		1000
 
 #define SLIM_LA_MGR	0xFF
 #define SLIM_ROOT_FREQ	24576000
@@ -1830,7 +1829,7 @@ static void qcom_slim_ngd_up_worker(struct work_struct *work)
 
 	/* Make sure qmi service is up before continuing */
 	if (!wait_for_completion_interruptible_timeout(&ctrl->qmi_up,
-		msecs_to_jiffies(SLIM_QMI_TIMEOUT_MS))) {
+							msecs_to_jiffies(MSEC_PER_SEC))) {
 		SLIM_INFO(ctrl, "QMI wait timeout\n");
 		return;
 	}
