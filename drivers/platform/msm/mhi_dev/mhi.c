@@ -4229,7 +4229,7 @@ static void mhi_dev_enable(struct work_struct *work)
 			"Cleared reset before waiting for M0\n");
 	}
 
-	while (state != MHI_DEV_M0_STATE &&
+	while (state != MHI_DEV_M0_STATE && !mhi->stop_polling_m0 &&
 		((max_cnt < MHI_SUSPEND_TIMEOUT) || mhi->no_m0_timeout)) {
 		/* Wait for Host to set the M0 state */
 		msleep(MHI_SUSPEND_MIN);
