@@ -2,7 +2,10 @@
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  *
- * Copyright (c) 2021-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ * Took is_el1_instruction_abort() from arch/arm64/mm/fault.c
+ * Copyright (C) 2012 ARM Ltd
  */
 
 #include <linux/module.h>
@@ -13,6 +16,9 @@
 #include <linux/nodemask.h>
 #include <linux/kthread.h>
 #include <linux/swap.h>
+#include <trace/hooks/fault.h>
+#include <asm/esr.h>
+#include <asm/ptrace.h>
 
 static unsigned long panic_on_oom_timeout;
 struct task_struct *saved_tsk;
@@ -152,6 +158,20 @@ static int init_kswapd_per_node_hook(void)
 	return ret;
 }
 
+static bool is_el1_instruction_abort(unsigned long esr)
+{
+	return ESR_ELx_EC(esr) == ESR_ELx_EC_IABT_CUR;
+}
+
+static void can_fixup_sea(void *unused, unsigned long addr, unsigned long esr,
+			  struct pt_regs *regs, bool *can_fixup)
+{
+	if (!user_mode(regs) && !is_el1_instruction_abort(esr))
+		*can_fixup = true;
+	else
+		*can_fixup = false;
+}
+
 static int __init init_mem_hooks(void)
 {
 	int ret;
@@ -186,6 +206,13 @@ static int __init init_mem_hooks(void)
 			return ret;
 		}
 	}
+
+	ret = register_trace_android_vh_try_fixup_sea(can_fixup_sea, NULL);
+	if (ret) {
+		pr_err("Failed to register try_fixup_sea\n");
+		return ret;
+	}
+
 	return 0;
 }
 

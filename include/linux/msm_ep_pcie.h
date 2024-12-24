@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2015, 2017, 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,6 +21,7 @@ enum ep_pcie_link_status {
 	EP_PCIE_LINK_DISABLED,
 	EP_PCIE_LINK_UP,
 	EP_PCIE_LINK_ENABLED,
+	EP_PCIE_LINK_IN_L23READY,
 };
 
 enum ep_pcie_event {
@@ -336,6 +337,14 @@ int ep_pcie_configure_inactivity_timer(struct ep_pcie_hw *phandle,
  * Return: 0 on success, negative value on error
  */
 int ep_pcie_core_l1ss_sleep_config_enable(void);
+
+/*
+ * ep_pcie_core_l1ss_sleep_config_disable - Disable L1ss sleep configuration
+ *		to ungate the CLKREQ#.
+ *
+ * Return: 0 on success, negative value on error
+ */
+int ep_pcie_core_l1ss_sleep_config_disable(void);
 
 /*
  * ep_pcie_core_get_capability - Exposes EP PCIE capability.

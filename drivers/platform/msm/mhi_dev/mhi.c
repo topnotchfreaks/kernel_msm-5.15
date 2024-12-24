@@ -44,7 +44,7 @@
 /* Wait time on the device for Host to set BHI_INTVEC */
 #define MHI_BHI_INTVEC_MAX_CNT			200
 #define MHI_BHI_INTVEC_WAIT_MS		50
-#define MHI_WAKEUP_TIMEOUT_CNT		20
+#define MHI_WAKEUP_TIMEOUT_CNT		25
 #define MHI_MASK_CH_EV_LEN		32
 #define MHI_RING_CMD_ID			0
 #define MHI_RING_PRIMARY_EVT_ID		1
