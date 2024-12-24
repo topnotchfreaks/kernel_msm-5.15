@@ -14,7 +14,7 @@
  *	- Context fault reporting
  *	- Extended Stream ID (16 bit)
  *
- * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "arm-smmu: " fmt
@@ -4013,6 +4013,9 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
 	if (!bitmap_empty(smmu->context_map, ARM_SMMU_MAX_CBS) ||
 		!bitmap_empty(smmu->secure_context_map, ARM_SMMU_MAX_CBS))
 		dev_notice(&pdev->dev, "disabling translation\n");
+
+	if (!strcmp(dev_name(&pdev->dev), "59a0000.kgsl-smmu"))
+		return 0;
 
 	arm_smmu_bus_init(NULL);
 	iommu_device_unregister(&smmu->iommu);
