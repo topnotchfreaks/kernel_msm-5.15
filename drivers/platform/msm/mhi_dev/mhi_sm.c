@@ -33,6 +33,8 @@
 #define MHI_DMA_DISABLE_DELAY_MS	10
 #define MHI_DMA_DISABLE_COUNTER		20
 #define MHI_PF_VALUE			0
+/* Maximum wait time for D state transitions to D3hot */
+#define M3_DO_WAKEUP_TIMEOUT_MS		2500
 
 static struct mhi_dma_ops *mhi_dma_fun_ops;
 
@@ -814,7 +816,7 @@ exit:
  * mhi_sm_wakeup_host() - wakeup MHI-host
  *@event: MHI state chenge event
  *
- * Sends wekup event to MHI-host via EP-PCIe, in case MHI is in M3 state.
+ * Sends wakeup event to MHI-host via EP-PCIe, in case MHI is in M3 state.
  *
  * Return:	0:success
  *		negative: failure
@@ -822,6 +824,7 @@ exit:
 static int mhi_sm_wakeup_host(struct mhi_sm_dev *mhi_sm_ctx, enum mhi_dev_event event)
 {
 	int res = 0;
+	int timeout = 0;
 	enum ep_pcie_event pcie_event;
 	struct mhi_dev *mhi = mhi_sm_ctx->mhi_dev;
 
@@ -834,16 +837,39 @@ static int mhi_sm_wakeup_host(struct mhi_sm_dev *mhi_sm_ctx, enum mhi_dev_event 
 			MHI_SM_ERR(mhi->vf_id, "Failed switching to M0 state\n");
 	} else if (mhi_sm_ctx->mhi_state == MHI_DEV_M3_STATE) {
 		/*
-		 * Check and send D3_HOT to enable waking up the host
-		 * using inband PME.
+		 * Handle host wakeup in M3 + D0 states.
+		 *
+		 * When a MHI WAKE request is received while device is in D0,
+		 * wait for D3 and wakeup the host using inband PME.
+		 * If the MHI state changes to M0 while waiting for D3,
+		 * exit, since both MHI and the device are in active state.
 		 */
+		if (mhi_sm_ctx->d_state == MHI_SM_EP_PCIE_D0_STATE) {
+			timeout = ktime_add_ms(ktime_get(), M3_DO_WAKEUP_TIMEOUT_MS);
+			while (1) {
+				/* Received M0 */
+				if (mhi_sm_ctx->mhi_state == MHI_DEV_M0_STATE)
+					goto exit;
+				/* Received D3 state */
+				if (mhi_sm_ctx->d_state == MHI_SM_EP_PCIE_D3_HOT_STATE ||
+						mhi_sm_ctx->d_state == MHI_SM_EP_PCIE_D3_COLD_STATE)
+					goto wakeup_host;
+				if (ktime_after(ktime_get(), timeout)) {
+					MHI_SM_ERR(mhi->vf_id,
+					 "M3, D0 wakeup host is not supported %d\n", res);
+					goto exit;
+				}
+				fsleep(1000);
+			}
+		}
+wakeup_host:
+		/* Received D3hot or D3cold, send the wakeup request */
 		if (mhi_sm_ctx->d_state == MHI_SM_EP_PCIE_D3_HOT_STATE)
 			pcie_event = EP_PCIE_EVENT_PM_D3_HOT;
 		else
 			pcie_event = EP_PCIE_EVENT_PM_D3_COLD;
-
 		res = ep_pcie_wakeup_host(mhi_sm_ctx->mhi_dev->mhi_hw_ctx->phandle,
-								pcie_event);
+									pcie_event);
 		if (res) {
 			MHI_SM_ERR(mhi->vf_id, "Failed to wakeup MHI host, returned %d\n",
 				res);

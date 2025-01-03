@@ -649,6 +649,17 @@ reg_base_err:
 	return ret;
 }
 
+const struct mpm_pin mpm_scuba_gic_chip_data[] = {
+	{2, 307}, /*tsens0_tsens_upper_lower_int */
+	{5, 328}, /* lpass_irq_out_sdc */
+	{12, 454}, /* b3_lfps_rxterm_irq */
+	{24, 111}, /* bi_px_lpi_1_aoss_mx */
+	{86, 215}, /* mpm_wake,spmi_m */
+	{90, 292}, /* eud_p0_dpse_int_mx */
+	{91, 292}, /* eud_p0_dmse_int_mx */
+	{-1},
+};
+
 const struct mpm_pin mpm_bengal_gic_chip_data[] = {
 	{2, 190},
 	{12, 422}, /* b3_lfps_rxterm_irq */
@@ -714,6 +725,10 @@ static const struct of_device_id mpm_gic_chip_data_table[] = {
 	{
 		.compatible = "qcom,mpm-bengal",
 		.data = mpm_bengal_gic_chip_data,
+	},
+	{
+		.compatible = "qcom,mpm-scuba",
+		.data = mpm_scuba_gic_chip_data,
 	},
 	{
 		.compatible = "qcom,mpm-khaje",

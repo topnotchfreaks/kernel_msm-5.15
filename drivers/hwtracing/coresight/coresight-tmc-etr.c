@@ -986,7 +986,8 @@ static struct etr_buf *tmc_alloc_etr_buf(struct tmc_drvdata *drvdata,
 	 *
 	 */
 	if (!pages &&
-	    (!has_sg || has_iommu || size < SZ_1M))
+	    (!has_sg || has_iommu || size < SZ_1M ||
+		drvdata->out_mode == TMC_ETR_OUT_MODE_PCIE))
 		rc = tmc_etr_mode_alloc_buf(ETR_MODE_FLAT, drvdata,
 					    etr_buf, node, pages);
 	if (rc && has_etr_sg)

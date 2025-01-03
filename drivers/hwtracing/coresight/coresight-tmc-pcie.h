@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * Description: CoreSight TMC PCIe driver
  */
@@ -15,7 +15,7 @@
 #define TMC_ETR_BAM_PIPE_INDEX	0
 #define TMC_ETR_BAM_NR_PIPES	2
 #define TMC_PCIE_MEM_SIZE     0x400000
-#define PCIE_BLK_SIZE 4096
+#define PCIE_BLK_SIZE 0x7000
 
 #define PCIE_DESC_BUF_SIZE 0x1000
 #define PCIE_DATA_BUF_SIZE 0x2000

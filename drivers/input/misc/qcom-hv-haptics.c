@@ -3241,6 +3241,7 @@ static int haptics_config_wa(struct haptics_chip *chip)
 			TOGGLE_EN_TO_FLUSH_FIFO | RECOVER_SWR_SLAVE;
 		break;
 	case HAP520_MV:
+		chip->wa_flags |= SLEEP_CLK_32K_SCALE;
 		if (!chip->cfg_rev1)
 			chip->wa_flags |= TOGGLE_MODULE_EN;
 		break;
