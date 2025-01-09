@@ -2494,6 +2494,9 @@
   __tracepoint_android_vh_ufs_send_uic_command
   __tracepoint_android_vh_ufs_update_sdev
   __tracepoint_android_vh_update_topology_flags_workfn
+  __tracepoint_android_vh_pcm_sanity_check_extn
+  __tracepoint_android_vh_snd_pcm_pre_start_extn
+  __tracepoint_android_vh_soc_new_pcm_extn
   __tracepoint_binder_transaction_received
   __tracepoint_block_bio_remap
   __tracepoint_cpu_frequency_limits
