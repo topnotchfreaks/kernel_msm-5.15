@@ -1267,18 +1267,22 @@ DECLARE_RWSEM(uts_sem);
 static void override_custom_release(char __user *release, size_t len)
 {
 	char *buf;
+	int ret;
 
 	buf = kstrdup_quotable_cmdline(current, GFP_KERNEL);
 	if (buf == NULL)
 		return;
 
 	if (strstr(buf, CONFIG_UNAME_OVERRIDE_TARGET)) {
-		copy_to_user(release, CONFIG_UNAME_OVERRIDE_STRING,
-			       strlen(CONFIG_UNAME_OVERRIDE_STRING) + 1);
+		ret = copy_to_user(release, CONFIG_UNAME_OVERRIDE_STRING,
+		                   strlen(CONFIG_UNAME_OVERRIDE_STRING) + 1);
+		if (ret) {
+			// Handle the error (optional)
+			pr_err("Failed to copy to user space, ret = %d\n", ret);
+		}
 	}
 
 	kfree(buf);
-
 }
 #endif
 
