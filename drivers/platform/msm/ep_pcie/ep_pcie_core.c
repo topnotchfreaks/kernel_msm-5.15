@@ -2173,6 +2173,7 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 	struct ep_pcie_dev_t *dev = &ep_pcie_dev;
 	u32 reg, linkup_ts;
 	int timedout = false;
+	unsigned long irqsave_flags;
 
 	EP_PCIE_DBG(dev, "PCIe V%d: options input are 0x%x\n", dev->rev, opt);
 
@@ -2214,7 +2215,9 @@ int ep_pcie_core_enable_endpoint(enum ep_pcie_options opt)
 			goto clk_fail;
 		}
 
+		spin_lock_irqsave(&dev->isr_lock, irqsave_flags);
 		dev->power_on = true;
+		spin_unlock_irqrestore(&dev->isr_lock, irqsave_flags);
 
 		if (!dev->tcsr_not_supported) {
 			EP_PCIE_DBG(dev,
@@ -2574,6 +2577,14 @@ int ep_pcie_core_disable_endpoint(void)
 			dev->rev);
 		goto out;
 	}
+
+	dev->power_on = false;
+	/*
+	 * In some cases, the device is requesting for an inband pme
+	 * as the wakeup host function is reading l23_ready bit as true.
+	 * Hence, clearing the bit here to avoid such scenarios.
+	 */
+	dev->l23_ready = false;
 	spin_unlock_irqrestore(&dev->isr_lock, irqsave_flags);
 
 	if (!m2_enabled) {
@@ -2610,8 +2621,6 @@ int ep_pcie_core_disable_endpoint(void)
 		EP_PCIE_DBG(dev, "PCIe V%d: Resources turned off M2 path\n", dev->rev);
 	}
 
-	dev->power_on = false;
-
 	spin_lock_irqsave(&dev->isr_lock, irqsave_flags);
 	if (atomic_read(&dev->ep_pcie_dev_wake) &&
 		!atomic_read(&dev->perst_deast)) {
@@ -2630,7 +2639,7 @@ int ep_pcie_core_disable_endpoint(void)
 	}
 
 	/*
-	 * In some caes though device requested to do an inband PME
+	 * In some cases though device requested to do an inband PME
 	 * the host might still proceed with PERST assertion, below
 	 * code is to toggle WAKE in such sceanrios.
 	 */
@@ -3933,7 +3942,7 @@ static int ep_pcie_core_wakeup_host_internal(enum ep_pcie_event event)
 		/*D3 cold handling*/
 		ep_pcie_core_toggle_wake_gpio(true);
 		atomic_set(&dev->host_wake_pending, 1);
-	} else if (dev->l23_ready) {
+	} else if (dev->l23_ready && dev->power_on) {
 		EP_PCIE_DBG(dev,
 			"PCIe V%d: request to assert WAKE# when in D3hot\n",
 			dev->rev);

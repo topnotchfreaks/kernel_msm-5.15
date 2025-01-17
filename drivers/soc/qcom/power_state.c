@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "%s: %s: " fmt, KBUILD_MODNAME, __func__
@@ -484,7 +484,8 @@ static int power_state_suspend(void)
 static ssize_t deep_sleep_allowed_show(struct kobject *kobj, struct kobj_attribute *attr,
 				       char *buf)
 {
-	struct power_state_drvdata *drv = container_of(attr, struct power_state_drvdata, ds_ka);
+	struct power_state_drvdata *drv =
+				container_of(attr, struct power_state_drvdata, ds_allow_ka);
 
 	return scnprintf(buf, PAGE_SIZE, "%u\n", drv->deep_sleep_allowed);
 }
@@ -492,7 +493,8 @@ static ssize_t deep_sleep_allowed_show(struct kobject *kobj, struct kobj_attribu
 static ssize_t deep_sleep_allowed_store(struct kobject *kobj, struct kobj_attribute *attr,
 					const char *buf, size_t count)
 {
-	struct power_state_drvdata *drv = container_of(attr, struct power_state_drvdata, ds_ka);
+	struct power_state_drvdata *drv =
+				container_of(attr, struct power_state_drvdata, ds_allow_ka);
 	int val;
 	int ret;
 
