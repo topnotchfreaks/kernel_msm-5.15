@@ -87,7 +87,7 @@ unsigned int sysctl_sched_child_runs_first __read_mostly;
 unsigned int sysctl_sched_wakeup_granularity			= 1000000UL;
 static unsigned int normalized_sysctl_sched_wakeup_granularity	= 1000000UL;
 
-const_debug unsigned int sysctl_sched_migration_cost	= 500000UL;
+const_debug unsigned int sysctl_sched_migration_cost	= 750000UL;
 
 int sched_thermal_decay_shift;
 static int __init setup_sched_thermal_decay_shift(char *str)
@@ -182,7 +182,11 @@ static unsigned int get_update_sysctl_factor(void)
 		break;
 	case SCHED_TUNABLESCALING_LOG:
 	default:
-		factor = 1 + ilog2(cpus);
+		if (cpus > 6) {
+		  factor = 2;
+		} else { 
+		  factor = 1;
+		}
 		break;
 	}
 
