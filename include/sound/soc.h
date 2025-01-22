@@ -733,12 +733,6 @@ struct snd_soc_dai_link {
 #ifdef CONFIG_SND_SOC_TOPOLOGY
 	struct snd_soc_dobj dobj; /* For topology */
 #endif
-
-	/*
-	 * This DAI can support no host IO (no pcm data is
-	 * copied to from host)
-	 */
-	ANDROID_VENDOR_DATA(_no_host_mode);
 	ANDROID_VENDOR_DATA(1);
 	ANDROID_KABI_RESERVE(1);
 };

@@ -24,7 +24,6 @@
 #include <sound/minors.h>
 #include <linux/uio.h>
 #include <linux/delay.h>
-#include <trace/hooks/alsacore.h>
 
 #include "pcm_local.h"
 
@@ -1412,16 +1411,11 @@ static int snd_pcm_pre_start(struct snd_pcm_substream *substream,
 			     snd_pcm_state_t state)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	int ret = 0;
 	if (runtime->status->state != SNDRV_PCM_STATE_PREPARED)
 		return -EBADFD;
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
-	    !snd_pcm_playback_data(substream)){
-		trace_android_vh_snd_pcm_pre_start_extn(&ret,substream);
-		if(ret >= 0){
-			return -EPIPE;
-		}
-	}
+	    !snd_pcm_playback_data(substream))
+		return -EPIPE;
 	runtime->trigger_tstamp_latched = false;
 	runtime->trigger_master = substream;
 	return 0;
