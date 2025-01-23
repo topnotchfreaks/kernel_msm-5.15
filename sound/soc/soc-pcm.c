@@ -26,7 +26,6 @@
 #include <sound/soc-dpcm.h>
 #include <sound/soc-link.h>
 #include <sound/initval.h>
-#include <trace/hooks/alsacore.h>
 
 static inline void snd_soc_dpcm_mutex_lock(struct snd_soc_pcm_runtime *rtd)
 {
@@ -2879,7 +2878,6 @@ int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num)
 	struct snd_pcm *pcm;
 	int ret = 0, playback = 0, capture = 0;
 	int i;
-	struct snd_pcm_str *stream = NULL;
 
 	ret = soc_get_playback_capture(rtd, &playback, &capture);
 	if (ret < 0)
@@ -2906,7 +2904,6 @@ int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num)
 			pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream->private_data = rtd;
 		goto out;
 	}
-	trace_android_vh_soc_new_pcm_extn(&stream,rtd,pcm);
 
 	/* ASoC PCM operations */
 	if (rtd->dai_link->dynamic) {

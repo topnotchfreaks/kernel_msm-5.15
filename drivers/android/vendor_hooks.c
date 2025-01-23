@@ -114,7 +114,6 @@
 #include <trace/hooks/delayacct.h>
 #include <trace/hooks/tmpfile.h>
 #include <trace/hooks/fuse.h>
-#include <trace/hooks/alsacore.h>
 
 /*
  * Export tracepoints that act as a bare tracehook (ie: have no trace event
@@ -540,6 +539,3 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_binder_spawn_new_thread);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_binder_has_special_work_ilocked);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_vmscan_kswapd_done);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_should_end_madvise);
-EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_pcm_sanity_check_extn);
-EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_snd_pcm_pre_start_extn);
-EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_soc_new_pcm_extn);
