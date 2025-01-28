@@ -1,3 +1,4 @@
+# set arch to arm64
 ARCH=arm64
 MAKE_GOALS="
 Image
