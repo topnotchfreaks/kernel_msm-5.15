@@ -1733,6 +1733,7 @@
   proto_unregister
   __pskb_pull_tail
   ___pskb_trim
+  __pskb_copy_fclone
   ptp_clock_event
   ptp_clock_index
   ptp_clock_register
