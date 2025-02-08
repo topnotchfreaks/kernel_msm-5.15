@@ -97,7 +97,7 @@
 #define CGCTL_REG		(QSCRATCH_REG_OFFSET + 0x28)
 #define PWR_EVNT_IRQ_STAT_REG    (QSCRATCH_REG_OFFSET + 0x58)
 #define PWR_EVNT_IRQ_MASK_REG    (QSCRATCH_REG_OFFSET + 0x5C)
-#define EXTRA_INP_REG		(QSCRATCH_REG_OFFSET + 0x1e4)
+#define DWC_EXTRA_INPUT_6		(QSCRATCH_REG_OFFSET + 0x1e4)
 
 #define PWR_EVNT_POWERDOWN_IN_P3_MASK		BIT(2)
 #define PWR_EVNT_POWERDOWN_OUT_P3_MASK		BIT(3)
@@ -106,7 +106,8 @@
 #define PWR_EVNT_LPM_OUT_RX_ELECIDLE_IRQ_MASK	BIT(12)
 #define PWR_EVNT_LPM_OUT_L1_MASK		BIT(13)
 
-#define EXTRA_INP_SS_DISABLE	BIT(5)
+#define DWC_EXTRA_INPUT_6_HUB_PORT_OVERCURRENT_U2	BIT(1)
+#define DWC_EXTRA_INPUT_6_HOST_U3_PORT_DISABLE	BIT(5)
 
 /* QSCRATCH_GENERAL_CFG register bit offset */
 #define PIPE_UTMI_CLK_SEL	BIT(0)
@@ -618,6 +619,8 @@ struct dwc3_msm {
 	bool			wcd_usbss;
 	bool			force_disconnect;
 	bool			read_u1u2;
+
+	struct gpio_desc	*oc_gpiod;
 };
 
 #define USB_HSPHY_3P3_VOL_MIN		3050000 /* uV */
@@ -4533,6 +4536,41 @@ static irqreturn_t msm_dwc3_pwr_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
+static irqreturn_t oc_irq_handler_thread(int irq, void *_mdwc)
+{
+	struct dwc3 *dwc = NULL;
+	struct dwc3_msm *mdwc = _mdwc;
+
+	if (mdwc->dwc3)
+		dwc =  platform_get_drvdata(mdwc->dwc3);
+
+	if (!mdwc->in_host_mode || !dwc || !dwc->xhci)
+		return IRQ_NONE;
+
+	dev_err(mdwc->dev, "OCP IRQ %d\n", gpiod_get_value_cansleep(mdwc->oc_gpiod));
+
+	pm_runtime_resume(&dwc->xhci->dev);
+
+	/**
+	 *
+	 * When OverCurrent condition happens, set OVERCURRENT_U2 bit of
+	 * DWC_EXTRA_INPUT_6 qscratch register to let xHC set OCA and OCC bit
+	 * of PORTSC register. Subsequently, XHC will clear PORT_POWER on HS
+	 * port and disable it.
+	 * When OverCurrent condition no longer exists, clear OVERCURRENT_U2.
+	 *
+	 **/
+
+	if (gpiod_get_value_cansleep(mdwc->oc_gpiod))
+		dwc3_msm_write_reg_field(mdwc->base, DWC_EXTRA_INPUT_6,
+			DWC_EXTRA_INPUT_6_HUB_PORT_OVERCURRENT_U2, 1);
+	else
+		dwc3_msm_write_reg_field(mdwc->base, DWC_EXTRA_INPUT_6,
+			DWC_EXTRA_INPUT_6_HUB_PORT_OVERCURRENT_U2, 0);
+
+	return IRQ_HANDLED;
+}
+
 static void dwc3_otg_sm_work(struct work_struct *w);
 
 static int dwc3_msm_get_clk_gdsc(struct dwc3_msm *mdwc)
@@ -5718,6 +5756,7 @@ static int dwc3_msm_core_init(struct dwc3_msm *mdwc)
 {
 	struct device_node *node = mdwc->dev->of_node, *dwc3_node;
 	struct dwc3	*dwc;
+	int oc_irq;
 	int ret = 0;
 
 	if (mdwc->dwc3)
@@ -5826,6 +5865,35 @@ static int dwc3_msm_core_init(struct dwc3_msm *mdwc)
 	dwc3_msm_notify_event(dwc, DWC3_GSI_EVT_BUF_ALLOC, 0);
 	pm_runtime_set_autosuspend_delay(dwc->dev, 0);
 	pm_runtime_allow(dwc->dev);
+
+	mdwc->oc_gpiod = devm_gpiod_get_optional(mdwc->dev, "oc", GPIOD_IN);
+	if (IS_ERR(mdwc->oc_gpiod)) {
+		ret = PTR_ERR(mdwc->oc_gpiod);
+		dev_err(mdwc->dev, "Error %d extracting OC gpio\n", ret);
+		goto err;
+	}
+
+	if (mdwc->oc_gpiod) {
+		oc_irq = gpiod_to_irq(mdwc->oc_gpiod);
+		if (oc_irq < 0) {
+			ret = oc_irq;
+			dev_err(mdwc->dev, "Error %d extracting OC IRQ\n",
+								ret);
+			goto err;
+		}
+
+		ret = devm_request_threaded_irq(mdwc->dev, oc_irq, NULL,
+						oc_irq_handler_thread,
+						IRQF_TRIGGER_RISING |
+						IRQF_TRIGGER_FALLING |
+						IRQF_ONESHOT,
+						"usb_oc_irq", mdwc);
+		if (ret < 0) {
+			dev_err(mdwc->dev, "Error %d registering OC irq\n",
+								ret);
+			goto err;
+		}
+	}
 
 	return 0;
 
@@ -6502,9 +6570,9 @@ static int dwc3_msm_host_ss_powerdown(struct dwc3_msm *mdwc)
 		dwc3_msm_get_max_speed(mdwc) < USB_SPEED_SUPER)
 		return 0;
 
-	reg = dwc3_msm_read_reg(mdwc->base, EXTRA_INP_REG);
-	reg |= EXTRA_INP_SS_DISABLE;
-	dwc3_msm_write_reg(mdwc->base, EXTRA_INP_REG, reg);
+	reg = dwc3_msm_read_reg(mdwc->base, DWC_EXTRA_INPUT_6);
+	reg |= DWC_EXTRA_INPUT_6_HOST_U3_PORT_DISABLE;
+	dwc3_msm_write_reg(mdwc->base, DWC_EXTRA_INPUT_6, reg);
 	dwc3_msm_switch_utmi(mdwc, 1);
 
 	usb_phy_notify_disconnect(mdwc->ss_phy,
@@ -6529,9 +6597,9 @@ static int dwc3_msm_host_ss_powerup(struct dwc3_msm *mdwc)
 					USB_SPEED_SUPER);
 
 	dwc3_msm_switch_utmi(mdwc, 0);
-	reg = dwc3_msm_read_reg(mdwc->base, EXTRA_INP_REG);
-	reg &= ~EXTRA_INP_SS_DISABLE;
-	dwc3_msm_write_reg(mdwc->base, EXTRA_INP_REG, reg);
+	reg = dwc3_msm_read_reg(mdwc->base, DWC_EXTRA_INPUT_6);
+	reg &= ~DWC_EXTRA_INPUT_6_HOST_U3_PORT_DISABLE;
+	dwc3_msm_write_reg(mdwc->base, DWC_EXTRA_INPUT_6, reg);
 
 	return 0;
 }

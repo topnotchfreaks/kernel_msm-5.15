@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  */
 
@@ -1249,9 +1249,13 @@ static irqreturn_t lt8711uxe2_cc_irq_thread_handler(int irq, void *dev_id)
 {
 	struct lt8711uxe2 *pdata = (struct lt8711uxe2 *)dev_id;
 
-	if (!pdata->is_cc_finished) {
+	if (gpio_get_value(pdata->cc_finished_gpio)) {
 		pdata->is_cc_finished = true;
 		lt8711uxe2_reset(pdata, true);
+		pr_debug("get cc gpio high\n");
+	} else {
+		gpio_set_value(pdata->reset_gpio, LT8711UXE2_GPIO_LOW);
+		pr_debug("get cc gpio low\n");
 	}
 
 	return IRQ_HANDLED;
@@ -1399,7 +1403,8 @@ static int lt8711uxe2_probe(struct i2c_client *client,
 		pdata->cc_irq = gpio_to_irq(pdata->cc_finished_gpio);
 		ret = devm_request_threaded_irq(&client->dev, pdata->cc_irq, NULL,
 					lt8711uxe2_cc_irq_thread_handler,
-					IRQF_TRIGGER_RISING | IRQF_ONESHOT,
+					IRQF_TRIGGER_RISING |
+					IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
 					"lt8711uxe2_cc_irq", pdata);
 		if (ret) {
 			pr_err("failed to request cc_irq\n");
