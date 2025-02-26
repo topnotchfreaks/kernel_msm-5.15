@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 /*
@@ -2971,6 +2971,9 @@ static irqreturn_t ep_pcie_handle_perst_irq(int irq, void *data)
 
 	perst = gpio_get_value(dev->gpio[EP_PCIE_GPIO_PERST].num);
 
+	EP_PCIE_DBG(dev, "PCIe V%d: PERST IRQ Handling\n",
+		dev->rev);
+
 	if (!dev->enumerated) {
 		EP_PCIE_DBG(dev,
 			"PCIe V%d: PCIe is not enumerated yet; PERST is %sasserted\n",
@@ -2989,6 +2992,7 @@ static irqreturn_t ep_pcie_handle_perst_irq(int irq, void *data)
 					"PCIe V%d: Acquired wakelock\n",
 					dev->rev);
 			}
+			dev->perst_deast_counter++;
 			/*
 			 * Perform link enumeration with the host side in the
 			 * bottom half
@@ -3056,6 +3060,16 @@ static irqreturn_t ep_pcie_handle_perst_deassert(int irq, void *data)
 			"PCIe V%d: Start enumeration due to PERST deassertion\n", dev->rev);
 		ep_pcie_enumeration(dev);
 	}
+
+	/*
+	 * perst_deast_thread_counter tracks the number of times the bottom half
+	 * (threaded handler) of the PERST deassertion interrupt is executed.
+	 * Helps compare with top half counter for debugging.
+	 */
+	dev->perst_deast_thread_counter++;
+	EP_PCIE_DBG(dev, "PCIe V%d: No. %ld PERST deassertion handled\n",
+		dev->rev, dev->perst_deast_thread_counter);
+
 	return IRQ_HANDLED;
 }
 
