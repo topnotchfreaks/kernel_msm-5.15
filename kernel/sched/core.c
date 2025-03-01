@@ -10525,7 +10525,6 @@ static int cpu_uclamp_boost_write_u64(struct cgroup_subsys_state *css,
 	if (boosted > 1)
 		return -EINVAL;
 	tg = css_tg(css);
-	tg->boosted = (unsigned int) boosted;
 
 	return 0;
 }
@@ -10533,9 +10532,7 @@ static int cpu_uclamp_boost_write_u64(struct cgroup_subsys_state *css,
 static u64 cpu_uclamp_boost_read_u64(struct cgroup_subsys_state *css,
                              struct cftype *cft)
 {
-	struct task_group *tg = css_tg(css);
-
-	return (u64) tg->boosted;
+	return 0;
 }
 
 /* Wrappers for the above {read, write, show} functions */
