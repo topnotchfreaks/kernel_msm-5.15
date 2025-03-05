@@ -82,7 +82,6 @@ scm_version()
 			# If only the short version is requested, don't bother
 			# running further git commands
 			if $short; then
-				echo "+"
 				return
 			fi
 			# If we are past a tagged commit (like
@@ -111,7 +110,7 @@ scm_version()
 			git --no-optional-locks status -uno --porcelain 2>/dev/null ||
 			git diff-index --name-only HEAD
 		} | read dummy; then
-			printf '%s' -dirty
+			printf '%s'
 		fi
 	fi
 }
