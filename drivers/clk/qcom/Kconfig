@@ -625,6 +625,15 @@ config SM_GPUCC_6115
 	  Say Y if you want to support graphics controller devices and
 	  functionality such as 3D graphics.
 
+config SM_LPASS_AUDIOCC_6115
+	tristate "SM6115 Audio Clock Controllers"
+	select SM_GCC_6115
+	help
+	  Support for the LPASS(Low-Power Audio Subsytem) aon & audio clock
+	  controllers on Qualcomm Technologies, Inc SM6115 devices.
+	  Say Y if you want to use LPASS AUDIOCC and AONCC clocks required
+	  to support audio devices and its functionalities.
+
 config SM_DEBUGCC_6115
 	tristate "SM6115 Debug Clock Controller"
 	depends on COMMON_CLK_QCOM
