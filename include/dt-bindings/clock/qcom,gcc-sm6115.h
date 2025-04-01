@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: (GPL-2.0-only OR BSD-2-Clause) */
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _DT_BINDINGS_CLK_QCOM_GCC_SM6115_H
@@ -172,6 +173,7 @@
 #define GCC_CAMSS_CPHY_2_CLK					164
 #define GCC_UFS_CLKREF_CLK					165
 #define GCC_DISP_GPLL0_CLK_SRC					166
+#define GCC_LPASS_SWAY_CLK					167
 
 /* GCC resets */
 #define GCC_QUSB2PHY_PRIM_BCR					0
