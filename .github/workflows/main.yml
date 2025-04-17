@@ -211,9 +211,11 @@ jobs:
         uses: pierotofy/set-swap-space@master
         with:
             swap-size-gb: 30
-            run: |
-              echo "vm.swappiness=100" | sudo tee -a /etc/sysctl.conf
-              sudo sysctl -p
+
+      - name: 📐 Tune Swap
+        run: |
+            echo "vm.swappiness=100" | sudo tee -a /etc/sysctl.conf
+            sudo sysctl -p
         
       - name: "📥 Restore ccache Cache"
         uses: actions/cache@v4
