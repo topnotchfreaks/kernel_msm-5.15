@@ -272,10 +272,10 @@ jobs:
           echo "⚙️ Using Clang version:"
           clang --version || echo "❌ Clang not found in PATH!"        
         
-      - name: 📐 Set swap to 30G
+      - name: 📐 Set swap to 12G
         uses: pierotofy/set-swap-space@master
         with:
-            swap-size-gb: 30
+            swap-size-gb: 12
 
       - name: "⚡ Tune Swap Settings"
         run: |
