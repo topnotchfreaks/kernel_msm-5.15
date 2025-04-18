@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2022, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <asm/unistd.h>
@@ -1670,7 +1670,7 @@ static int hgsl_ioctl_get_shadowts_mem(struct file *filep, unsigned long arg)
 		get_dma_buf(dma_buf);
 		params.fd = dma_buf_fd(dma_buf, O_CLOEXEC);
 		if (params.fd < 0) {
-			LOGE("dma buf to fd failed\n");
+			LOGE("dma buf to fd failed with %d\n", params.fd);
 			ret = -ENOMEM;
 			dma_buf_put(dma_buf);
 			goto out;
@@ -2270,7 +2270,7 @@ static int hgsl_ioctl_mem_alloc(struct file *filep, unsigned long arg)
 	params.fd = dma_buf_fd(mem_node->dma_buf, O_CLOEXEC);
 
 	if (params.fd < 0) {
-		LOGE("dma_buf_fd failed, size 0x%x", mem_node->memdesc.size);
+		LOGE("dma_buf_fd failed with %d, size 0x%x", params.fd, mem_node->memdesc.size);
 		ret = -EINVAL;
 		dma_buf_put(mem_node->dma_buf);
 		goto out;
@@ -2603,7 +2603,7 @@ static int hgsl_ioctl_mem_get_fd(struct file *filep, unsigned long arg)
 	if (!ret) {
 		params.fd = dma_buf_fd(node_found->dma_buf, O_CLOEXEC);
 		if (params.fd < 0) {
-			LOGE("dma buf to fd failed");
+			LOGE("dma buf to fd failed with %d", params.fd);
 			ret = -EINVAL;
 			dma_buf_put(node_found->dma_buf);
 		} else if (copy_to_user(USRPTR(arg), &params, sizeof(params))) {
