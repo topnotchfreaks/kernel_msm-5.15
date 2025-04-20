@@ -479,3 +479,14 @@ jobs:
           name: Anykernel3_${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip
           path: ./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip
           retention-days: 7
+
+      - name: "⬆️ Upload Kernel to Telegram"
+        run: |
+          set -e
+        
+          TELEGRAM_BOT_TOKEN="${{ secrets.TELEGRAM_BOT_API }}"
+          TELEGRAM_CHAT_ID="${{ secrets.TELEGRAM_CHANNEL_ID }}"
+    
+          KERNEL_ZIP_PATH="${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip"
+    
+          curl -F "chat_id=$TELEGRAM_CHAT_ID" -F "document=@$KERNEL_ZIP_PATH" "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/sendDocument"
