@@ -39,7 +39,7 @@ on:
       kernelSUChoice:
         description: "KernelSU version"
         required: true
-        default: "KernelSU"
+        default: "None"
         type: choice
         options:
           - "None"
