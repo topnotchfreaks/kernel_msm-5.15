@@ -488,7 +488,7 @@ jobs:
           TELEGRAM_BOT_TOKEN="${{ secrets.TELEGRAM_BOT_API }}"
           TELEGRAM_CHAT_ID="${{ secrets.TELEGRAM_CHANNEL_ID }}"
     
-          KERNEL_ZIP_PATH="${{ env.ZIP_NAME }}"
+          KERNEL_ZIP_PATH="./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip"
     
           curl -F "chat_id=$TELEGRAM_CHAT_ID" -F "document=@$KERNEL_ZIP_PATH" \
             -F caption="Kernel Build: ${{ env.kernelBranch }} | ${{ env.BUILD_TIME }}" \
