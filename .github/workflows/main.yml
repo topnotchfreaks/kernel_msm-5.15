@@ -436,9 +436,11 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         env:
           args: ${{ steps.generate-args.outputs.args }}
+          USER: ${{ github.event.inputs.setAuthorUSER }}
+          HOST: ${{ github.event.inputs.setAuthorHOST }}
         run: |
-          export KBUILD_BUILD_USER=${{ github.event.inputs.setAuthorUSER }}
-          export KBUILD_BUILD_HOST=${{ github.event.inputs.setAuthorHOST }}
+          export USER=$USER
+          export HOST=$HOST
         
           ccache -z
         
