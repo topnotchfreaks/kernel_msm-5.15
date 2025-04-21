@@ -62,17 +62,6 @@ on:
         options:
           - "ZyC Clang"
           - "Greenforce Clang"
-      setAuthorUSER:
-        description: "Set USER"
-        required: false
-        type: string
-        default: Github
-      setAuthorHOST:
-        description: "Set HOST"
-        required: false
-        type: string
-        default: Action
-
 
 jobs:
   Set-repos:
@@ -437,12 +426,7 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         env:
           args: ${{ steps.generate-args.outputs.args }}
-          USER: ${{ github.event.inputs.setAuthorUSER }}
-          HOST: ${{ github.event.inputs.setAuthorHOST }}
         run: |
-          export USER=$USER
-          export HOST=$HOST
-        
           ccache -z
         
           make ${args} \
