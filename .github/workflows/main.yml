@@ -62,6 +62,16 @@ on:
         options:
           - "ZyC Clang"
           - "Greenforce Clang"
+      setAuthorUSER:
+        description: "Set USER"
+        required: false
+        type: string
+        default: Github
+      setAuthorHOST:
+        description: "Set HOST"
+        required: false
+        type: string
+        default: Action
 
 jobs:
   Set-repos:
@@ -427,8 +437,8 @@ jobs:
         env:
           args: ${{ steps.generate-args.outputs.args }}
         run: |
-          export KBUILD_BUILD_USER="GitHub"
-          export KBUILD_BUILD_HOST="Actions"
+          export KBUILD_BUILD_USER="${{ github.event.inputs.setAuthorUSER }}"
+          export KBUILD_BUILD_HOST="${{ github.event.inputs.setAuthorHOST }}"
         
           ccache -z
         
