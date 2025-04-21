@@ -1,3 +1,6 @@
+# TopNotchFreaks kernel configuration
+# Kernel version: 5.15.x
+# Separator: #
 CONFIG_UAPI_HEADER_TEST=y
 CONFIG_AUDIT=y
 CONFIG_NO_HZ=y
