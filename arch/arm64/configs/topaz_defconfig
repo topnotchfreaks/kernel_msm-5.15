@@ -1,5 +1,6 @@
 # TopNotchFreaks kernel configuration
 # Kernel version: 5.15.x
+CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3=y
 # Separator: #
 CONFIG_UAPI_HEADER_TEST=y
 CONFIG_AUDIT=y
