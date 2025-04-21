@@ -1,2 +1,1 @@
-DEFCONFIG=gki_defconfig
-POST_DEFCONFIG_CMDS="check_defconfig"
+DEFCONFIG=topaz_defconfig
