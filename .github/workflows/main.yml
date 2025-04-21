@@ -437,8 +437,8 @@ jobs:
         env:
           args: ${{ steps.generate-args.outputs.args }}
         run: |
-          export KBUILD_BUILD_USER="${{ github.event.inputs.setAuthorUSER }}"
-          export KBUILD_BUILD_HOST="${{ github.event.inputs.setAuthorHOST }}"
+          export KBUILD_BUILD_USER=${{ github.event.inputs.setAuthorUSER }}
+          export KBUILD_BUILD_HOST=${{ github.event.inputs.setAuthorHOST }}
         
           ccache -z
         
