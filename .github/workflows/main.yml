@@ -214,7 +214,7 @@ jobs:
 
       - name: 📐 Tune Swap
         run: |
-            echo "vm.swappiness=100" | sudo tee -a /etc/sysctl.conf
+            echo "vm.swappiness=85" | sudo tee -a /etc/sysctl.conf
             sudo sysctl -p
         
       - name: "📥 Restore ccache Cache"
