@@ -36,6 +36,14 @@ on:
         required: false
         type: string
         default: ""
+      kernelSUChoice:
+        description: "Choose KernelSU version"
+        required: true
+        default: "KernelSU"
+        type: choice
+        options:
+          - "None"
+          - "KernelSU-Next-SuSFS"
       clangCompiler:
         description: "Clang compiler to use"
         required: false
@@ -235,6 +243,19 @@ jobs:
           if [ -n "$LOCALVERSION" ]; then
             echo "CONFIG_LOCALVERSION=\"$LOCALVERSION\"" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           fi
+
+      - name: "😋 Update KernelSU-Next + Next-SuSFS"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }}
+        run: |
+          if [ -d "./KernelSU-Next" ]; then
+            rm -rf "./KernelSU-Next"
+          fi
+          if [ -d "./drivers/kernelsu" ]; then
+            rm -rf "./drivers/kernelsu"
+          fi
+
+          curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs-dev
 
       - name: "👍 Make defconfig"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
