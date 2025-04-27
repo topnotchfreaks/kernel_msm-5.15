@@ -32,7 +32,7 @@ Go to the Actions tab → Select builder workflow → Click Run workflow and fil
 > ✅ Click **Run workflow** to start the build!
 
 
-![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/topnotchfreaks/kernel_msm-5.15/builder.yml?branch=builder)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/topnotchfreaks/kernel_msm-5.15/main.yml?branch=builder)
 ![GitHub branch checks state](https://img.shields.io/github/checks-status/topnotchfreaks/kernel_msm-5.15/builder?branch=builder)
 ![License](https://img.shields.io/github/license/topnotchfreaks/kernel_msm-5.15)
 
