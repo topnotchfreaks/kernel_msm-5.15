@@ -1,3 +1,6 @@
+![Indonesia](https://github.com/topnotchfreaks/kernel_msm-5.15/README_id.md)
+![Jepang](https://github.com/topnotchfreaks/kernel_msm-5.15/README_jp.md)
+
 🚀 GitHub Actions Build Guide
 
 This repository provides a pre-configured GitHub Actions workflow to build the kernel easily through the GitHub UI.
