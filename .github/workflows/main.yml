@@ -20,7 +20,7 @@ on:
         description: "Kernel branch (default if empty)"
         required: false
         type: string
-        default: "main"
+        default: "codelinaro"
       kernelDevice:
         description: "Device (used for defconfig)"
         required: true
