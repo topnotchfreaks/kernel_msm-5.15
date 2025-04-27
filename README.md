@@ -37,8 +37,8 @@ Go to the Actions tab → Select builder workflow → Click Run workflow and fil
 ![License](https://img.shields.io/github/license/topnotchfreaks/kernel_msm-5.15)
 
 **🤝 Big thanks to**:
-- @PhamtomK12 Original Kernel builder Owner
-- @ssocozy
-- @NVG-064
-- @rifsxd
-- @thewildjames
+- ![@PhamtomK12](https://github.com/PhamtomK12)Original Kernel builder Owner
+- ![@ssocozy](https://github.com/ssocozy)
+- ![@NVG-064](https://github.com/NVG-064)
+- ![@rifsxd](https://github.com/rifsxd)
+- ![@thewildjames](https://github.com/thewildjames)
