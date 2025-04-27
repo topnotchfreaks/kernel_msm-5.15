@@ -57,10 +57,11 @@ on:
       clangCompiler:
         description: "Clang compiler to use"
         required: false
-        default: "Greenforce Clang"
+        default: "ZyC Clang"
         type: choice
         options:
           - "Greenforce Clang"
+          - "ZyC Clang"
 
 jobs:
   Set-repos:
@@ -174,6 +175,8 @@ jobs:
             "Greenforce Clang")
               clang_url=$(get_latest_github_release "greenforce-project/greenforce_clang")
               ;;
+            "ZyC Clang")
+              clang_url=$(get_latest_github_release "ZyCromerZ/Clang")
             *)
               echo "❌ Unsupported Clang compiler: ${{ github.event.inputs.clangCompiler }}"
               exit 1
