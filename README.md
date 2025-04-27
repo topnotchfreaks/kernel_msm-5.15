@@ -9,7 +9,7 @@ Go to the Actions tab → Select builder workflow → Click Run workflow and fil
 |:------|:------------|:--------|
 | **Custom kernel source URL** | The Git URL of the kernel source to build. | `https://github.com/topnotchfreaks/kernel_msm-5.15` |
 | **Is private source?** | Check if your repository is private. | (Leave unchecked if public) |
-| **Kernel branch (default if empty)** | Branch name to build. | `main` |
+| **Kernel branch (default if empty)** | Branch name to build. | `codelinaro` |
 | **Device (used for defconfig)** | The device name or defconfig to use. | `gki` |
 | **Kernel source name** | Name of the kernel folder. | `kernel_msm-5.15` |
 | **Custom localversion name** | (Optional) Local version suffix (e.g., `-mybuild`). | `-testbuild` |
@@ -21,7 +21,7 @@ Go to the Actions tab → Select builder workflow → Click Run workflow and fil
 📋 Example Setup
 
 - **Custom kernel source URL**: `https://github.com/topnotchfreaks/kernel_msm-5.15`
-- **Kernel branch**: `main`
+- **Kernel branch**: `codelinaro`
 - **Device**: `gki`
 - **Kernel source name**: `kernel_msm-5.15`
 - **Custom localversion name**: *(optional)*
