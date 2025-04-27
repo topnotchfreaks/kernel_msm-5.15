@@ -177,6 +177,7 @@ jobs:
               ;;
             "ZyC Clang")
               clang_url=$(get_latest_github_release "ZyCromerZ/Clang")
+              ;;
             *)
               echo "❌ Unsupported Clang compiler: ${{ github.event.inputs.clangCompiler }}"
               exit 1
