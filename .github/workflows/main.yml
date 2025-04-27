@@ -10,7 +10,7 @@ on:
         description: "Custom kernel source URL"
         required: true
         type: string
-        default: "https://github.com/topnotchfreaks/kernel_codelinaro"
+        default: "https://github.com/topnotchfreaks/kernel_msm-5.15"
       kernelPrivateSource:
         description: "Is private source?"
         required: false
@@ -44,6 +44,16 @@ on:
         options:
           - "None"
           - "KernelSU-Next-SuSFS"
+      withKernelSUSFS:
+        description: "Enable SUSFS"
+        required: false
+        type: boolean
+        default: false
+      susfsBranch:
+        description: "SUSFS branch to use"
+        required: false
+        type: string
+        default: "gki-android13-5.15"
       clangCompiler:
         description: "Clang compiler to use"
         required: false
@@ -193,14 +203,14 @@ jobs:
       
           clang --version
 
-      - name: 📐 Setup swap 30G
+      - name: 📐 Setup swap 25G
         uses: pierotofy/set-swap-space@master
         with:
-            swap-size-gb: 30
+            swap-size-gb: 25
 
       - name: 📐 Tune Swap
         run: |
-            echo "vm.swappiness=90" | sudo tee -a /etc/sysctl.conf
+            echo "vm.swappiness=80" | sudo tee -a /etc/sysctl.conf
             sudo sysctl -p
         
       - name: "📥 Restore ccache Cache"
@@ -256,6 +266,152 @@ jobs:
           fi
 
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs-dev
+
+
+      - name: 😋 Setup KSU SUSFS
+        if: ${{ github.event.inputs.withKernelSUSFS == 'true' }}
+        env: 
+          ARCH: ${{ steps.generate-args.outputs.ARCH }}
+          DEFCONFIG: ./${{ env.kernelName }}/arch/${{ env.ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
+          SFS_BRANCH: ${{ github.event.inputs.susfsBranch }}
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex  # Exit on error and print commands
+
+          # Helper functions
+          log() {
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+          }
+
+          check_status() {
+            if [ $? -ne 0 ]; then
+              log "Error: $1"
+              exit 1
+            fi
+          }
+
+          copy_file() {
+            local src="$1"
+            local dst="$2"
+            local error_msg="$3"
+            
+            if [ ! -f "$src" ]; then
+              log "Error: Source file $src not found"
+              exit 1
+            fi
+            
+            cp -f "$src" "$dst"
+            check_status "$error_msg"
+          }
+
+          remove_file() {
+            local file="$1"
+            local error_msg="$2"
+            
+            if [ -f "$file" ]; then
+              rm -f "$file"
+              check_status "$error_msg"
+            fi
+          }
+
+          apply_patch() {
+            local patch="$1"
+            local error_msg="$2"
+            
+            log "Attempting to apply patch: $(basename "$patch")"
+            if ! patch -p1 < "$patch"; then
+              log "Warning: Some hunks failed while applying patch $(basename "$patch")"
+            fi
+          }
+
+          log "Starting SUSFS setup..."
+          
+          # First clean up any existing files
+          log "Cleaning up existing files..."
+          remove_file "fs/susfs.c" "Failed to remove existing susfs.c"
+          remove_file "include/linux/susfs.h" "Failed to remove existing susfs.h"
+          remove_file "fs/sus_su.c" "Failed to remove existing sus_su.c"
+          remove_file "include/linux/sus_su.h" "Failed to remove existing sus_su.h"
+
+          # Create necessary directories
+          log "Creating necessary directories..."
+          mkdir -p fs include/linux
+          check_status "Failed to create directories"
+
+          # Clone SUSFS repository
+          if [ -d "./susfs4ksu" ]; then
+            rm -rf "./susfs4ksu"
+          fi
+          log "Cloning SUSFS repository (branch: ${{env.SFS_BRANCH}})..."
+          git clone -v https://gitlab.com/simonpunk/susfs4ksu.git -b "${{env.SFS_BRANCH}}" || {
+            log "Failed to clone SUSFS repository"
+            exit 1
+          }
+
+          # Verify SUSFS repository structure
+          log "Verifying repository structure..."
+          if [ ! -d "susfs4ksu/kernel_patches" ]; then
+            log "Error: kernel_patches directory not found in SUSFS repository"
+            ls -la susfs4ksu/
+            exit 1
+          fi
+
+          # Copy SUSFS files
+          log "Copying SUSFS files..."
+          if [ -d "susfs4ksu/kernel_patches/fs" ]; then
+            cp -rv susfs4ksu/kernel_patches/fs/* fs/
+            check_status "Failed to copy fs files"
+          fi
+
+          if [ -d "susfs4ksu/kernel_patches/include/linux" ]; then
+            cp -rv susfs4ksu/kernel_patches/include/linux/* include/linux/
+            check_status "Failed to copy include files"
+          fi
+
+          # Copy and apply patches
+          log "Processing patches..."
+          find susfs4ksu/kernel_patches -name "*.patch" -type f -exec cp -v {} . \;
+
+          for patch in *.patch; do
+            if [ -f "$patch" ]; then
+              apply_patch "$patch" "Failed to apply patch: $patch"
+            fi
+          done
+
+          # Configure SUSFS
+          log "Configuring SUSFS..."
+          CONFIG_FILE="./arch/${{ env.ARCH }}/configs/${{ env.DEFCONFIG_NAME }}"
+          mkdir -p "$(dirname "$CONFIG_FILE")"
+          
+          # Configuration settings
+          CONFIGS=(
+            "CONFIG_KSU=y"
+            "CONFIG_KSU_SUSFS=y"
+            "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"
+            "CONFIG_KSU_SUSFS_SUS_PATH=y"
+            "CONFIG_KSU_SUSFS_SUS_MOUNT=y"
+            "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y"
+            "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y"
+            "CONFIG_KSU_SUSFS_SUS_KSTAT=n"
+            "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y"
+            "CONFIG_KSU_SUSFS_TRY_UMOUNT=y"
+            "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y"
+            "CONFIG_KSU_SUSFS_SPOOF_UNAME=y"
+            "CONFIG_KSU_SUSFS_ENABLE_LOG=y"
+            "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y"
+            "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y"
+            "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"
+            "CONFIG_KSU_SUSFS_SUS_SU=y"
+            "CONFIG_TMPFS_XATTR=y"
+          )
+
+          for config in "${CONFIGS[@]}"; do
+            echo "$config" >> "$CONFIG_FILE"
+          done
+
+          log "✅ SUSFS setup completed successfully"
+          log "Current config file contents:"
+          cat "$CONFIG_FILE"
 
       - name: "👍 Make defconfig"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
