@@ -57,7 +57,7 @@ on:
       clangCompiler:
         description: "Clang compiler to use"
         required: false
-        default: "ZyC Clang"
+        default: "Greenforce Clang"
         type: choice
         options:
           - "Greenforce Clang"
