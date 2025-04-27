@@ -205,6 +205,8 @@ jobs:
           export OBJDUMP="llvm-objdump"
           export STRIP="llvm-strip"
           export KCFLAGS="--target=aarch64-linux-gnu -x c"
+
+          export KBUILD_CFLAGS="$KBUILD_CFLAGS -Wno-default-const-init-unsafe"
       
           clang --version
 
