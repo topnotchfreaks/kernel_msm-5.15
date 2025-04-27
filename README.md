@@ -12,7 +12,7 @@ Go to the Actions tab → Select builder workflow → Click Run workflow and fil
 | **Kernel branch (default if empty)** | Branch name to build. | `codelinaro` |
 | **Device (used for defconfig)** | The device name or defconfig to use. | `gki` |
 | **Kernel source name** | Name of the kernel folder. | `kernel_msm-5.15` |
-| **Custom localversion name** | (Optional) Local version suffix (e.g., `-mybuild`). | `-testbuild` |
+| **Custom localversion name** | (Optional) Local version suffix. | `-testbuild` |
 | **Choose KernelSU version** | Select KernelSU version to patch (optional). | `None` |
 | **Enable SUSFS** | Enable SUSFS patches. | (Check to enable) |
 | **SUSFS branch to use** | SUSFS branch to pull patches from. | `gki-android13-5.15` |
