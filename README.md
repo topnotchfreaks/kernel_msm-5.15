@@ -40,3 +40,5 @@ Go to the Actions tab → Select builder workflow → Click Run workflow and fil
 - @PhamtomK12 Original Kernel builder Owner
 - @ssocozy
 - @NVG-064
+- @rifsxd
+- @thewildjames
