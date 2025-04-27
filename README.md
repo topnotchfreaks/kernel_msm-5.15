@@ -1,3 +1,5 @@
+ℹ️ Current info: `Building with Greenfore clang maybe broken. use ZyC for now!!`
+
 🚀 GitHub Actions Build Guide
 
 This repository provides a pre-configured GitHub Actions workflow to build the kernel easily through the GitHub UI.
