@@ -44,16 +44,6 @@ on:
         options:
           - "None"
           - "KernelSU-Next-SuSFS"
-      withKernelSUSFS:
-        description: "Enable SUSFS"
-        required: false
-        type: boolean
-        default: false
-      susfsBranch:
-        description: "SUSFS branch to use"
-        required: false
-        type: string
-        default: "gki-android13-5.15"
 
 jobs:
   Set-repos:
@@ -160,9 +150,9 @@ jobs:
       
             printf "%s" "$latest_url"
           }
-      
+
           clang_url=$(get_latest_github_release "greenforce-project/greenforce_clang")
-      
+
           mkdir -p clang
           wget --progress=bar:force -O "clang/clang.tar.gz" "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
           tar -xf clang/clang.tar.gz -C clang || { echo "❌ Extraction failed!"; exit 1; }
@@ -248,133 +238,112 @@ jobs:
             rm -rf "./drivers/kernelsu"
           fi
 
-          curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs
+          curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs-dev
 
-
-      - name: 😋 Setup KSU SUSFS
-        if: ${{ github.event.inputs.withKernelSUSFS == 'true' }}
+      - name: 😋 Setup SUSFS
+        if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }}
         env: 
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
-          DEFCONFIG: ./${{ env.kernelName }}/arch/${{ env.ARCH }}/configs/${{ env.DEFCONFIG_NAME }}
-          SFS_BRANCH: ${{ github.event.inputs.susfsBranch }}
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          set -ex  # Exit on error and print commands
-
-          # Helper functions
+          set -ex
+        
           log() {
             echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
           }
-
-          check_status() {
-            if [ $? -ne 0 ]; then
-              log "Error: $1"
-              exit 1
-            fi
-          }
-
-          copy_file() {
-            local src="$1"
-            local dst="$2"
-            local error_msg="$3"
-            
-            if [ ! -f "$src" ]; then
-              log "Error: Source file $src not found"
-              exit 1
-            fi
-            
-            cp -f "$src" "$dst"
-            check_status "$error_msg"
-          }
-
-          remove_file() {
-            local file="$1"
-            local error_msg="$2"
-            
-            if [ -f "$file" ]; then
-              rm -f "$file"
-              check_status "$error_msg"
-            fi
-          }
-
+        
           apply_patch() {
             local patch="$1"
             local error_msg="$2"
-            
+        
             log "Attempting to apply patch: $(basename "$patch")"
             if ! patch -p1 < "$patch"; then
               log "Warning: Some hunks failed while applying patch $(basename "$patch")"
             fi
           }
-
-          log "Starting SUSFS setup..."
-          
-          # First clean up any existing files
-          log "Cleaning up existing files..."
-          remove_file "fs/susfs.c" "Failed to remove existing susfs.c"
-          remove_file "include/linux/susfs.h" "Failed to remove existing susfs.h"
-          remove_file "fs/sus_su.c" "Failed to remove existing sus_su.c"
-          remove_file "include/linux/sus_su.h" "Failed to remove existing sus_su.h"
-
-          # Create necessary directories
-          log "Creating necessary directories..."
-          mkdir -p fs include/linux
-          check_status "Failed to create directories"
-
-          # Clone SUSFS repository
-          if [ -d "./susfs4ksu" ]; then
-            rm -rf "./susfs4ksu"
-          fi
-          log "Cloning SUSFS repository (branch: ${{env.SFS_BRANCH}})..."
-          git clone -v https://gitlab.com/simonpunk/susfs4ksu.git -b "${{env.SFS_BRANCH}}" || {
-            log "Failed to clone SUSFS repository"
+        
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Implement-SUSFS-v1.5.7.patch"
+          PATCH_FILE="0001-Implement-SUSFS-v1.5.7.patch"
+        
+          log "Downloading SUSFS patch from $PATCH_URL"
+          curl -L -o "$PATCH_FILE" "$PATCH_URL"
+        
+          if [ ! -f "$PATCH_FILE" ]; then
+            log "Patch file $PATCH_FILE does not exist after download"
             exit 1
+          fi
+        
+          apply_patch "$PATCH_FILE"
+        
+          log "✅ External SUSFS patch applied successfully"
+
+
+      - name: 🧩 Setup KSU SUSFS Manual hook
+        if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }}
+        env:
+          kernelName: ${{ env.kernelName }}
+          kernelDir: ${{ env.kernelDir }}
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex
+        
+          log() {
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
           }
-
-          # Verify SUSFS repository structure
-          log "Verifying repository structure..."
-          if [ ! -d "susfs4ksu/kernel_patches" ]; then
-            log "Error: kernel_patches directory not found in SUSFS repository"
-            ls -la susfs4ksu/
+        
+          apply_patch() {
+            local patch="$1"
+            local error_msg="$2"
+        
+            log "Attempting to apply patch: $(basename "$patch")"
+            if ! patch -p1 < "$patch"; then
+              log "Warning: Some hunks failed while applying patch $(basename "$patch")"
+            fi
+          }
+        
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/kernelsu-next-susfs.patch"
+          PATCH_FILE="kernelsu-next-susfs.patch"
+        
+          log "Downloading SUSFS patch from $PATCH_URL"
+          curl -L -o "$PATCH_FILE" "$PATCH_URL"
+        
+          if [ ! -f "$PATCH_FILE" ]; then
+            log "Patch file $PATCH_FILE does not exist after download"
             exit 1
           fi
+        
+          apply_patch "$PATCH_FILE"
+        
+          log "✅ External SUSFS patch applied successfully"
 
-          # Copy SUSFS files
-          log "Copying SUSFS files..."
-          if [ -d "susfs4ksu/kernel_patches/fs" ]; then
-            cp -rv susfs4ksu/kernel_patches/fs/* fs/
-            check_status "Failed to copy fs files"
-          fi
-
-          if [ -d "susfs4ksu/kernel_patches/include/linux" ]; then
-            cp -rv susfs4ksu/kernel_patches/include/linux/* include/linux/
-            check_status "Failed to copy include files"
-          fi
-
-          # Copy and apply patches
-          log "Processing patches..."
-          find susfs4ksu/kernel_patches -name "*.patch" -type f -exec cp -v {} . \;
-
-          for patch in *.patch; do
-            if [ -f "$patch" ]; then
-              apply_patch "$patch" "Failed to apply patch: $patch"
-            fi
-          done
-
-          # Configure SUSFS
-          log "Configuring SUSFS..."
-          CONFIG_FILE="./arch/${{ env.ARCH }}/configs/${{ env.DEFCONFIG_NAME }}"
+      - name: ⚙️ Add SUSFS configs
+        if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }}
+        env:
+          ARCH: ${{ steps.generate-args.outputs.ARCH }}
+          DEFCONFIG_NAME: ${{ env.DEFCONFIG_NAME }}
+          kernelName: ${{ env.kernelName }}
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex
+      
+          log() {
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+          }
+      
+          CONFIG_FILE="./arch/${ARCH}/configs/${DEFCONFIG_NAME}"
           mkdir -p "$(dirname "$CONFIG_FILE")"
-          
+      
           # Configuration settings
           CONFIGS=(
             "CONFIG_KSU=y"
+            "CONFIG_KSU_WITH_KPROBES=n"
             "CONFIG_KSU_SUSFS=y"
             "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"
             "CONFIG_KSU_SUSFS_SUS_PATH=y"
             "CONFIG_KSU_SUSFS_SUS_MOUNT=y"
             "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y"
             "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y"
+            "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_RECOVERY_MOUNT=y"
             "CONFIG_KSU_SUSFS_SUS_KSTAT=n"
             "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y"
             "CONFIG_KSU_SUSFS_TRY_UMOUNT=y"
@@ -386,15 +355,18 @@ jobs:
             "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"
             "CONFIG_KSU_SUSFS_SUS_SU=y"
             "CONFIG_TMPFS_XATTR=y"
+            "CONFIG_OVERLAY_FS=y"
+            "CONFIG_OVERLAY_FS_REDIRECT_DIR=y"
+            "CONFIG_OVERLAY_FS_REDIRECT_ALWAYS_FOLLOW=y"
           )
-
+      
           for config in "${CONFIGS[@]}"; do
             echo "$config" >> "$CONFIG_FILE"
           done
-
-          log "✅ SUSFS setup completed successfully"
-          log "Current config file contents:"
-          cat "$CONFIG_FILE"
+      
+          log "✅ SUSFS configs added to $CONFIG_FILE"
+          log "Current config contents:"
+          cat "$CONFIG_FILE"            
 
       - name: "📝 Append custom Makefile line"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
