@@ -1,6 +1,6 @@
 # 🚀 GitHub Actionsカーネルビルドガイド
 
-🌐 他の言語: [English 🇬🇧](README.md) | [Indonesian 🇮🇩](x_id.md)
+🌐 他の言語: [English 🇬🇧](README.md) | [Indonesian 🇮🇩](README_id.md)
 
 ようこそ！  
 このリポジトリでは、**事前に設定されたGitHub Actionsのワークフロー**で、簡単にカーネルビルドができます。
@@ -24,7 +24,6 @@
 | **Choose KernelSU version** | *(オプション)* KernelSUバージョン。 | `None` |
 | **Enable SUSFS** | SUSFSパッチを有効にする。 | (チェックを入れる) |
 | **SUSFS branch to use** | SUSFSパッチ用のブランチ。 | `gki-android13-5.15` |
-| **Clang compiler to use** | 使用するClangツールチェイン。 | `Greenforce Clang` |
 
 ---
 
@@ -37,7 +36,6 @@
 - **Custom localversion name**: *(オプション)*
 - **Choose KernelSU version**: `None`
 - **Enable SUSFS**: *(未チェックのまま)*
-- **Clang compiler to use**: `Greenforce Clang`
 
 ✅ **Run workflow**をクリックしてビルドを開始しましょう！
 

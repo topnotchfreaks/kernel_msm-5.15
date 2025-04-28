@@ -24,7 +24,6 @@ Repositori ini menyediakan **workflow GitHub Actions** untuk membangun kernel de
 | **Choose KernelSU version** | *(Opsional)* Versi KernelSU. | `None` |
 | **Enable SUSFS** | Aktifkan patch SUSFS. | (Centang jika ingin) |
 | **SUSFS branch to use** | Branch SUSFS yang dipakai. | `gki-android13-5.15` |
-| **Clang compiler to use** | Clang compiler yang digunakan. | `Greenforce Clang` |
 
 ---
 
@@ -37,7 +36,6 @@ Repositori ini menyediakan **workflow GitHub Actions** untuk membangun kernel de
 - **Custom localversion name**: *(opsional)*
 - **Choose KernelSU version**: `None`
 - **Enable SUSFS**: *(Biarkan kosong)*
-- **Clang compiler to use**: `Greenforce Clang`
 
 ✅ Klik **Run workflow** untuk memulai build!
 

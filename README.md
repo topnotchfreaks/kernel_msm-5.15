@@ -26,7 +26,6 @@ You can start builds directly from GitHub using a few simple input options!
 | **Choose KernelSU version** | *(Optional)* KernelSU version to patch. | `None` |
 | **Enable SUSFS** | Enable SUSFS patches. | (Check to enable) |
 | **SUSFS branch to use** | SUSFS branch for patches. | `gki-android13-5.15` |
-| **Clang compiler to use** | Clang toolchain to use. | `Greenforce Clang` |
 
 ---
 
@@ -41,7 +40,6 @@ You can start builds directly from GitHub using a few simple input options!
 | Custom localversion name | *(Optional)* |
 | Choose KernelSU version | `None` |
 | Enable SUSFS | *(Unchecked)* |
-| Clang compiler to use | `Greenforce Clang` |
 
 > ✅ Click **Run workflow** to start the build!
 
