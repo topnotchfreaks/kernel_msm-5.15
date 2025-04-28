@@ -22,8 +22,6 @@
 | **Kernel source name** | カーネルソースフォルダ名。 | `kernel_msm-5.15` |
 | **Custom localversion name** | *(オプション)* ローカルバージョンサフィックス。 | `-testbuild` |
 | **Choose KernelSU version** | *(オプション)* KernelSUバージョン。 | `None` |
-| **Enable SUSFS** | SUSFSパッチを有効にする。 | (チェックを入れる) |
-| **SUSFS branch to use** | SUSFSパッチ用のブランチ。 | `gki-android13-5.15` |
 
 ---
 
@@ -35,7 +33,6 @@
 - **Kernel source name**: `kernel_msm-5.15`
 - **Custom localversion name**: *(オプション)*
 - **Choose KernelSU version**: `None`
-- **Enable SUSFS**: *(未チェックのまま)*
 
 ✅ **Run workflow**をクリックしてビルドを開始しましょう！
 

@@ -24,8 +24,6 @@ You can start builds directly from GitHub using a few simple input options!
 | **Kernel source name** | Name for the kernel folder. | `kernel_msm-5.15` |
 | **Custom localversion name** | *(Optional)* Suffix for the kernel version. | `-testbuild` |
 | **Choose KernelSU version** | *(Optional)* KernelSU version to patch. | `None` |
-| **Enable SUSFS** | Enable SUSFS patches. | (Check to enable) |
-| **SUSFS branch to use** | SUSFS branch for patches. | `gki-android13-5.15` |
 
 ---
 
@@ -39,7 +37,6 @@ You can start builds directly from GitHub using a few simple input options!
 | Kernel source name | `kernel_msm-5.15` |
 | Custom localversion name | *(Optional)* |
 | Choose KernelSU version | `None` |
-| Enable SUSFS | *(Unchecked)* |
 
 > ✅ Click **Run workflow** to start the build!
 

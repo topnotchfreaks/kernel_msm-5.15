@@ -22,8 +22,6 @@ Repositori ini menyediakan **workflow GitHub Actions** untuk membangun kernel de
 | **Kernel source name** | Nama folder kernel. | `kernel_msm-5.15` |
 | **Custom localversion name** | *(Opsional)* Sufiks lokalversi kernel. | `-testbuild` |
 | **Choose KernelSU version** | *(Opsional)* Versi KernelSU. | `None` |
-| **Enable SUSFS** | Aktifkan patch SUSFS. | (Centang jika ingin) |
-| **SUSFS branch to use** | Branch SUSFS yang dipakai. | `gki-android13-5.15` |
 
 ---
 
@@ -35,7 +33,6 @@ Repositori ini menyediakan **workflow GitHub Actions** untuk membangun kernel de
 - **Kernel source name**: `kernel_msm-5.15`
 - **Custom localversion name**: *(opsional)*
 - **Choose KernelSU version**: `None`
-- **Enable SUSFS**: *(Biarkan kosong)*
 
 ✅ Klik **Run workflow** untuk memulai build!
 
