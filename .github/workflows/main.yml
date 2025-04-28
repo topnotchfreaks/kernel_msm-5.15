@@ -54,14 +54,6 @@ on:
         required: false
         type: string
         default: "gki-android13-5.15"
-      clangCompiler:
-        description: "Clang compiler to use"
-        required: false
-        default: "Greenforce Clang"
-        type: choice
-        options:
-          - "Greenforce Clang"
-          - "ZyC Clang"
 
 jobs:
   Set-repos:
@@ -117,14 +109,12 @@ jobs:
       DEFCONFIG_NAME: ${{ github.event.inputs.kernelDevice }}_defconfig
 
     steps:
-      - name: "✨ Create working dir"
-        run: mkdir -p $kernelDir
-
-      - name: "🕒 Generate Timestamp"
-        run: echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
-
-      - name: "⭐ Install prerequisites"
+      - name: "✨ Setup workspace"
         run: |
+          mkdir -p $kernelDir
+
+          echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+
           sudo apt-get update
           sudo apt-get install -y build-essential bc curl flex cpio ccache rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
 
@@ -171,18 +161,7 @@ jobs:
             printf "%s" "$latest_url"
           }
       
-          case "${{ github.event.inputs.clangCompiler }}" in
-            "Greenforce Clang")
-              clang_url=$(get_latest_github_release "greenforce-project/greenforce_clang")
-              ;;
-            "ZyC Clang")
-              clang_url=$(get_latest_github_release "ZyCromerZ/Clang")
-              ;;
-            *)
-              echo "❌ Unsupported Clang compiler: ${{ github.event.inputs.clangCompiler }}"
-              exit 1
-              ;;
-          esac
+          clang_url=$(get_latest_github_release "greenforce-project/greenforce_clang")
       
           mkdir -p clang
           wget --progress=bar:force -O "clang/clang.tar.gz" "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
@@ -436,8 +415,8 @@ jobs:
         env:
           args: ${{ steps.generate-args.outputs.args }}
         run: |
-          export KBUILD_BUILD_USER="unknown"
-          export KBUILD_BUILD_HOST="belowzeroiq"
+          export KBUILD_BUILD_USER="Action"
+          export KBUILD_BUILD_HOST="GitHub"
 
           ccache -z
         
