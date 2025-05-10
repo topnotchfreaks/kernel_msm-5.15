@@ -36,6 +36,9 @@
 #endif
 #include "version.h"
 #include <linux/notifier.h>
+#include <linux/kthread.h>
+#include <linux/cpufreq.h>
+#include <linux/blkdev.h>
 
 #ifdef CONFIG_AUTO_KPROFILES_MSM_DRM
 #define KP_EVENT_BLANK MSM_DRM_EVENT_BLANK
@@ -232,6 +235,10 @@ static __always_inline void kp_trigger_mode_change_event(void)
 	unsigned int current_mode = kp_active_mode();
 	blocking_notifier_call_chain(&kp_mode_notifier, KP_MODE_CHANGE,
 				     (void *)(uintptr_t)current_mode);
+
+	if (current_mode == 3) {
+		kp_apply_performance_profile();
+	}
 }
 
 /**
@@ -421,3 +428,39 @@ MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("KernelSpace Profiles");
 MODULE_AUTHOR("Dakkshesh <dakkshesh5@gmail.com>");
 MODULE_VERSION(KPROFILES_VERSION);
+
+static void kp_apply_performance_profile(void)
+{
+#if defined(CONFIG_CPU_FREQ_GOV_PERFORMANCE)
+    int cpu;
+    for_each_online_cpu(cpu) {
+        cpufreq_set_policy(cpu, CPUFREQ_POLICY_PERFORMANCE);
+    }
+#endif
+
+    struct gendisk *gd;
+    struct request_queue *q;
+    struct class_dev_iter iter;
+    class_dev_iter_init(&iter, &block_class, NULL, NULL);
+    while ((gd = dev_to_disk(class_dev_iter_next(&iter)))) {
+        q = bdev_get_queue(gd->part0);
+        if (!q || !q->elevator)
+            continue;
+
+        if (strcmp(q->elevator->type->elevator_name, "ssg") != 0) {
+            if (elv_iosched_store(q, "ssg", strlen("ssg")) == 0) {
+                kp_info("Set IO scheduler to ssg for %s\n", gd->disk_name);
+                continue;
+            }
+        }
+#if defined(CONFIG_IOSCHED_BFQ)
+        if (strcmp(q->elevator->type->elevator_name, "bfq") != 0) {
+            if (elv_iosched_store(q, "bfq", strlen("bfq")) == 0) {
+                kp_info("Set IO scheduler to bfq for %s\n", gd->disk_name);
+                continue;
+            }
+        }
+#endif
+    }
+    class_dev_iter_exit(&iter);
+}
