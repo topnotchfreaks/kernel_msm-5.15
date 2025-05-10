@@ -433,13 +433,6 @@ MODULE_VERSION(KPROFILES_VERSION);
 
 static void kp_apply_performance_profile(void)
 {
-#if defined(CONFIG_CPU_FREQ_GOV_PERFORMANCE)
-    int cpu;
-    for_each_online_cpu(cpu) {
-        cpufreq_set_policy(cpu, CPUFREQ_POLICY_PERFORMANCE);
-    }
-#endif
-
     struct gendisk *gd;
     struct request_queue *q;
     struct class_dev_iter iter;
