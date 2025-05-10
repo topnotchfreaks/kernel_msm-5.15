@@ -89,6 +89,8 @@ DEFINE_SPINLOCK(kp_set_mode_lock);
 
 static void kp_trigger_mode_change_event(void);
 
+static void kp_apply_performance_profile(void);
+
 /**
  * kp_set_mode_rollback - Change profile to a given mode for a specific duration
  * @level: The profile mode level to set (0-3)
