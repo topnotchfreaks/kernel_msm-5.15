@@ -227,6 +227,41 @@ jobs:
             echo "CONFIG_LOCALVERSION=\"$LOCALVERSION\"" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           fi
 
+      - name: "🛠 Setup kernel Tweaks"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -e
+
+          log() {
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+          }
+
+          apply_patch() {
+            local patch="$1"
+            local error_msg="$2"
+
+            log "Attempting to apply patch: $(basename "$patch")"
+
+            if ! patch -p1 < "$patch"; then
+              log "Warning: Some hunks failed while applying patch $(basename "$patch")"
+            fi
+          }
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-fs-lineageos-disguise.patch"
+          PATCH_FILE="0001-fs-lineageos-disguise.patch"
+
+          log "Downloading patch from $PATCH_URL"
+
+          curl -L -o "$PATCH_FILE" "$PATCH_URL"
+
+          if [ ! -f "$PATCH_FILE" ]; then
+            log "Patch file $PATCH_FILE does not exist after download"
+            exit 1
+          fi
+
+          apply_patch "$PATCH_FILE"
+
+          log "✅ Patch applied successfully"
+
       - name: "😋 Update KernelSU-Next + Next-SuSFS"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }}
@@ -238,7 +273,7 @@ jobs:
             rm -rf "./drivers/kernelsu"
           fi
 
-          curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs-dev
+          curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs
 
       - name: 😋 Setup SUSFS
         if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }}
@@ -262,47 +297,8 @@ jobs:
             fi
           }
         
-          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Implement-SUSFS-v1.5.7.patch"
-          PATCH_FILE="0001-Implement-SUSFS-v1.5.7.patch"
-        
-          log "Downloading SUSFS patch from $PATCH_URL"
-          curl -L -o "$PATCH_FILE" "$PATCH_URL"
-        
-          if [ ! -f "$PATCH_FILE" ]; then
-            log "Patch file $PATCH_FILE does not exist after download"
-            exit 1
-          fi
-        
-          apply_patch "$PATCH_FILE"
-        
-          log "✅ External SUSFS patch applied successfully"
-
-
-      - name: 🧩 Setup KSU SUSFS Manual hook
-        if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }}
-        env:
-          kernelName: ${{ env.kernelName }}
-          kernelDir: ${{ env.kernelDir }}
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          set -ex
-        
-          log() {
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
-          }
-        
-          apply_patch() {
-            local patch="$1"
-            local error_msg="$2"
-        
-            log "Attempting to apply patch: $(basename "$patch")"
-            if ! patch -p1 < "$patch"; then
-              log "Warning: Some hunks failed while applying patch $(basename "$patch")"
-            fi
-          }
-        
-          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/kernelsu-next-susfs.patch"
-          PATCH_FILE="kernelsu-next-susfs.patch"
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Implement-SUSFS-v1.5.7-manual-hooks.patch"
+          PATCH_FILE="0001-Implement-SUSFS-v1.5.7-manual-hooks.patch"
         
           log "Downloading SUSFS patch from $PATCH_URL"
           curl -L -o "$PATCH_FILE" "$PATCH_URL"
@@ -330,34 +326,34 @@ jobs:
             echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
           }
       
-          CONFIG_FILE="./arch/${ARCH}/configs/${DEFCONFIG_NAME}"
+          CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
           mkdir -p "$(dirname "$CONFIG_FILE")"
       
           # Configuration settings
           CONFIGS=(
-            "CONFIG_KSU=y"
-            "CONFIG_KSU_WITH_KPROBES=n"
-            "CONFIG_KSU_SUSFS=y"
-            "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"
-            "CONFIG_KSU_SUSFS_SUS_PATH=y"
-            "CONFIG_KSU_SUSFS_SUS_MOUNT=y"
-            "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y"
-            "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y"
-            "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_RECOVERY_MOUNT=y"
-            "CONFIG_KSU_SUSFS_SUS_KSTAT=n"
-            "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y"
-            "CONFIG_KSU_SUSFS_TRY_UMOUNT=y"
-            "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y"
-            "CONFIG_KSU_SUSFS_SPOOF_UNAME=y"
-            "CONFIG_KSU_SUSFS_ENABLE_LOG=y"
-            "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y"
-            "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y"
-            "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"
-            "CONFIG_KSU_SUSFS_SUS_SU=y"
-            "CONFIG_TMPFS_XATTR=y"
-            "CONFIG_OVERLAY_FS=y"
-            "CONFIG_OVERLAY_FS_REDIRECT_DIR=y"
-            "CONFIG_OVERLAY_FS_REDIRECT_ALWAYS_FOLLOW=y"
+          "CONFIG_KSU=y"
+          "CONFIG_KSU_WITH_KPROBES=n"
+          "CONFIG_KSU_SUSFS=y"
+          "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"
+          "CONFIG_KSU_SUSFS_SUS_PATH=y"
+          "CONFIG_KSU_SUSFS_SUS_MOUNT=y"
+          "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y"
+          "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y"
+          "CONFIG_KSU_SUSFS_SUS_KSTAT=n"
+          "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y"
+          "CONFIG_KSU_SUSFS_TRY_UMOUNT=y"
+          "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y"
+          "CONFIG_KSU_SUSFS_SPOOF_UNAME=y"
+          "CONFIG_KSU_SUSFS_ENABLE_LOG=y"
+          "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y"
+          "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y"
+          "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"
+          "CONFIG_KSU_SUSFS_SUS_SU=n"
+          "CONFIG_TMPFS_XATTR=y"
+          "CONFIG_TMPFS_POSIX_ACL=y"
+          "CONFIG_OVERLAY_FS=y"
+          "CONFIG_OVERLAY_FS_REDIRECT_DIR=y"
+          "CONFIG_OVERLAY_FS_REDIRECT_ALWAYS_FOLLOW=y"
           )
       
           for config in "${CONFIGS[@]}"; do
@@ -387,8 +383,8 @@ jobs:
         env:
           args: ${{ steps.generate-args.outputs.args }}
         run: |
-          export KBUILD_BUILD_USER="Action"
-          export KBUILD_BUILD_HOST="GitHub"
+          export KBUILD_BUILD_USER="♠️"
+          export KBUILD_BUILD_HOST="belowzeroiq"
 
           ccache -z
         
@@ -439,3 +435,24 @@ jobs:
           name: Anykernel3_${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip
           path: ./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip
           retention-days: 7
+
+      - name: "📤 Send kernel ZIP to Telegram"
+        run: |
+          UPLOAD_ZIP_NAME="Anykernel3_${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip"
+
+          mv "./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip" \
+             "./${{ env.kernelDir }}/${{ env.kernelName }}/${UPLOAD_ZIP_NAME}"
+
+          ANYKERNEL3_PATH="./${{ env.kernelDir }}/${{ env.kernelName }}/${UPLOAD_ZIP_NAME}"
+
+          if [[ -f "$ANYKERNEL3_PATH" ]]; then
+            curl -s -F document=@"$ANYKERNEL3_PATH" \
+                 -F caption="✅ Custom Kernel Build $(date '+%Y-%m-%d %H:%M:%S')" \
+                 -F chat_id=${{ secrets.TELEGRAM_USER_ID }} \
+                 "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument"
+          else
+            curl -s -X POST \
+                 -d chat_id=${{ secrets.TELEGRAM_USER_ID }} \
+                 -d text="❌ Kernel build failed or no output file found." \
+                 "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage"
+          fi
