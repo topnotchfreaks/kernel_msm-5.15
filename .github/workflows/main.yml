@@ -364,13 +364,6 @@ jobs:
           log "Current config contents:"
           cat "$CONFIG_FILE"            
 
-      - name: "📝 Append custom Makefile line"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          # temporary clang compiler fixup
-          echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
-          echo "Custom Makefile line added successfully"
-
       - name: "👍 Make defconfig"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         env:
