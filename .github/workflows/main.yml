@@ -44,6 +44,7 @@ on:
         options:
           - "None"
           - "KernelSU-Next-SuSFS"
+          - "SukiSU-Ultra-SuSFS"
 
 jobs:
   Set-repos:
@@ -262,21 +263,30 @@ jobs:
 
           log "✅ Patch applied successfully"
 
-      - name: "😋 Update KernelSU-Next + Next-SuSFS"
+      - name: "😋 Update KernelSU Version"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }}
+        if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }} || ${{ github.event.inputs.kernelSUChoice == 'SukiSU-Ultra-SuSFS' }}
         run: |
           if [ -d "./KernelSU-Next" ]; then
             rm -rf "./KernelSU-Next"
+          fi
+          if [ -d "./KernelSU" ]; then
+            rm -rf "./KernelSU"
           fi
           if [ -d "./drivers/kernelsu" ]; then
             rm -rf "./drivers/kernelsu"
           fi
 
+          if ${ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }; then
           curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs
+          elif ${ github.event.inputs.kernelSUChoice == 'SukiSU-Ultra-SuSFS' }; then
+          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-dev
+          fi
+
+          log "✅ KernelSU updated successfully"
 
       - name: 😋 Setup SUSFS
-        if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }}
+        if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }} || ${{ github.event.inputs.kernelSUChoice == 'SukiSU-Ultra-SuSFS' }}
         env: 
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -313,56 +323,61 @@ jobs:
           log "✅ External SUSFS patch applied successfully"
 
       - name: ⚙️ Add SUSFS configs
-        if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }}
+        if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }} || ${{ github.event.inputs.kernelSUChoice == 'SukiSU-Ultra-SuSFS' }}
         env:
-          ARCH: ${{ steps.generate-args.outputs.ARCH }}
           DEFCONFIG_NAME: ${{ env.DEFCONFIG_NAME }}
-          kernelName: ${{ env.kernelName }}
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -ex
-      
+
           log() {
             echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
           }
-      
+
           CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
           mkdir -p "$(dirname "$CONFIG_FILE")"
-      
-          # Configuration settings
-          CONFIGS=(
-          "CONFIG_KSU=y"
-          "CONFIG_KSU_WITH_KPROBES=n"
-          "CONFIG_KSU_SUSFS=y"
-          "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"
-          "CONFIG_KSU_SUSFS_SUS_PATH=y"
-          "CONFIG_KSU_SUSFS_SUS_MOUNT=y"
-          "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y"
-          "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y"
-          "CONFIG_KSU_SUSFS_SUS_KSTAT=n"
-          "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y"
-          "CONFIG_KSU_SUSFS_TRY_UMOUNT=y"
-          "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y"
-          "CONFIG_KSU_SUSFS_SPOOF_UNAME=y"
-          "CONFIG_KSU_SUSFS_ENABLE_LOG=y"
-          "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y"
-          "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y"
-          "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"
-          "CONFIG_KSU_SUSFS_SUS_SU=n"
-          "CONFIG_TMPFS_XATTR=y"
-          "CONFIG_TMPFS_POSIX_ACL=y"
-          "CONFIG_OVERLAY_FS=y"
-          "CONFIG_OVERLAY_FS_REDIRECT_DIR=y"
-          "CONFIG_OVERLAY_FS_REDIRECT_ALWAYS_FOLLOW=y"
+
+          CONFIGS=()
+          if [[ "${{ github.event.inputs.kernelSUChoice }}" == "KernelSU-Next-SuSFS" ]]; then
+            CONFIGS+=("CONFIG_KSU=y")
+          elif [[ "${{ github.event.inputs.kernelSUChoice }}" == "SukiSU-Ultra-SuSFS" ]]; then
+            CONFIGS+=(
+            "CONFIG_KSU=y"
+            "CONFIG_KSU_MANUAL_HOOKS=y"
+            "CONFIG_KPM=y"
           )
-      
-          for config in "${CONFIGS[@]}"; do
-            echo "$config" >> "$CONFIG_FILE"
-          done
-      
+          fi
+
+          CONFIGS+=(
+            "CONFIG_KSU_WITH_KPROBES=n"
+            "CONFIG_KSU_SUSFS=y"
+            "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"
+            "CONFIG_KSU_SUSFS_SUS_PATH=y"
+            "CONFIG_KSU_SUSFS_SUS_MOUNT=y"
+            "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y"
+            "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y"
+            "CONFIG_KSU_SUSFS_SUS_KSTAT=n"
+            "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y"
+            "CONFIG_KSU_SUSFS_TRY_UMOUNT=y"
+            "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y"
+            "CONFIG_KSU_SUSFS_SPOOF_UNAME=y"
+            "CONFIG_KSU_SUSFS_ENABLE_LOG=y"
+            "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y"
+            "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y"
+            "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"
+            "CONFIG_KSU_SUSFS_SUS_SU=n"
+            "CONFIG_TMPFS_XATTR=y"
+            "CONFIG_TMPFS_POSIX_ACL=y"
+            "CONFIG_OVERLAY_FS=y"
+            "CONFIG_OVERLAY_FS_REDIRECT_DIR=y"
+            "CONFIG_OVERLAY_FS_REDIRECT_ALWAYS_FOLLOW=y"
+          )
+
+          printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
+
           log "✅ SUSFS configs added to $CONFIG_FILE"
           log "Current config contents:"
-          cat "$CONFIG_FILE"            
+          cat "$CONFIG_FILE"
 
       - name: "👍 Make defconfig"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -430,6 +445,8 @@ jobs:
           retention-days: 7
 
       - name: "📤 Send kernel ZIP to Telegram"
+        env:
+          KSU_CHOICE: ${{ github.event.inputs.kernelSUChoice }}
         run: |
           UPLOAD_ZIP_NAME="Anykernel3_${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip"
 
@@ -438,14 +455,29 @@ jobs:
 
           ANYKERNEL3_PATH="./${{ env.kernelDir }}/${{ env.kernelName }}/${UPLOAD_ZIP_NAME}"
 
+          KSU_MSG=""
+          if [[ "${KSU_CHOICE}" == "KernelSU-Next-SuSFS" ]]; then
+            KSU_MSG="KernelSU: KernelSU-Next-SuSFS"
+          elif [[ "${KSU_CHOICE}" == "SukiSU-Ultra-SuSFS" ]]; then
+            KSU_MSG="KernelSU: SukiSU-Ultra-SuSFS"
+          elif [[ "${KSU_CHOICE}" == "None" ]]; then
+            KSU_MSG="KernelSU: None"
+          else
+            KSU_MSG="KernelSU: ${KSU_CHOICE}"
+          fi
+
           if [[ -f "$ANYKERNEL3_PATH" ]]; then
             curl -s -F document=@"$ANYKERNEL3_PATH" \
-                 -F caption="✅ Custom Kernel Build $(date '+%Y-%m-%d %H:%M:%S')" \
+                 -F caption="
+                 ✅ Custom Kernel Build $(date '+%Y-%m-%d %H:%M:%S')
+                 %0A${KSU_MSG}" \
                  -F chat_id=${{ secrets.TELEGRAM_USER_ID }} \
                  "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument"
           else
             curl -s -X POST \
                  -d chat_id=${{ secrets.TELEGRAM_USER_ID }} \
-                 -d text="❌ Kernel build failed or no output file found." \
+                 -d text="
+                 ❌ Kernel build failed or no output file found.
+                 %0A${KSU_MSG}" \
                  "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage"
           fi
