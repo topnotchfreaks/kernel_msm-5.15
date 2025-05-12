@@ -265,7 +265,7 @@ jobs:
 
       - name: "😋 Update KernelSU Version"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }} || ${{ github.event.inputs.kernelSUChoice == 'SukiSU-Ultra-SuSFS' }}
+        if: ${{ github.event.inputs.kernelSUChoice != 'None' }}
         run: |
           if [ -d "./KernelSU-Next" ]; then
             rm -rf "./KernelSU-Next"
@@ -286,7 +286,7 @@ jobs:
           echo "✅ KernelSU updated successfully"
 
       - name: 😋 Setup SUSFS
-        if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }} || ${{ github.event.inputs.kernelSUChoice == 'SukiSU-Ultra-SuSFS' }}
+        if: ${{ github.event.inputs.kernelSUChoice != 'None' }}
         env: 
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -323,7 +323,7 @@ jobs:
           log "✅ External SUSFS patch applied successfully"
 
       - name: ⚙️ Add SUSFS configs
-        if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }} || ${{ github.event.inputs.kernelSUChoice == 'SukiSU-Ultra-SuSFS' }}
+        if: ${{ github.event.inputs.kernelSUChoice != 'None' }}
         env:
           DEFCONFIG_NAME: ${{ env.DEFCONFIG_NAME }}
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -469,8 +469,8 @@ jobs:
           if [[ -f "$ANYKERNEL3_PATH" ]]; then
             curl -s -F document=@"$ANYKERNEL3_PATH" \
                  -F caption="
-                 ✅ Custom Kernel Build $(date '+%Y-%m-%d %H:%M:%S')
-                 %0A${KSU_MSG}" \
+                 ✅ Build Date $(date '+%Y-%m-%d %H:%M:%S')
+                 ${KSU_MSG}" \
                  -F chat_id=${{ secrets.TELEGRAM_USER_ID }} \
                  "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument"
           else
@@ -478,6 +478,6 @@ jobs:
                  -d chat_id=${{ secrets.TELEGRAM_USER_ID }} \
                  -d text="
                  ❌ Kernel build failed or no output file found.
-                 %0A${KSU_MSG}" \
+                 ${KSU_MSG}" \
                  "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage"
           fi
