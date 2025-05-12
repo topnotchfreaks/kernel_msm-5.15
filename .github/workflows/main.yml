@@ -277,10 +277,10 @@ jobs:
             rm -rf "./drivers/kernelsu"
           fi
 
-          if ${ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }; then
-          curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs
-          elif ${ github.event.inputs.kernelSUChoice == 'SukiSU-Ultra-SuSFS' }; then
-          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-dev
+          if [[ "${{ github.event.inputs.kernelSUChoice }}" == "KernelSU-Next-SuSFS" ]]; then
+            curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs
+          elif [[ "${{ github.event.inputs.kernelSUChoice }}" == "SukiSU-Ultra-SuSFS" ]]; then
+            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-dev
           fi
 
           log "✅ KernelSU updated successfully"
