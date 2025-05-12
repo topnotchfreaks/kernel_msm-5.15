@@ -283,7 +283,7 @@ jobs:
             curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-dev
           fi
 
-          log "✅ KernelSU updated successfully"
+          echo "✅ KernelSU updated successfully"
 
       - name: 😋 Setup SUSFS
         if: ${{ github.event.inputs.kernelSUChoice == 'KernelSU-Next-SuSFS' }} || ${{ github.event.inputs.kernelSUChoice == 'SukiSU-Ultra-SuSFS' }}
