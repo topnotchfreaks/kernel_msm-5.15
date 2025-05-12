@@ -345,6 +345,7 @@ jobs:
             "CONFIG_KSU=y"
             "CONFIG_KSU_MANUAL_HOOKS=y"
             "CONFIG_KPM=y"
+            "CONFIG_KALLSYMS=y"
           )
           fi
 
