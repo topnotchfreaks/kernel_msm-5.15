@@ -152,7 +152,7 @@ jobs:
             printf "%s" "$latest_url"
           }
 
-          clang_url=$(get_latest_github_release "greenforce-project/greenforce_clang")
+          clang_url=$(get_latest_github_release "ZyCromerZ/Clang")
 
           mkdir -p clang
           wget --progress=bar:force -O "clang/clang.tar.gz" "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
