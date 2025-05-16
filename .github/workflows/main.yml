@@ -411,8 +411,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-${{ github.sha }}
-        
+          key: ccache-${{ github.ref }}-${{ hashFiles('**/defconfig') }}
+          restore-keys: |
+            ccache-${{ github.ref }}
+            ccache-
+
+      - name: "📤 Show ccache stats"
+        run: ccache -s
+
       - name: "📦 Pack Anykernel3"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
