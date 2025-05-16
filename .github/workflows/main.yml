@@ -45,6 +45,14 @@ on:
           - "None"
           - "KernelSU-Next-SuSFS"
           - "SukiSU-Ultra-SuSFS"
+      clangCompiler:
+        description: "Choose Clang compiler"
+        required: true
+        default: "ZyC Clang"
+        type: choice
+        options:
+          - "ZyC Clang"
+          - "Greenforce Clang"
 
 jobs:
   Set-repos:
@@ -138,8 +146,9 @@ jobs:
 
       - name: "💫 Get Toolchains"
         run: |
-          set -e
-          
+          set -e  # Exit on errors
+      
+          # Function to fetch latest release tar.gz URL from GitHub
           get_latest_github_release() {
             local repo_url="$1"
             latest_url=$(curl -sL "https://api.github.com/repos/$repo_url/releases/latest" | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | head -n 1)
@@ -149,21 +158,60 @@ jobs:
               exit 1
             fi
       
-            printf "%s" "$latest_url"
+            printf "%s" "$latest_url"  # Use printf to output only the URL
           }
-
-          clang_url=$(get_latest_github_release "ZyCromerZ/Clang")
-
-          mkdir -p clang
-          wget --progress=bar:force -O "clang/clang.tar.gz" "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
-          tar -xf clang/clang.tar.gz -C clang || { echo "❌ Extraction failed!"; exit 1; }
-          rm -f clang/clang.tar.gz
-          
-          CLANG_PATH=$(find clang -type d -name "bin" | head -n 1)
-          CLANG_PATH="${{ github.workspace }}/${CLANG_PATH}"
       
+          # Determine the Clang URL dynamically
+          case "${{ github.event.inputs.clangCompiler }}" in
+            "ZyC Clang")
+              clang_url=$(get_latest_github_release "ZyCromerZ/Clang")
+              ;;
+            "Greenforce Clang")
+              clang_url=$(get_latest_github_release "greenforce-project/greenforce_clang")
+              ;;
+            *)
+              echo "❌ Unsupported Clang compiler: ${{ github.event.inputs.clangCompiler }}"
+              exit 1
+              ;;
+          esac
+      
+          echo "✅ Clang URL: $clang_url"
+      
+          # Create clang directory
+          mkdir -p clang
+      
+          # Check if it's an archive or a Git repo
+          if [[ "$clang_url" == *.tar.gz ]]; then
+            echo "🚀 Downloading latest Clang from: $clang_url..."
+            wget --progress=bar:force -O "clang/clang.tar.gz" "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
+      
+            # Extract Clang
+            echo "📦 Extracting Clang..."
+            tar -xf clang/clang.tar.gz -C clang || { echo "❌ Extraction failed!"; exit 1; }
+            rm -f clang/clang.tar.gz
+          else
+            echo "🚀 Cloning Clang from $clang_url..."
+            git clone --recursive --depth=1 "$clang_url" clang || { echo "❌ Cloning failed!"; exit 1; }
+          fi
+      
+          # Find Clang's bin directory
+          if [ -d "clang/bin" ]; then
+            CLANG_PATH="${{ github.workspace }}/clang/bin"
+          else
+            CLANG_PATH=$(find clang -type d -name "bin" | head -n 1)
+            CLANG_PATH="${{ github.workspace }}/${CLANG_PATH}"
+          fi
+      
+          # Ensure Clang binary exists
+          if [ ! -f "$CLANG_PATH/clang" ]; then
+            echo "❌ Clang binary not found in $CLANG_PATH! Build might fail."
+            ls -R clang  # Debugging: Show extracted files
+            exit 1
+          fi
+      
+          echo "✅ Using Clang from $CLANG_PATH"
           echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
-          echo "$CLANG_PATH" >> $GITHUB_PATH
+          echo "$CLANG_PATH" >> $GITHUB_PATH  # Ensures path is updated
       
           export PATH="$CLANG_PATH:$PATH"
           export CLANG_TRIPLE="aarch64-linux-gnu-"
@@ -175,7 +223,8 @@ jobs:
           export OBJDUMP="llvm-objdump"
           export STRIP="llvm-strip"
       
-          clang --version
+          echo "⚙️ Using Clang version:"
+          clang --version || echo "❌ Clang not found in PATH!"  
 
       - name: 📐 Setup swap 25G
         uses: pierotofy/set-swap-space@master
