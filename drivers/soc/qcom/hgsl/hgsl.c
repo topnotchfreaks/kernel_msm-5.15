@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <asm/unistd.h>
@@ -1308,11 +1308,13 @@ static void _signal_contexts(struct qcom_hgsl *hgsl)
 			continue;
 		}
 
+		mutex_lock(&ctxt->lock);
 		ts = get_context_retired_ts(ctxt);
 		if (ts != ctxt->last_ts) {
 			hgsl_hsync_timeline_signal(ctxt->timeline, ts);
 			ctxt->last_ts = ts;
 		}
+		mutex_unlock(&ctxt->lock);
 		hgsl_put_context(ctxt);
 
 	}
