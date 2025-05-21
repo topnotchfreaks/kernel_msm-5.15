@@ -465,7 +465,7 @@ jobs:
         run: ccache -s
 
       - name: "🩹 Patch Image with KPM"
-        if: ${{ inputs.kernelSUChoice == 'SukiSU-Ultra-SuSFS' }}
+        if: ${{ github.event.inputs.kernelSUChoice != 'None' }}
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
             echo "Patching Image file..."
