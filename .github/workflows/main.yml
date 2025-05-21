@@ -167,7 +167,7 @@ jobs:
               clang_url=$(get_latest_github_release "ZyCromerZ/Clang")
               ;;
             "Greenforce Clang")
-              clang_url=$(get_latest_github_release "greenforce-project/greenforce_clang")
+              clang_url=$(get_latest_github_release "topnotchfreaks/clang")
               ;;
             *)
               echo "❌ Unsupported Clang compiler: ${{ github.event.inputs.clangCompiler }}"
