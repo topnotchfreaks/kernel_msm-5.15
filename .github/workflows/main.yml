@@ -39,12 +39,12 @@ on:
       kernelSUChoice:
         description: "Choose KernelSU version"
         required: true
-        default: "KernelSU"
+        default: "SukiSU-Ultra-SuSFS-stable"
         type: choice
         options:
           - "None"
-          - "KernelSU-Next-SuSFS"
-          - "SukiSU-Ultra-SuSFS"
+          - "SukiSU-Ultra-SuSFS-stable"
+          - "SukiSU-Ultra-SuSFS-dev"
       clangCompiler:
         description: "Choose Clang compiler"
         required: true
@@ -316,9 +316,6 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         if: ${{ github.event.inputs.kernelSUChoice != 'None' }}
         run: |
-          if [ -d "./KernelSU-Next" ]; then
-            rm -rf "./KernelSU-Next"
-          fi
           if [ -d "./KernelSU" ]; then
             rm -rf "./KernelSU"
           fi
@@ -326,9 +323,9 @@ jobs:
             rm -rf "./drivers/kernelsu"
           fi
 
-          if [[ "${{ github.event.inputs.kernelSUChoice }}" == "KernelSU-Next-SuSFS" ]]; then
-            curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs
-          elif [[ "${{ github.event.inputs.kernelSUChoice }}" == "SukiSU-Ultra-SuSFS" ]]; then
+          if [[ "${{ github.event.inputs.kernelSUChoice }}" == "SukiSU-Ultra-SuSFS-stable" ]]; then
+            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-stable
+          elif [[ "${{ github.event.inputs.kernelSUChoice }}" == "SukiSU-Ultra-SuSFS-dev" ]]; then
             curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-dev
           fi
 
@@ -386,19 +383,11 @@ jobs:
           CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
           mkdir -p "$(dirname "$CONFIG_FILE")"
 
-          CONFIGS=()
-          if [[ "${{ github.event.inputs.kernelSUChoice }}" == "KernelSU-Next-SuSFS" ]]; then
-            CONFIGS+=("CONFIG_KSU=y")
-          elif [[ "${{ github.event.inputs.kernelSUChoice }}" == "SukiSU-Ultra-SuSFS" ]]; then
-            CONFIGS+=(
+          CONFIGS+=(
             "CONFIG_KSU=y"
             "CONFIG_KSU_MANUAL_HOOKS=y"
             "CONFIG_KPM=y"
             "CONFIG_KALLSYMS=y"
-          )
-          fi
-
-          CONFIGS+=(
             "CONFIG_KSU_WITH_KPROBES=n"
             "CONFIG_KSU_SUSFS=y"
             "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"
@@ -406,7 +395,7 @@ jobs:
             "CONFIG_KSU_SUSFS_SUS_MOUNT=y"
             "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y"
             "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y"
-            "CONFIG_KSU_SUSFS_SUS_KSTAT=n"
+            "CONFIG_KSU_SUSFS_SUS_KSTAT=y"
             "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y"
             "CONFIG_KSU_SUSFS_TRY_UMOUNT=y"
             "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y"
@@ -531,10 +520,10 @@ jobs:
           ANYKERNEL3_PATH="./${{ env.kernelDir }}/${{ env.kernelName }}/${UPLOAD_ZIP_NAME}"
 
           KSU_MSG=""
-          if [[ "${KSU_CHOICE}" == "KernelSU-Next-SuSFS" ]]; then
-            KSU_MSG="KernelSU: KernelSU-Next-SuSFS"
-          elif [[ "${KSU_CHOICE}" == "SukiSU-Ultra-SuSFS" ]]; then
-            KSU_MSG="KernelSU: SukiSU-Ultra-SuSFS"
+          if [[ "${KSU_CHOICE}" == "SukiSU-Ultra-SuSFS-stable" ]]; then
+            KSU_MSG="KernelSU: SukiSU-Stable"
+          elif [[ "${KSU_CHOICE}" == "SukiSU-Ultra-SuSFS-dev" ]]; then
+            KSU_MSG="KernelSU: SukiSU-dev"
           elif [[ "${KSU_CHOICE}" == "None" ]]; then
             KSU_MSG="KernelSU: None"
           else
