@@ -48,11 +48,11 @@ on:
       clangCompiler:
         description: "Choose Clang compiler"
         required: true
-        default: "ZyC Clang"
+        default: "TopNotchFreaks Clang"
         type: choice
         options:
           - "ZyC Clang"
-          - "Greenforce Clang"
+          - "TopNotchFreaks Clang"
 
 jobs:
   Set-repos:
@@ -166,7 +166,7 @@ jobs:
             "ZyC Clang")
               clang_url=$(get_latest_github_release "ZyCromerZ/Clang")
               ;;
-            "Greenforce Clang")
+            "TopNotchFreaks Clang")
               clang_url=$(get_latest_github_release "topnotchfreaks/clang")
               ;;
             *)
