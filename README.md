@@ -55,7 +55,7 @@ This repository provides a **pre-configured GitHub Actions workflow** to easily 
 - [@PhamtomK12](https://github.com/PhamtomK12) - Original Kernel Builder Owner
 - [@ssocozy](https://github.com/ssocozy)
 - [@NVG-064](https://github.com/NVG-064)
-- [@rifsxd](https://github.com/rifsxd)
+- [@ShirkNeko](https://github.com/ShirkNeko)
 - [@thewildjames](https://github.com/thewildjames)
 
 ---
