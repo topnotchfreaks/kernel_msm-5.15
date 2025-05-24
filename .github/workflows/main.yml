@@ -450,7 +450,7 @@ jobs:
             NM=llvm-nm \
             OBJCOPY=llvm-objcopy \
             STRIP=llvm-strip \
-            -j$(nproc --all)
+            -j8
         
       - name: "📤 Save ccache Cache"
         uses: actions/cache@v4
