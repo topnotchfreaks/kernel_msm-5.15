@@ -202,29 +202,30 @@ jobs:
 
           apply_patch() {
             local patch="$1"
-            local error_msg="$2"
-
             log "Attempting to apply patch: $(basename "$patch")"
-
             if ! patch -p1 < "$patch"; then
               log "Warning: Some hunks failed while applying patch $(basename "$patch")"
             fi
           }
-          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-fs-lineageos-disguise.patch"
-          PATCH_FILE="0001-fs-lineageos-disguise.patch"
 
-          log "Downloading patch from $PATCH_URL"
+          PATCH_URLS=(
+            "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-fs-lineageos-disguise.patch"
+            "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-crypto-Add-support-for-LZ4K-and-LZ4KD.patch"
+            "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-lz4-Update-LZ4-to-v1.9.4.patch"
+          )
 
-          curl -L -o "$PATCH_FILE" "$PATCH_URL"
+          for PATCH_URL in "${PATCH_URLS[@]}"; do
+            PATCH_FILE=$(basename "$PATCH_URL")
+            log "Downloading patch from $PATCH_URL"
+            curl -L -o "$PATCH_FILE" "$PATCH_URL"
+            if [ ! -f "$PATCH_FILE" ]; then
+              log "Patch file $PATCH_FILE does not exist after download"
+              exit 1
+            fi
+            apply_patch "$PATCH_FILE"
+          done
 
-          if [ ! -f "$PATCH_FILE" ]; then
-            log "Patch file $PATCH_FILE does not exist after download"
-            exit 1
-          fi
-
-          apply_patch "$PATCH_FILE"
-
-          log "✅ Patch applied successfully"
+          log "✅ All kernel tweak patches applied successfully"
 
       - name: "😋 Update KernelSU Version"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
