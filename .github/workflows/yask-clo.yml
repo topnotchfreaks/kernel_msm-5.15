@@ -410,20 +410,3 @@ jobs:
         with:
           files: ./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.ZIP_NAME }}
           tag_name: "YASK"
-
-      - name: "⬆️ Send kernel ZIP to Telegram Channel"
-        run: |
-          UPLOAD_ZIP_NAME="Anykernel3_${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip"
-          ANYKERNEL3_PATH="./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.ZIP_NAME }}"
-
-          if [[ -f "$ANYKERNEL3_PATH" ]]; then
-            curl -s -F document=@"$ANYKERNEL3_PATH" \
-                 -F caption="✅ Build Date $(date '+%Y-%m-%d %H:%M:%S')" \
-                 -F chat_id="@topnotchfreaks_yask" \
-                 "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument"
-          else
-            curl -s -X POST \
-                 -d chat_id="@topnotchfreaks_yask" \
-                 -d text="❌ Kernel build failed or no output file found." \
-                 "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage"
-          fi
