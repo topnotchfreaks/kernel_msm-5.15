@@ -1,0 +1,407 @@
+name: "Build YASK GKI"
+
+env:
+  OUT_DIR: "out"
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  Set-repos:
+    name: "🐂 Parse repository"
+    runs-on: ubuntu-latest
+    outputs:
+      repos: ${{ steps.generate-matrix.outputs.repos }}
+    steps:
+      - name: "😄 Checkout"
+        uses: actions/checkout@v4
+
+  Build-Kernel:
+    name: "🐎 Build kernel"
+    runs-on: ubuntu-latest
+    env:
+      kernelDir: common_gki
+      kernelName: common
+      kernelRepo: https://github.com/topnotchfreaks/kernel_msm-5.15
+      kernelBranch: google
+      kernelDevice: gki
+      DEFCONFIG_NAME: gki_defconfig
+      OUT_DIR: "out"
+      localVersion: "-YASK/GKI"
+
+    steps:
+      - name: "✨ Setup workspace"
+        run: |
+          mkdir -p $kernelDir
+
+          echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc curl flex cpio ccache rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
+
+      - name: "🌟 Clone kernel source => (${{ env.kernelRepo }})"
+        working-directory: ./${{ env.kernelDir }}
+        run: |
+          set -x
+
+          git clone --recursive --branch ${{ env.kernelBranch }} \
+            ${{ env.kernelRepo }} ${{ env.kernelName }} --depth=1
+
+
+      - name: "💫 Get Toolchains"
+        run: |
+          set -e  # Exit on errors
+
+          # Function to fetch latest release tar.gz URL from GitHub
+          get_latest_github_release() {
+            local repo_url="$1"
+            latest_url=$(curl -sL "https://api.github.com/repos/$repo_url/releases/latest" | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | head -n 1)
+
+            if [[ -z "$latest_url" ]]; then
+              echo "❌ Failed to fetch latest release from $repo_url!"
+              exit 1
+            fi
+
+            printf "%s" "$latest_url"  # Use printf to output only the URL
+          }
+
+          clang_url=$(get_latest_github_release "topnotchfreaks/clang")
+
+          echo "✅ Clang URL: $clang_url"
+
+          # Create clang directory
+          mkdir -p clang
+
+          # Check if it's an archive or a Git repo
+          if [[ "$clang_url" == *.tar.gz ]]; then
+            echo "🚀 Downloading latest Clang from: $clang_url..."
+            wget --progress=bar:force -O "clang/clang.tar.gz" "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
+
+            # Extract Clang
+            echo "📦 Extracting Clang..."
+            tar -xf clang/clang.tar.gz -C clang || { echo "❌ Extraction failed!"; exit 1; }
+            rm -f clang/clang.tar.gz
+          else
+            echo "🚀 Cloning Clang from $clang_url..."
+            git clone --recursive --depth=1 "$clang_url" clang || { echo "❌ Cloning failed!"; exit 1; }
+          fi
+
+          # Find Clang's bin directory
+          if [ -d "clang/bin" ]; then
+            CLANG_PATH="${{ github.workspace }}/clang/bin"
+          else
+            CLANG_PATH=$(find clang -type d -name "bin" | head -n 1)
+            CLANG_PATH="${{ github.workspace }}/${CLANG_PATH}"
+          fi
+
+          # Ensure Clang binary exists
+          if [ ! -f "$CLANG_PATH/clang" ]; then
+            echo "❌ Clang binary not found in $CLANG_PATH! Build might fail."
+            ls -R clang  # Debugging: Show extracted files
+            exit 1
+          fi
+
+          echo "✅ Using Clang from $CLANG_PATH"
+          echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
+          echo "$CLANG_PATH" >> $GITHUB_PATH  # Ensures path is updated
+
+          export PATH="$CLANG_PATH:$PATH"
+          export CLANG_TRIPLE="aarch64-linux-gnu-"
+          export CC="ccache clang"
+          export AR="llvm-ar"
+          export AS="llvm-as"
+          export NM="llvm-nm"
+          export OBJCOPY="llvm-objcopy"
+          export OBJDUMP="llvm-objdump"
+          export STRIP="llvm-strip"
+
+          echo "⚙️ Using Clang version:"
+          clang --version || echo "❌ Clang not found in PATH!"  
+
+      - name: 📐 Setup swap 25G
+        uses: pierotofy/set-swap-space@master
+        with:
+            swap-size-gb: 25
+
+      - name: 📐 Tune Swap
+        run: |
+            echo "vm.swappiness=50" | sudo tee -a /etc/sysctl.conf
+            sudo sysctl -p
+        
+      - name: "📥 Restore ccache Cache"
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ${{ runner.os }}-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
+
+      - name: "⚡ Configure ccache"
+        run: |
+            echo "CCACHE_DIR=${{ github.workspace }}/.ccache" >> $GITHUB_ENV
+            echo "CC='ccache clang'" >> $GITHUB_ENV
+            echo "PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
+          
+      - name: "😎 Set args for GKI kernels"
+        id: generate-args
+        working-directory: ./${{ env.kernelDir }}
+        env:
+            params: "${{ toJSON(matrix.repos.params) }}"
+        run: |
+            args="-j$(nproc --all)"
+            if [ -n "${{ env.OUT_DIR }}" ]; then
+              mkdir -p $(pwd)/${{ env.OUT_DIR }}
+              args="$args O=$(pwd)/${{ env.OUT_DIR }}"
+            fi
+            args="$args ARCH=arm64 LLVM=1 LTO=thin"
+            args="$args CROSS_COMPILE=aarch64-linux-gnu-"
+            args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
+            args="$args AR=llvm-ar"
+            args="$args CC=clang"
+            echo "args=$args" >> $GITHUB_OUTPUT
+
+      - name: "🛠 Set localversion name in defconfig"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        env:
+          LOCALVERSION: ${{ env.localVersion }}
+        run: |
+          if [ -n "$LOCALVERSION" ]; then
+            echo "CONFIG_LOCALVERSION=\"$LOCALVERSION\"" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          fi
+
+      - name: "🛠 Setup kernel Tweaks"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -e
+
+          log() {
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+          }
+
+          apply_patch() {
+            local patch="$1"
+            local error_msg="$2"
+
+            log "Attempting to apply patch: $(basename "$patch")"
+
+            if ! patch -p1 < "$patch"; then
+              log "Warning: Some hunks failed while applying patch $(basename "$patch")"
+            fi
+          }
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-fs-lineageos-disguise.patch"
+          PATCH_FILE="0001-fs-lineageos-disguise.patch"
+
+          log "Downloading patch from $PATCH_URL"
+
+          curl -L -o "$PATCH_FILE" "$PATCH_URL"
+
+          if [ ! -f "$PATCH_FILE" ]; then
+            log "Patch file $PATCH_FILE does not exist after download"
+            exit 1
+          fi
+
+          apply_patch "$PATCH_FILE"
+
+          log "✅ Patch applied successfully"
+
+      - name: "😋 Update KernelSU Version"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          if [ -d "./KernelSU" ]; then
+            rm -rf "./KernelSU"
+          fi
+          if [ -d "./drivers/kernelsu" ]; then
+            rm -rf "./drivers/kernelsu"
+          fi
+
+          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-stable
+
+          echo "✅ KernelSU updated successfully"
+
+      - name: 😋 Setup SUSFS
+        env: 
+          ARCH: ${{ steps.generate-args.outputs.ARCH }}
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex
+        
+          log() {
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+          }
+        
+          apply_patch() {
+            local patch="$1"
+            local error_msg="$2"
+        
+            log "Attempting to apply patch: $(basename "$patch")"
+            if ! patch -p1 < "$patch"; then
+              log "Warning: Some hunks failed while applying patch $(basename "$patch")"
+            fi
+          }
+        
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Implement-SUSFS-v1.5.7-syscall-hooks.patch"
+          PATCH_FILE="0001-Implement-SUSFS-v1.5.7-syscall-hooks.patch"
+        
+          log "Downloading SUSFS patch from $PATCH_URL"
+          curl -L -o "$PATCH_FILE" "$PATCH_URL"
+        
+          if [ ! -f "$PATCH_FILE" ]; then
+            log "Patch file $PATCH_FILE does not exist after download"
+            exit 1
+          fi
+        
+          apply_patch "$PATCH_FILE"
+        
+          log "✅ External SUSFS patch applied successfully"
+
+      - name: ⚙️ Add SUSFS configs
+        env:
+          DEFCONFIG_NAME: ${{ env.DEFCONFIG_NAME }}
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex
+
+          log() {
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+          }
+
+          CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
+          mkdir -p "$(dirname "$CONFIG_FILE")"
+
+          CONFIGS+=(
+            "CONFIG_KSU=y"
+            "CONFIG_KSU_MANUAL_HOOKS=y"
+            "CONFIG_KPM=y"
+            "CONFIG_KALLSYMS=y"
+            "CONFIG_KSU_WITH_KPROBES=n"
+            "CONFIG_KSU_SUSFS=y"
+            "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"
+            "CONFIG_KSU_SUSFS_SUS_PATH=y"
+            "CONFIG_KSU_SUSFS_SUS_MOUNT=y"
+            "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y"
+            "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y"
+            "CONFIG_KSU_SUSFS_SUS_KSTAT=y"
+            "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=y"
+            "CONFIG_KSU_SUSFS_TRY_UMOUNT=y"
+            "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y"
+            "CONFIG_KSU_SUSFS_SPOOF_UNAME=y"
+            "CONFIG_KSU_SUSFS_ENABLE_LOG=y"
+            "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y"
+            "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y"
+            "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"
+            "CONFIG_KSU_SUSFS_SUS_SU=n"
+            "CONFIG_TMPFS_XATTR=y"
+            "CONFIG_TMPFS_POSIX_ACL=y"
+            "CONFIG_OVERLAY_FS=y"
+            "CONFIG_OVERLAY_FS_REDIRECT_DIR=y"
+            "CONFIG_OVERLAY_FS_REDIRECT_ALWAYS_FOLLOW=y"
+          )
+
+          printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
+
+          log "✅ SUSFS configs added to $CONFIG_FILE"
+          log "Current config contents:"
+          cat "$CONFIG_FILE"
+
+      - name: "📝 Append custom Makefile line"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          # temporary clang compiler fixup
+          echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
+          echo "Custom Makefile line added successfully"
+
+      - name: "👍 Make defconfig"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        env:
+          args: ${{ steps.generate-args.outputs.args }}
+        run: |
+          make ${{ env.args }} ${{ env.DEFCONFIG_NAME }}
+
+      - name: "🎶 Build kernel"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        env:
+          args: ${{ steps.generate-args.outputs.args }}
+        run: |
+          export KBUILD_BUILD_USER="Automated"
+          export KBUILD_BUILD_HOST="GitHub-Actions"
+
+          ccache -z
+        
+          make ${args} \
+            LLVM=1 \
+            LTO=thin \
+            CC="ccache clang" \
+            AR=llvm-ar \
+            NM=llvm-nm \
+            OBJCOPY=llvm-objcopy \
+            STRIP=llvm-strip \
+            -j8
+        
+      - name: "📤 Save ccache Cache"
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.ccache
+          key: ccache-${{ github.ref }}-${{ hashFiles('**/defconfig') }}
+          restore-keys: |
+            ccache-${{ github.ref }}
+            ccache-
+
+      - name: "📤 Show ccache stats"
+        run: ccache -s
+
+      - name: "🩹 Patch Image with KPM"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+            echo "Patching Image file..."
+            cd "../${{ env.OUT_DIR }}/arch/arm64/boot/"
+            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
+            chmod 777 patch
+            ./patch
+            rm -rf Image
+            mv oImage Image
+
+      - name: "📦 Pack Anykernel3"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -e
+
+          [ ! -d "AnyKernel3" ] && git clone https://github.com/topnotchfreaks/AnyKernel3.git --depth=1
+
+          KERNEL_IMAGE_PATH="../${{ env.OUT_DIR }}/arch/arm64/boot/Image"
+          if [ ! -f "$KERNEL_IMAGE_PATH" ]; then
+            KERNEL_IMAGE_PATH=$(find ../${{ env.OUT_DIR }}/arch/arm64/boot -name "Image*" | head -n 1)
+            if [ -z "$KERNEL_IMAGE_PATH" ]; then
+              echo "Error: No kernel image found."
+              exit 1
+            fi
+          fi
+
+          cp "$KERNEL_IMAGE_PATH" AnyKernel3/Image
+
+          # Get kernel version from Makefile
+          KERNEL_VERSION=$(make kernelversion)
+          BUILD_DATE=$(date +'%Y-%m-%d')
+
+          ZIP_NAME="Anykernel3_GKI-YASK-${KERNEL_VERSION}-${BUILD_DATE}.zip"
+          cd AnyKernel3
+          zip -r9 "../$ZIP_NAME" * -x .git/*
+          cd ..
+
+          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+
+      - name: "⬆️ Upload Kernel Artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ZIP_NAME }}
+          path: ./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.ZIP_NAME }}
+          retention-days: 7
+
+      - name: "⬆️ Upload ZIP to GitHub Release"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          ZIP_PATH="./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.ZIP_NAME }}"
+          TAG_NAME="YASK"
+          gh release upload "$TAG_NAME" "$ZIP_PATH" --clobber
