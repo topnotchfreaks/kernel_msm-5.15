@@ -24,8 +24,8 @@ jobs:
     env:
       kernelDir: common_gki
       kernelName: common
-      kernelRepo: https://github.com/topnotchfreaks/kernel_msm-5.15
-      kernelBranch: google
+      kernelRepo: https://android.googlesource.com/kernel/common
+      kernelBranch: android13-5.15-lts
       kernelDevice: gki
       DEFCONFIG_NAME: gki_defconfig
       OUT_DIR: "out"

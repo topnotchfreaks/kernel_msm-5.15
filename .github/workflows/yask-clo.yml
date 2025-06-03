@@ -24,8 +24,8 @@ jobs:
     env:
       kernelDir: common_gki
       kernelName: common
-      kernelRepo: https://github.com/topnotchfreaks/kernel_msm-5.15
-      kernelBranch: codelinaro
+      kernelRepo: https://git.codelinaro.org/clo/la/kernel/msm-5.15
+      kernelBranch: kernel.lnx.5.15.r1-rel
       kernelDevice: gki
       DEFCONFIG_NAME: gki_defconfig
       OUT_DIR: "out"
