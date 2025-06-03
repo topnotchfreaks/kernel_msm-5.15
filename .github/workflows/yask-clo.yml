@@ -433,9 +433,9 @@ jobs:
           retention-days: 7
 
       - name: "⬆️ Upload ZIP to GitHub Release"
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-        run: |
-          ZIP_PATH="./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.ZIP_NAME }}"
-          TAG_NAME="YASK"
-          gh release upload "$TAG_NAME" "$ZIP_PATH" --clobber
+        with:
+          files: ./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.ZIP_NAME }}
+          tag_name: "YASK"
