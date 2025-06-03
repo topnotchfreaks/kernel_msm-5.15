@@ -387,7 +387,7 @@ jobs:
           KERNEL_VERSION=$(make kernelversion)
           BUILD_DATE=$(date +'%Y-%m-%d')
 
-          ZIP_NAME="Anykernel3_GKI-YASK-${KERNEL_VERSION}-${BUILD_DATE}.zip"
+          ZIP_NAME="Anykernel3_YASK-GKI-${KERNEL_VERSION}-${BUILD_DATE}.zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
