@@ -210,7 +210,6 @@ jobs:
 
           PATCH_URLS=(
             "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-fs-lineageos-disguise.patch"
-            "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-crypto-Add-support-for-LZ4K-and-LZ4KD.patch"
             "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-lz4-Update-LZ4-to-v1.9.4.patch"
           )
 
