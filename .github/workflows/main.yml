@@ -64,41 +64,9 @@ jobs:
       - name: "😄 Checkout"
         uses: actions/checkout@v4
 
-      - name: "😆 Generate Matrix"
-        id: generate-matrix
-        run: |
-          repos='[
-            {
-              "kernelSource": {
-                "repo": "",
-                "branch": ""
-              },
-              "params": {
-                "ARCH": "arm64",
-                "CROSS_COMPILE": "aarch64-linux-gnu-",
-                "CLANG_TRIPLE": "aarch64-linux-gnu-",
-                "AR": "llvm-ar",
-                "CC": "clang"
-              }
-            }
-          ]'
-
-          repos=$(echo "$repos" | jq --arg url "${{ github.event.inputs.kernelSourceURL }}" --arg branch "${{ github.event.inputs.kernelBranch }}" '.[].kernelSource.repo = $url | .[].kernelSource.branch = $branch')
-
-          echo "repos<<EOF" >> $GITHUB_OUTPUT
-          echo "$repos" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
   Build-Kernel:
     name: "🐎 Build kernel"
     runs-on: ubuntu-latest
-    needs:
-      - Set-repos
-    strategy:
-      max-parallel: 2
-      fail-fast: false
-      matrix:
-        repos: ${{ fromJSON(needs.Set-repos.outputs.repos) }}
     env:
       kernelDir: ${{ github.event.inputs.kernelSourceName }}_${{ github.event.inputs.kernelDevice }}
       kernelName: ${{ github.event.inputs.kernelSourceName }}
@@ -115,7 +83,7 @@ jobs:
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
           sudo apt-get update
-          sudo apt-get install -y build-essential bc curl flex cpio ccache rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
+          sudo apt-get install -y build-essential bc curl flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
 
       - name: "🌟 Clone kernel source => (${{ env.kernelRepo }})"
         working-directory: ./${{ env.kernelDir }}
@@ -215,7 +183,7 @@ jobs:
       
           export PATH="$CLANG_PATH:$PATH"
           export CLANG_TRIPLE="aarch64-linux-gnu-"
-          export CC="ccache clang"
+          export CC=clang
           export AR="llvm-ar"
           export AS="llvm-as"
           export NM="llvm-nm"
@@ -235,20 +203,6 @@ jobs:
         run: |
             echo "vm.swappiness=30" | sudo tee -a /etc/sysctl.conf
             sudo sysctl -p
-        
-      - name: "📥 Restore ccache Cache"
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-
-
-      - name: "⚡ Configure ccache"
-        run: |
-            echo "CCACHE_DIR=${{ github.workspace }}/.ccache" >> $GITHUB_ENV
-            echo "CC='ccache clang'" >> $GITHUB_ENV
-            echo "PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
           
       - name: "😎 Set args for GKI kernels"
         id: generate-args
@@ -439,30 +393,16 @@ jobs:
         run: |
           export KBUILD_BUILD_USER="♠️"
           export KBUILD_BUILD_HOST="belowzeroiq"
-
-          ccache -z
         
           make ${args} \
             LLVM=1 \
             LTO=thin \
-            CC="ccache clang" \
+            CC=clang \
             AR=llvm-ar \
             NM=llvm-nm \
             OBJCOPY=llvm-objcopy \
             STRIP=llvm-strip \
             -j8
-        
-      - name: "📤 Save ccache Cache"
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache-${{ github.ref }}-${{ hashFiles('**/defconfig') }}
-          restore-keys: |
-            ccache-${{ github.ref }}
-            ccache-
-
-      - name: "📤 Show ccache stats"
-        run: ccache -s
 
       - name: "🩹 Patch Image with KPM"
         if: ${{ github.event.inputs.kernelSUChoice != 'None' }}
