@@ -129,20 +129,6 @@ jobs:
         run: |
             echo "vm.swappiness=50" | sudo tee -a /etc/sysctl.conf
             sudo sysctl -p
-        
-      - name: "📥 Restore ccache Cache"
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-
-
-      - name: "⚡ Configure ccache"
-        run: |
-            echo "CCACHE_DIR=${{ github.workspace }}/.ccache" >> $GITHUB_ENV
-            echo "CC='ccache clang'" >> $GITHUB_ENV
-            echo "PATH=/usr/lib/ccache:$PATH" >> $GITHUB_ENV
           
       - name: "😎 Set args for GKI kernels"
         id: generate-args
@@ -357,8 +343,6 @@ jobs:
         run: |
           export KBUILD_BUILD_USER="Automated"
           export KBUILD_BUILD_HOST="GitHub-Actions"
-
-          ccache -z
         
           make ${args} \
             LLVM=1 \
@@ -368,19 +352,7 @@ jobs:
             NM=llvm-nm \
             OBJCOPY=llvm-objcopy \
             STRIP=llvm-strip \
-            -j8
-        
-      - name: "📤 Save ccache Cache"
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/.ccache
-          key: ccache-${{ github.ref }}-${{ hashFiles('**/defconfig') }}
-          restore-keys: |
-            ccache-${{ github.ref }}
-            ccache-
-
-      - name: "📤 Show ccache stats"
-        run: ccache -s
+            -j10
 
       - name: "🩹 Patch Image with KPM"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
