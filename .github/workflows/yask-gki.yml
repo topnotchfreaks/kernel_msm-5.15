@@ -52,9 +52,8 @@ jobs:
 
       - name: "💫 Get Toolchains"
         run: |
-          set -e  # Exit on errors
+          set -e
 
-          # Function to fetch latest release tar.gz URL from GitHub
           get_latest_github_release() {
             local repo_url="$1"
             latest_url=$(curl -sL "https://api.github.com/repos/$repo_url/releases/latest" | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | head -n 1)
@@ -71,15 +70,12 @@ jobs:
 
           echo "✅ Clang URL: $clang_url"
 
-          # Create clang directory
           mkdir -p clang
 
-          # Check if it's an archive or a Git repo
           if [[ "$clang_url" == *.tar.gz ]]; then
             echo "🚀 Downloading latest Clang from: $clang_url..."
             wget --progress=bar:force -O "clang/clang.tar.gz" "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
 
-            # Extract Clang
             echo "📦 Extracting Clang..."
             tar -xf clang/clang.tar.gz -C clang || { echo "❌ Extraction failed!"; exit 1; }
             rm -f clang/clang.tar.gz
@@ -88,7 +84,6 @@ jobs:
             git clone --recursive --depth=1 "$clang_url" clang || { echo "❌ Cloning failed!"; exit 1; }
           fi
 
-          # Find Clang's bin directory
           if [ -d "clang/bin" ]; then
             CLANG_PATH="${{ github.workspace }}/clang/bin"
           else
@@ -96,7 +91,6 @@ jobs:
             CLANG_PATH="${{ github.workspace }}/${CLANG_PATH}"
           fi
 
-          # Ensure Clang binary exists
           if [ ! -f "$CLANG_PATH/clang" ]; then
             echo "❌ Clang binary not found in $CLANG_PATH! Build might fail."
             ls -R clang  # Debugging: Show extracted files
@@ -351,7 +345,7 @@ jobs:
             NM=llvm-nm \
             OBJCOPY=llvm-objcopy \
             STRIP=llvm-strip \
-            -j10
+            -j$(nproc --all)
 
       - name: "🩹 Patch Image with KPM"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -382,7 +376,6 @@ jobs:
 
           cp "$KERNEL_IMAGE_PATH" AnyKernel3/Image
 
-          # Get kernel version from Makefile
           KERNEL_VERSION=$(make kernelversion)
           BUILD_DATE=$(date +'%Y-%m-%d')
 
