@@ -210,7 +210,6 @@ jobs:
 
           PATCH_URLS=(
             "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-fs-lineageos-disguise.patch"
-            "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-lz4-Update-LZ4-to-v1.9.4.patch"
           )
 
           for PATCH_URL in "${PATCH_URLS[@]}"; do
