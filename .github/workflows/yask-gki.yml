@@ -42,15 +42,31 @@ jobs:
       - name: "🔧 Optimize CCache Setup"
         run: |
           sudo apt-get install -y ccache
-          echo "CCACHE_DIR=$GITHUB_WORKSPACE/ccache" >> $GITHUB_ENV
-          echo "CCACHE_MAXSIZE=10G" >> $GITHUB_ENV
-          echo "CCACHE_SLOPPINESS=file_macro,locale,time_macros" >> $GITHUB_ENV
-          echo "CCACHE_COMPILERCHECK=content" >> $GITHUB_ENV
-          echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
-          echo "CCACHE_HARDLINK=1" >> $GITHUB_ENV
+          
+          # Set CCACHE_DIR in current shell and create directory
+          CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
           mkdir -p "$CCACHE_DIR"
-          echo "$(realpath /usr/lib/ccache):$PATH" >> $GITHUB_ENV
+          
+          # Configure CCache
+          {
+            echo "CCACHE_DIR=$CCACHE_DIR"
+            echo "CCACHE_MAXSIZE=10G"
+            echo "CCACHE_SLOPPINESS=file_macro,locale,time_macros"
+            echo "CCACHE_COMPILERCHECK=content"
+            echo "CCACHE_COMPRESS=1"
+            echo "CCACHE_HARDLINK=1"
+          } >> $GITHUB_ENV
+          
+          # Setup PATH correctly (alternative method)
+          echo "/usr/lib/ccache" >> $GITHUB_PATH
+          
+          # Initialize and verify CCache
           ccache --clear --zero-stats
+          echo "CCache version: $(ccache --version)"
+          echo "CCache configuration:"
+          ccache -p  # This is the correct command to print configuration
+          echo "CCache stats:"
+          ccache -s  # Show statistics
 
       - name: "🔍 Verify CCache Setup"
         run: |
