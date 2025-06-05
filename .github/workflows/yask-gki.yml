@@ -30,6 +30,7 @@ jobs:
       DEFCONFIG_NAME: gki_defconfig
       OUT_DIR: "out"
       localVersion: "-YASK/GKI"
+      CCACHE_DIR: ${{ github.workspace }}/kernel_ccache
 
     steps:
       - name: "✨ Maximize build space"
@@ -50,43 +51,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential bc curl flex cpio ccache rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
 
-      - name: "🔧 Optimize CCache Setup"
-        run: |
-          sudo apt-get install -y ccache
-          
-          # Set CCACHE_DIR in current shell and create directory
-          CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
-          mkdir -p "$CCACHE_DIR"
-          
-          # Configure CCache
-          {
-            echo "CCACHE_DIR=$CCACHE_DIR"
-            echo "CCACHE_MAXSIZE=10G"
-            echo "CCACHE_SLOPPINESS=file_macro,locale,time_macros"
-            echo "CCACHE_COMPILERCHECK=content"
-            echo "CCACHE_COMPRESS=1"
-            echo "CCACHE_HARDLINK=1"
-          } >> $GITHUB_ENV
-          
-          # Setup PATH correctly (alternative method)
-          echo "/usr/lib/ccache" >> $GITHUB_PATH
-          
-          # Initialize and verify CCache
-          ccache --clear --zero-stats
-          echo "CCache version: $(ccache --version)"
-          echo "CCache configuration:"
-          ccache -p  # This is the correct command to print configuration
-          echo "CCache stats:"
-          ccache -s  # Show statistics
+      - name: "🔧 Restore ccache"
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ runner.os }}-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
 
-      - name: "🔍 Verify CCache Setup"
-        run: |
-          echo "CCache wrapper location:"
-          which clang
-          readlink -f $(which clang)
-          echo "Current PATH:"
-          echo $PATH
-          ccache --version
+      - name: "🔧 Setup ccache"
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          create-symlink: true
+          max-size: 10G
 
       - name: "🌟 Clone kernel source => (${{ env.kernelRepo }})"
         working-directory: ./${{ env.kernelDir }}
@@ -360,10 +337,8 @@ jobs:
           files: ./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.ZIP_NAME }}
           tag_name: "YASK"
 
-      - name: "💾 Save CCache"
+      - name: "💾 Save ccache"
         uses: actions/cache@v3
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ${{ runner.os }}-ccache-${{ hashFiles('yask-clo.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-
+          key: ${{ runner.os }}-ccache-${{ github.sha }}
