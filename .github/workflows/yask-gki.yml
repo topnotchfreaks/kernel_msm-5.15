@@ -32,6 +32,17 @@ jobs:
       localVersion: "-YASK/GKI"
 
     steps:
+      - name: "✨ Maximize build space"
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 8192
+          temp-reserve-mb: 2048
+          swap-size-mb: 8192
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+
       - name: "✨ Setup workspace"
         run: |
           mkdir -p $kernelDir
@@ -135,16 +146,6 @@ jobs:
       - name: "📊 CCache Stats (Pre-Build)"
         run: |
           ccache --show-stats --verbose
-
-      - name: 📐 Setup swap 25G
-        uses: pierotofy/set-swap-space@master
-        with:
-            swap-size-gb: 25
-
-      - name: 📐 Tune Swap
-        run: |
-            echo "vm.swappiness=80" | sudo tee -a /etc/sysctl.conf
-            sudo sysctl -p
           
       - name: "😎 Set args for GKI kernels"
         id: generate-args
