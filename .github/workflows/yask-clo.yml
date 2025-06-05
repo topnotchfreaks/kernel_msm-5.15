@@ -35,20 +35,38 @@ jobs:
       - name: "✨ Setup workspace"
         run: |
           mkdir -p $kernelDir
-
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
-
           sudo apt-get update
           sudo apt-get install -y build-essential bc curl flex cpio ccache rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
+
+      - name: "🔧 Optimize CCache Setup"
+        run: |
+          sudo apt-get install -y ccache
+          echo "CCACHE_DIR=$GITHUB_WORKSPACE/ccache" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=10G" >> $GITHUB_ENV
+          echo "CCACHE_SLOPPINESS=file_macro,locale,time_macros" >> $GITHUB_ENV
+          echo "CCACHE_COMPILERCHECK=content" >> $GITHUB_ENV
+          echo "CCACHE_COMPRESS=1" >> $GITHUB_ENV
+          echo "CCACHE_HARDLINK=1" >> $GITHUB_ENV
+          mkdir -p "$CCACHE_DIR"
+          echo "$(realpath /usr/lib/ccache):$PATH" >> $GITHUB_ENV
+          ccache --clear --zero-stats
+
+      - name: "🔍 Verify CCache Setup"
+        run: |
+          echo "CCache wrapper location:"
+          which clang
+          readlink -f $(which clang)
+          echo "Current PATH:"
+          echo $PATH
+          ccache --version
 
       - name: "🌟 Clone kernel source => (${{ env.kernelRepo }})"
         working-directory: ./${{ env.kernelDir }}
         run: |
           set -x
-
           git clone --recursive --branch ${{ env.kernelBranch }} \
             ${{ env.kernelRepo }} ${{ env.kernelName }} --depth=1
-
 
       - name: "💫 Get Toolchains"
         run: |
@@ -63,24 +81,21 @@ jobs:
               exit 1
             fi
 
-            printf "%s" "$latest_url"  # Use printf to output only the URL
+            printf "%s" "$latest_url"
           }
 
           clang_url=$(get_latest_github_release "greenforce-project/greenforce_clang")
-
           echo "✅ Clang URL: $clang_url"
-
           mkdir -p clang
 
           if [[ "$clang_url" == *.tar.gz ]]; then
-            echo "🚀 Downloading latest Clang from: $clang_url..."
+            echo "🚀 Downloading latest Clang..."
             wget --progress=bar:force -O "clang/clang.tar.gz" "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
-
             echo "📦 Extracting Clang..."
             tar -xf clang/clang.tar.gz -C clang || { echo "❌ Extraction failed!"; exit 1; }
             rm -f clang/clang.tar.gz
           else
-            echo "🚀 Cloning Clang from $clang_url..."
+            echo "🚀 Cloning Clang..."
             git clone --recursive --depth=1 "$clang_url" clang || { echo "❌ Cloning failed!"; exit 1; }
           fi
 
@@ -92,27 +107,18 @@ jobs:
           fi
 
           if [ ! -f "$CLANG_PATH/clang" ]; then
-            echo "❌ Clang binary not found in $CLANG_PATH! Build might fail."
-            ls -R clang  # Debugging: Show extracted files
+            echo "❌ Clang binary not found in $CLANG_PATH!"
+            ls -R clang
             exit 1
           fi
 
           echo "✅ Using Clang from $CLANG_PATH"
           echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
-          echo "$CLANG_PATH" >> $GITHUB_PATH  # Ensures path is updated
+          echo "$CLANG_PATH" >> $GITHUB_PATH
 
-          export PATH="$CLANG_PATH:$PATH"
-          export CLANG_TRIPLE="aarch64-linux-gnu-"
-          export CC="ccache clang"
-          export AR="llvm-ar"
-          export AS="llvm-as"
-          export NM="llvm-nm"
-          export OBJCOPY="llvm-objcopy"
-          export OBJDUMP="llvm-objdump"
-          export STRIP="llvm-strip"
-
-          echo "⚙️ Using Clang version:"
-          clang --version || echo "❌ Clang not found in PATH!"  
+      - name: "📊 CCache Stats (Pre-Build)"
+        run: |
+          ccache --show-stats --verbose
 
       - name: 📐 Setup swap 25G
         uses: pierotofy/set-swap-space@master
@@ -139,7 +145,7 @@ jobs:
             args="$args CROSS_COMPILE=aarch64-linux-gnu-"
             args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
             args="$args AR=llvm-ar"
-            args="$args CC=clang"
+            args="$args CC='ccache clang'"
             echo "args=$args" >> $GITHUB_OUTPUT
 
       - name: "🛠 Set localversion name in defconfig"
@@ -155,140 +161,79 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -ex
-
           log() {
             echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
           }
-        
           apply_patch() {
             local patch="$1"
-            local error_msg="$2"
-        
-            log "Attempting to apply patch: $(basename "$patch")"
+            log "Applying patch: $(basename "$patch")"
             if ! patch -p1 < "$patch"; then
-              log "Warning: Some hunks failed while applying patch $(basename "$patch")"
+              log "Warning: Some hunks failed in $(basename "$patch")"
             fi
           }
-        
           PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-gki-fixup.patch"
           PATCH_FILE="0001-gki-fixup.patch"
-        
-          log "Downloading patch from $PATCH_URL"
           curl -L -o "$PATCH_FILE" "$PATCH_URL"
-        
-          if [ ! -f "$PATCH_FILE" ]; then
-            log "Patch file $PATCH_FILE does not exist after download"
-            exit 1
-          fi
-        
+          [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
           apply_patch "$PATCH_FILE"
-        
-          log "✅ External patch applied successfully"
+          log "✅ External patch applied"
 
       - name: "🛠 Setup kernel Tweaks"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
-
           log() {
             echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
           }
-
           apply_patch() {
             local patch="$1"
-            log "Attempting to apply patch: $(basename "$patch")"
+            log "Applying patch: $(basename "$patch")"
             if ! patch -p1 < "$patch"; then
-              log "Warning: Some hunks failed while applying patch $(basename "$patch")"
+              log "Warning: Some hunks failed in $(basename "$patch")"
             fi
           }
-
           PATCH_URLS=(
             "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-fs-lineageos-disguise.patch"
           )
-
           for PATCH_URL in "${PATCH_URLS[@]}"; do
             PATCH_FILE=$(basename "$PATCH_URL")
-            log "Downloading patch from $PATCH_URL"
             curl -L -o "$PATCH_FILE" "$PATCH_URL"
-            if [ ! -f "$PATCH_FILE" ]; then
-              log "Patch file $PATCH_FILE does not exist after download"
-              exit 1
-            fi
+            [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
             apply_patch "$PATCH_FILE"
           done
-
-          log "✅ All kernel tweak patches applied successfully"
+          log "✅ All patches applied"
 
       - name: "😋 Update KernelSU Version"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          if [ -d "./KernelSU" ]; then
-            rm -rf "./KernelSU"
-          fi
-          if [ -d "./drivers/kernelsu" ]; then
-            rm -rf "./drivers/kernelsu"
-          fi
-
+          [ -d "./KernelSU" ] && rm -rf "./KernelSU"
+          [ -d "./drivers/kernelsu" ] && rm -rf "./drivers/kernelsu"
           curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-stable
+          echo "✅ KernelSU updated"
 
-          echo "✅ KernelSU updated successfully"
-
-      - name: 😋 Setup SUSFS
-        env: 
-          ARCH: ${{ steps.generate-args.outputs.ARCH }}
+      - name: "😋 Setup SUSFS"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -ex
-        
-          log() {
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
-          }
-        
-          apply_patch() {
-            local patch="$1"
-            local error_msg="$2"
-        
-            log "Attempting to apply patch: $(basename "$patch")"
-            if ! patch -p1 < "$patch"; then
-              log "Warning: Some hunks failed while applying patch $(basename "$patch")"
-            fi
-          }
-        
+          log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
           PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Implement-SUSFS-v1.5.7-syscall-hooks.patch"
           PATCH_FILE="0001-Implement-SUSFS-v1.5.7-syscall-hooks.patch"
-        
-          log "Downloading SUSFS patch from $PATCH_URL"
           curl -L -o "$PATCH_FILE" "$PATCH_URL"
-        
-          if [ ! -f "$PATCH_FILE" ]; then
-            log "Patch file $PATCH_FILE does not exist after download"
-            exit 1
-          fi
-        
-          apply_patch "$PATCH_FILE"
-        
-          log "✅ External SUSFS patch applied successfully"
+          [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
+          patch -p1 < "$PATCH_FILE" || log "Warning: Some hunks failed"
+          log "✅ SUSFS patch applied"
 
-      - name: ⚙️ Add SUSFS configs
-        env:
-          DEFCONFIG_NAME: ${{ env.DEFCONFIG_NAME }}
+      - name: "⚙️ Add SUSFS configs"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -ex
-
-          log() {
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
-          }
-
           CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
-          mkdir -p "$(dirname "$CONFIG_FILE")"
-
-          CONFIGS+=(
-            "CONFIG_KSU=y"
-            "CONFIG_KSU_MANUAL_HOOKS=y"
+          CONFIGS=(
+            "CONFIG_KSU=y" 
+            "CONFIG_KSU_MANUAL_HOOKS=y" 
             "CONFIG_KPM=y"
-            "CONFIG_KALLSYMS=y"
-            "CONFIG_KSU_WITH_KPROBES=n"
+            "CONFIG_KALLSYMS=y" 
+            "CONFIG_KSU_WITH_KPROBES=n" 
             "CONFIG_KSU_SUSFS=y"
             "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"
             "CONFIG_KSU_SUSFS_SUS_PATH=y"
@@ -296,7 +241,6 @@ jobs:
             "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y"
             "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y"
             "CONFIG_KSU_SUSFS_SUS_KSTAT=y"
-            "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n"
             "CONFIG_KSU_SUSFS_TRY_UMOUNT=y"
             "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y"
             "CONFIG_KSU_SUSFS_SPOOF_UNAME=y"
@@ -308,18 +252,14 @@ jobs:
             "CONFIG_TMPFS_XATTR=y"
             "CONFIG_TMPFS_POSIX_ACL=y"
           )
-
           printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
-
-          log "✅ SUSFS configs added to $CONFIG_FILE"
-          log "Current config contents:"
-          cat "$CONFIG_FILE"
+          echo "✅ SUSFS configs added"
 
       - name: "📝 Append custom Makefile line"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
-          echo "Custom Makefile line added successfully"
+          echo "Custom Makefile line added"
 
       - name: "👍 Make defconfig"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -335,7 +275,6 @@ jobs:
         run: |
           export KBUILD_BUILD_USER="Automated"
           export KBUILD_BUILD_HOST="GitHub-Actions"
-        
           make ${args} \
             LLVM=1 \
             LTO=thin \
@@ -346,43 +285,35 @@ jobs:
             STRIP=llvm-strip \
             -j$(nproc --all)
 
+      - name: "📊 CCache Stats (Post-Build)"
+        run: |
+          ccache --show-stats --verbose
+
       - name: "🩹 Patch Image with KPM"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-            echo "Patching Image file..."
-            cd "../${{ env.OUT_DIR }}/arch/arm64/boot/"
-            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
-            chmod 777 patch
-            ./patch
-            rm -rf Image
-            mv oImage Image
+          cd "../${{ env.OUT_DIR }}/arch/arm64/boot/"
+          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
+          chmod 777 patch
+          ./patch
+          rm -rf Image
+          mv oImage Image
 
       - name: "📦 Pack Anykernel3"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
-
           [ ! -d "AnyKernel3" ] && git clone https://github.com/topnotchfreaks/AnyKernel3.git --depth=1
-
           KERNEL_IMAGE_PATH="../${{ env.OUT_DIR }}/arch/arm64/boot/Image"
-          if [ ! -f "$KERNEL_IMAGE_PATH" ]; then
-            KERNEL_IMAGE_PATH=$(find ../${{ env.OUT_DIR }}/arch/arm64/boot -name "Image*" | head -n 1)
-            if [ -z "$KERNEL_IMAGE_PATH" ]; then
-              echo "Error: No kernel image found."
-              exit 1
-            fi
-          fi
-
+          [ -f "$KERNEL_IMAGE_PATH" ] || KERNEL_IMAGE_PATH=$(find ../${{ env.OUT_DIR }}/arch/arm64/boot -name "Image*" | head -n 1)
+          [ -z "$KERNEL_IMAGE_PATH" ] && { echo "Error: No kernel image found"; exit 1; }
           cp "$KERNEL_IMAGE_PATH" AnyKernel3/Image
-
           KERNEL_VERSION=$(make kernelversion)
           BUILD_DATE=$(date +'%Y-%m-%d')
-
           ZIP_NAME="Anykernel3_YASK-CLO-${KERNEL_VERSION}-${BUILD_DATE}.zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
-
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
 
       - name: "⬆️ Upload Kernel Artifact"
@@ -399,3 +330,11 @@ jobs:
         with:
           files: ./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.ZIP_NAME }}
           tag_name: "YASK"
+
+      - name: "💾 Save CCache"
+        uses: actions/cache@v3
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ${{ runner.os }}-ccache-${{ hashFiles('yask-clo.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
