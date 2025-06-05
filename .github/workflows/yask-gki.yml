@@ -291,15 +291,27 @@ jobs:
         run: |
           export KBUILD_BUILD_USER="Automated"
           export KBUILD_BUILD_HOST="GitHub-Actions"
-          make ${args} \
+          
+          # First verify CCache is working
+          echo "=== CCache wrapper check ==="
+          which clang
+          readlink -f $(which clang)
+          
+          # Build command with proper quoting
+          set -x  # Enable debug output to see the actual command being run
+          make ${{ env.args }} \
             LLVM=1 \
             LTO=thin \
-            CC='ccache clang' \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            OBJCOPY=llvm-objcopy \
-            STRIP=llvm-strip \
+            CC="ccache clang" \
+            AR="llvm-ar" \
+            NM="llvm-nm" \
+            OBJCOPY="llvm-objcopy" \
+            STRIP="llvm-strip" \
             -j$(nproc --all)
+          
+          # Show CCache statistics after build
+          echo "=== CCache stats after build ==="
+          ccache -s
 
       - name: "📊 CCache Stats (Post-Build)"
         run: |
