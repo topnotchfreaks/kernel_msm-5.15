@@ -33,17 +33,6 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/kernel_ccache
 
     steps:
-      - name: "✨ Maximize build space"
-        uses: easimon/maximize-build-space@master
-        with:
-          root-reserve-mb: 8192
-          temp-reserve-mb: 2048
-          swap-size-mb: 8192
-          remove-dotnet: 'true'
-          remove-android: 'true'
-          remove-haskell: 'true'
-          remove-codeql: 'true'
-
       - name: "✨ Setup workspace"
         run: |
           mkdir -p $kernelDir
@@ -123,6 +112,16 @@ jobs:
       - name: "📊 CCache Stats (Pre-Build)"
         run: |
           ccache --show-stats --verbose
+
+      - name: 📐 Setup swap 25G
+        uses: pierotofy/set-swap-space@master
+        with:
+            swap-size-gb: 25
+
+      - name: 📐 Tune Swap
+        run: |
+            echo "vm.swappiness=80" | sudo tee -a /etc/sysctl.conf
+            sudo sysctl -p
           
       - name: "😎 Set args for GKI kernels"
         id: generate-args
@@ -270,13 +269,6 @@ jobs:
           export KBUILD_BUILD_USER="Automated"
           export KBUILD_BUILD_HOST="GitHub-Actions"
           
-          # First verify CCache is working
-          echo "=== CCache wrapper check ==="
-          which clang
-          readlink -f $(which clang)
-          
-          # Build command with proper quoting
-          set -x  # Enable debug output to see the actual command being run
           make ${{ env.args }} \
             LLVM=1 \
             LTO=thin \
@@ -287,8 +279,6 @@ jobs:
             STRIP="llvm-strip" \
             -j$(nproc --all)
           
-          # Show CCache statistics after build
-          echo "=== CCache stats after build ==="
           ccache -s
 
       - name: "📊 CCache Stats (Post-Build)"
