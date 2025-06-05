@@ -294,7 +294,7 @@ jobs:
           make ${args} \
             LLVM=1 \
             LTO=thin \
-            CC="ccache clang" \
+            CC='ccache clang' \
             AR=llvm-ar \
             NM=llvm-nm \
             OBJCOPY=llvm-objcopy \

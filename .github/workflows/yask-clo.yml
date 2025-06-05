@@ -42,11 +42,11 @@ jobs:
       - name: "🔧 Optimize CCache Setup"
         run: |
           sudo apt-get install -y ccache
-          
+
           # Set CCACHE_DIR in current shell and create directory
           CCACHE_DIR="$GITHUB_WORKSPACE/ccache"
           mkdir -p "$CCACHE_DIR"
-          
+
           # Configure CCache
           {
             echo "CCACHE_DIR=$CCACHE_DIR"
@@ -56,10 +56,10 @@ jobs:
             echo "CCACHE_COMPRESS=1"
             echo "CCACHE_HARDLINK=1"
           } >> $GITHUB_ENV
-          
+
           # Setup PATH correctly (alternative method)
           echo "/usr/lib/ccache" >> $GITHUB_PATH
-          
+
           # Initialize and verify CCache
           ccache --clear --zero-stats
           echo "CCache version: $(ccache --version)"
@@ -291,10 +291,11 @@ jobs:
         run: |
           export KBUILD_BUILD_USER="Automated"
           export KBUILD_BUILD_HOST="GitHub-Actions"
+
           make ${args} \
             LLVM=1 \
             LTO=thin \
-            CC="ccache clang" \
+            CC='ccache clang' \
             AR=llvm-ar \
             NM=llvm-nm \
             OBJCOPY=llvm-objcopy \
