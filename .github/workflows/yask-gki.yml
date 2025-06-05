@@ -30,7 +30,6 @@ jobs:
       DEFCONFIG_NAME: gki_defconfig
       OUT_DIR: "out"
       localVersion: "-YASK/GKI"
-      CCACHE_DIR: ${{ github.workspace }}/kernel_ccache
 
     steps:
       - name: "✨ Setup workspace"
@@ -38,21 +37,7 @@ jobs:
           mkdir -p $kernelDir
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
           sudo apt-get update
-          sudo apt-get install -y build-essential bc curl flex cpio ccache rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
-
-      - name: "🔧 Restore ccache"
-        uses: actions/cache@v3
-        with:
-          path: ${{ env.CCACHE_DIR }}
-          key: ${{ runner.os }}-ccache-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-
-
-      - name: "🔧 Setup ccache"
-        uses: hendrikmuhs/ccache-action@v1.2
-        with:
-          create-symlink: true
-          max-size: 10G
+          sudo apt-get install -y build-essential bc curl flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
 
       - name: "🌟 Clone kernel source => (${{ env.kernelRepo }})"
         working-directory: ./${{ env.kernelDir }}
@@ -109,10 +94,6 @@ jobs:
           echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
           echo "$CLANG_PATH" >> $GITHUB_PATH
 
-      - name: "📊 CCache Stats (Pre-Build)"
-        run: |
-          ccache --show-stats --verbose
-
       - name: 📐 Setup swap 25G
         uses: pierotofy/set-swap-space@master
         with:
@@ -138,7 +119,7 @@ jobs:
             args="$args CROSS_COMPILE=aarch64-linux-gnu-"
             args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
             args="$args AR=llvm-ar"
-            args="$args CC='ccache clang'"
+            args="$args CC=clang"
             echo "args=$args" >> $GITHUB_OUTPUT
 
       - name: "🛠 Set localversion name in defconfig"
@@ -272,18 +253,12 @@ jobs:
           make ${{ env.args }} \
             LLVM=1 \
             LTO=thin \
-            CC="ccache clang" \
-            AR="llvm-ar" \
-            NM="llvm-nm" \
+            CC=clang \
+            AR=llvm-ar \
+            NM=llvm-nm \
             OBJCOPY="llvm-objcopy" \
             STRIP="llvm-strip" \
             -j$(nproc --all)
-          
-          ccache -s
-
-      - name: "📊 CCache Stats (Post-Build)"
-        run: |
-          ccache --show-stats --verbose
 
       - name: "🩹 Patch Image with KPM"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -326,9 +301,3 @@ jobs:
         with:
           files: ./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.ZIP_NAME }}
           tag_name: "YASK"
-
-      - name: "💾 Save ccache"
-        uses: actions/cache@v3
-        with:
-          path: ${{ env.CCACHE_DIR }}
-          key: ${{ runner.os }}-ccache-${{ github.sha }}
