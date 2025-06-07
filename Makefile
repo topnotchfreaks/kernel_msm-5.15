@@ -550,11 +550,11 @@ KBUILD_CPPFLAGS := -D__KERNEL__
 # Tell compiler to tune the performance of the code for a specified
 # target processor
 ifeq ($(cc-name),gcc)
-KBUILD_CFLAGS += -mcpu=cortex-a73.cortex-a53 -mtune=cortex-a73.cortex-a53
-KBUILD_AFLAGS += -mcpu=cortex-a73.cortex-a53 -mtune=cortex-a73.cortex-a53
+KBUILD_CFLAGS += -mcpu=cortex-a53+crypto+crc -mtune=cortex-a73 -march=armv8-a+crypto+crc -O3 -funroll-loops
+KBUILD_AFLAGS += -mcpu=cortex-a53+crypto+crc -mtune=cortex-a73 -march=armv8-a+crypto+crc -O3 -funroll-loops
 else ifeq ($(cc-name),clang)
-KBUILD_CFLAGS += -mcpu=cortex-a73+crypto+crc -mtune=cortex-a73
-KBUILD_AFLAGS += -mcpu=cortex-a73 -mtune=cortex-a73
+KBUILD_CFLAGS += -mcpu=cortex-a53+crypto+crc -mtune=cortex-a73 -march=armv8-a+crypto+crc -O3 -funroll-loops
+KBUILD_AFLAGS += -mcpu=cortex-a53+crypto+crc -mtune=cortex-a73 -march=armv8-a+crypto+crc -O3 -funroll-loops
 endif
 
 KBUILD_AFLAGS_KERNEL :=
