@@ -182,7 +182,7 @@ jobs:
         run: |
           [ -d "./KernelSU" ] && rm -rf "./KernelSU"
           [ -d "./drivers/kernelsu" ] && rm -rf "./drivers/kernelsu"
-          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-stable
+          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
           echo "✅ KernelSU updated"
 
       - name: "😋 Setup SUSFS"

@@ -282,9 +282,9 @@ jobs:
           fi
 
           if [[ "${{ github.event.inputs.kernelSUChoice }}" == "SukiSU-Ultra-SuSFS-stable" ]]; then
-            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-stable
+            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
           elif [[ "${{ github.event.inputs.kernelSUChoice }}" == "SukiSU-Ultra-SuSFS-dev" ]]; then
-            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-dev
+            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-test
           fi
 
           echo "✅ KernelSU updated successfully"
