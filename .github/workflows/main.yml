@@ -198,10 +198,10 @@ jobs:
           echo "⚙️ Using Clang version:"
           clang --version || echo "❌ Clang not found in PATH!"  
 
-      - name: 📐 Setup swap 8G
+      - name: 📐 Setup swap 20G
         uses: pierotofy/set-swap-space@master
         with:
-            swap-size-gb: 8
+            swap-size-gb: 20
 
       - name: 📐 Tune Swap
         run: |
