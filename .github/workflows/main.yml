@@ -296,18 +296,35 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -ex
-          log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
-          PATCH_URLS=(
-            "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Implement-SUSFS-v1.5.7-syscall-hooks.patch"
-            "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scope-min-manual-hooks-v1.4-revised.patch"
-          )
-          for PATCH_URL in "${PATCH_URLS[@]}"; do
-            PATCH_FILE=$(basename "$PATCH_URL")
-            curl -L -o "$PATCH_FILE" "$PATCH_URL"
-            [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
-            patch -p1 < "$PATCH_FILE" || log "Warning: Some hunks failed"
-          done
-          log "✅ All SUSFS patches applied"
+        
+          log() {
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+          }
+        
+          apply_patch() {
+            local patch="$1"
+            local error_msg="$2"
+        
+            log "Attempting to apply patch: $(basename "$patch")"
+            if ! patch -p1 < "$patch"; then
+              log "Warning: Some hunks failed while applying patch $(basename "$patch")"
+            fi
+          }
+        
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Implement-SUSFS-v1.5.7-syscall-hooks.patch"
+          PATCH_FILE="0001-Implement-SUSFS-v1.5.7-syscall-hooks.patch"
+        
+          log "Downloading SUSFS patch from $PATCH_URL"
+          curl -L -o "$PATCH_FILE" "$PATCH_URL"
+        
+          if [ ! -f "$PATCH_FILE" ]; then
+            log "Patch file $PATCH_FILE does not exist after download"
+            exit 1
+          fi
+        
+          apply_patch "$PATCH_FILE"
+        
+          log "✅ External SUSFS patch applied successfully"
 
       - name: ⚙️ Add SUSFS configs
         if: ${{ github.event.inputs.kernelSUChoice != 'None' }}
