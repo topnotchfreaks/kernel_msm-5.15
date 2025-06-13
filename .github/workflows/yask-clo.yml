@@ -94,10 +94,10 @@ jobs:
           echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
           echo "$CLANG_PATH" >> $GITHUB_PATH
 
-      - name: 📐 Setup swap 25G
+      - name: 📐 Setup swap 8G
         uses: pierotofy/set-swap-space@master
         with:
-            swap-size-gb: 25
+            swap-size-gb: 8
 
       - name: 📐 Tune Swap
         run: |
