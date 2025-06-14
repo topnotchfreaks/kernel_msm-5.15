@@ -3591,6 +3591,9 @@ static char *custom_module_blacklist[] = {
 #if IS_BUILTIN(CONFIG_ZSMALLOC)
     "zsmalloc",
 #endif
+#if IS_BUILTIN(CONFIG_CPU_MAX_FREQ)
+    "cpumaxfreq",
+#endif
 #ifdef CONFIG_MACH_XIAOMI_TOPAZ
     /* Useless logs */
     "f_fs_ipc_log",

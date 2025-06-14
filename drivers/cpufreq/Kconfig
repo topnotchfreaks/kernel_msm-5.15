@@ -347,5 +347,15 @@ config QORIQ_CPUFREQ
 	  This adds the CPUFreq driver support for Freescale QorIQ SoCs
 	  which are capable of changing the CPU's frequency dynamically.
 
+config CPU_MAX_FREQ
+	tristate "Unlock maximum CPU frequency"
+	help
+	  This is for unlocking cpu maximum frequency.
+
+config DISABLE_FREQ_LIMIT
+	tristate "Disable CPU frequency limit"
+	help
+	  This is for disabling cpu frequency limitation
+
 endif
 endmenu
