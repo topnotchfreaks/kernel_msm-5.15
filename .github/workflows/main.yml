@@ -392,8 +392,8 @@ jobs:
         env:
           args: ${{ steps.generate-args.outputs.args }}
         run: |
-          export KBUILD_BUILD_USER="♠️"
-          export KBUILD_BUILD_HOST="belowzeroiq"
+          export KBUILD_BUILD_USER="belowzeroiq"
+          export KBUILD_BUILD_HOST="GitHub"
         
           make ${args} \
             LLVM=1 \
