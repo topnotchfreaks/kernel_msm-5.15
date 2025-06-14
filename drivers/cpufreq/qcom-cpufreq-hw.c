@@ -35,12 +35,6 @@
 #define CYCLE_CNTR_OFFSET(core_id, m, acc_count)		\
 				(acc_count ? ((core_id + 1) * 4) : 0)
 
-/* MI-PERF: add sys node for cpu LMH disable
- * We can disable CPU LMH for performance or benchmark mode,
- * And avoid sched magraion with thermal weight of EAS,
-*/
-#define DISABLE_FREQ_LM 1
-
 struct cpufreq_counter {
 	u64 total_cycle_counter;
 	u32 prev_cycle_counter;
@@ -86,7 +80,7 @@ struct qcom_cpufreq_data {
 
 	unsigned long dcvsh_freq_limit;
 	struct device_attribute freq_limit_attr;
-#if DISABLE_FREQ_LM
+#if IS_ENABLED(CONFIG_DISABLE_FREQ_LIMIT)
 	unsigned long disable_dcvsh_freq_limit;
 	struct device_attribute disable_limit_attr;
 #endif
@@ -385,7 +379,7 @@ static unsigned long qcom_lmh_get_throttle_freq(struct qcom_cpufreq_data *data)
 	return lval * xo_rate;
 }
 
-#if DISABLE_FREQ_LM
+#if IS_ENABLED(CONFIG_DISABLE_FREQ_LIMIT)
 static ssize_t disable_limit_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct qcom_cpufreq_data *c = container_of(attr, struct qcom_cpufreq_data, disable_limit_attr);
@@ -455,8 +449,8 @@ static void qcom_lmh_dcvs_notify(struct qcom_cpufreq_data *data)
 	 * If h/w throttled frequency is higher than what cpufreq has requested
 	 * for, then stop polling and switch back to interrupt mechanism.
 	 */
-#if DISABLE_FREQ_LM
-       	if ((throttled_freq >= qcom_cpufreq_hw_get(cpu)) ||  (data->disable_dcvsh_freq_limit ==1)) {
+#if IS_ENABLED(CONFIG_DISABLE_FREQ_LIMIT)
+	if ((throttled_freq >= qcom_cpufreq_hw_get(cpu)) ||  (data->disable_dcvsh_freq_limit ==1)) {
 #else
 	if (throttled_freq >= qcom_cpufreq_hw_get(cpu)) {
 #endif
@@ -597,7 +591,7 @@ static int qcom_cpufreq_hw_lmh_init(struct cpufreq_policy *policy, int index,
 	data->dcvsh_freq_limit = U32_MAX;
 	device_create_file(cpu_dev, &data->freq_limit_attr);
 
-#if DISABLE_FREQ_LM
+#if IS_ENABLED(CONFIG_DISABLE_FREQ_LIMIT)
                 sysfs_attr_init(&data->disable_limit_attr.attr);
                 data->disable_limit_attr.attr.name = "disable_limit";
                 data->disable_limit_attr.show = disable_limit_show;
