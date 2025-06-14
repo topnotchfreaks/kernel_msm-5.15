@@ -1,4 +1,7 @@
 # Xiaomi Topaz Defconfig
+# Freq limits
+CONFIG_CPU_MAX_FREQ=y
+CONFIG_DISABLE_FREQ_LIMIT=y
 # Modules Blocklist
 CONFIG_MACH_XIAOMI_UNIFIED_BLOCKLIST=y
 # -------------------------
