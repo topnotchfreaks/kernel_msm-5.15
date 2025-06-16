@@ -342,7 +342,6 @@ jobs:
           mkdir -p "$(dirname "$CONFIG_FILE")"
 
           CONFIGS+=(
-            "CONFIG_LOCALVERSION_AUTO=n"
             "CONFIG_KSU=y"
             "CONFIG_KSU_MANUAL_HOOKS=y"
             "CONFIG_KPM=y"
@@ -393,7 +392,7 @@ jobs:
         env:
           args: ${{ steps.generate-args.outputs.args }}
         run: |
-          export KBUILD_BUILD_USER="belowzeroiq"
+          export KBUILD_BUILD_USER="bromanprjkt"
           export KBUILD_BUILD_HOST="GitHub"
         
           make ${args} \
