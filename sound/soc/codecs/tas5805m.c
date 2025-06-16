@@ -692,6 +692,14 @@ static void tas5805m_priv_init(struct TAS5805m_priv *priv)
 				tas5805m_check_checksum_sequence,
 				ARRAY_SIZE(tas5805m_check_checksum_sequence));
 		i2c_read_reg(priv->client, TAS5805M_REG_7E, &crc);
+		// reapply mute setting
+		if (priv->hpd_gpio >= 0) {
+			if (gpio_get_value(priv->hpd_gpio))
+				priv->hs_state = 1;
+			else
+				priv->hs_state = 0;
+			tas5805m_i2c_mute(priv->client, priv->hs_state);
+		}
 
 		if (crc == CONFIG_CRC_CHECKSUM) {
 			priv->init_done = 1;

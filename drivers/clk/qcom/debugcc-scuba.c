@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, 2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #define pr_fmt(fmt) "clk: %s: " fmt, __func__
@@ -191,6 +191,7 @@ static const char *const gcc_debug_mux_parent_names[] = {
 	"gcc_video_venus_ctl_clk",
 	"gcc_video_xo_clk",
 	"gpu_cc_debug_mux",
+	"mc_cc_debug_mux",
 	"measure_only_cnoc_clk",
 	"measure_only_gcc_camera_ahb_clk",
 	"measure_only_gcc_camera_xo_clk",
@@ -200,7 +201,6 @@ static const char *const gcc_debug_mux_parent_names[] = {
 	"measure_only_gcc_sys_noc_cpuss_ahb_clk",
 	"measure_only_hwkm_ahb_clk",
 	"measure_only_ipa_2x_clk",
-	"measure_only_mccc_clk",
 	"measure_only_pka_ahb_clk",
 	"measure_only_pka_core_clk",
 	"measure_only_qpic_clk",
@@ -292,6 +292,7 @@ static int gcc_debug_mux_sels[] = {
 	0x127,		/* gcc_video_venus_ctl_clk */
 	0x3D,		/* gcc_video_xo_clk */
 	0xE3,		/* gpu_cc_debug_mux */
+	0x9B,		/* mc_cc_debug_mux or ddrss_gcc_debug_clk */
 	0x19,		/* measure_only_cnoc_clk */
 	0x36,		/* measure_only_gcc_camera_ahb_clk */
 	0x3E,		/* measure_only_gcc_camera_xo_clk */
@@ -301,7 +302,6 @@ static int gcc_debug_mux_sels[] = {
 	0x9,		/* measure_only_gcc_sys_noc_cpuss_ahb_clk */
 	0xA2,		/* measure_only_hwkm_ahb_clk */
 	0xC2,		/* measure_only_ipa_2x_clk */
-	0x9B,		/* measure_only_mccc_clk */
 	0xA4,		/* measure_only_pka_ahb_clk */
 	0xA3,		/* measure_only_pka_core_clk */
 	0x9C,		/* measure_only_qpic_clk */

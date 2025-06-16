@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/err.h>
@@ -3782,7 +3782,7 @@ static int gcc_sm6115_probe(struct platform_device *pdev)
 	/* Keep clocks always enabled:
 	 * gcc_camera_ahb_clk, gcc_camera_xo_clk, gcc_cpuss_gnoc_clk
 	 * gcc_disp_ahb_clk, gcc_disp_xo_clk, gcc_gpu_cfg_ahb_clk
-	 * gcc_sys_noc_cpuss_ahb_clk.
+	 * gcc_sys_noc_cpuss_ahb_clk, gcc_lpass_sway_clk.
 	 */
 
 	regmap_update_bits(regmap, 0x17008, BIT(0), BIT(0));
@@ -3792,6 +3792,7 @@ static int gcc_sm6115_probe(struct platform_device *pdev)
 	regmap_update_bits(regmap, 0x1702c, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x36004, BIT(0), BIT(0));
 	regmap_update_bits(regmap, 0x79004, BIT(0), BIT(0));
+	regmap_update_bits(regmap, 0x3a00c, BIT(0), BIT(0));
 
 	ret = qcom_cc_really_probe(pdev, &gcc_sm6115_desc, regmap);
 	if (ret) {

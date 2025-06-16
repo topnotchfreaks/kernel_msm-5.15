@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2019-2022, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <asm/unistd.h>
@@ -1308,11 +1308,13 @@ static void _signal_contexts(struct qcom_hgsl *hgsl)
 			continue;
 		}
 
+		mutex_lock(&ctxt->lock);
 		ts = get_context_retired_ts(ctxt);
 		if (ts != ctxt->last_ts) {
 			hgsl_hsync_timeline_signal(ctxt->timeline, ts);
 			ctxt->last_ts = ts;
 		}
+		mutex_unlock(&ctxt->lock);
 		hgsl_put_context(ctxt);
 
 	}
@@ -1339,19 +1341,26 @@ static int hgsl_init_global_hyp_channel(struct qcom_hgsl *hgsl)
 {
 	int ret = 0;
 	int rval = 0;
+	unsigned int retry_count = 5;
 
 	ret = hgsl_hyp_init(&hgsl->global_hyp, hgsl->dev, 0, "hgsl");
 	if (ret != 0)
 		goto out;
 
-	ret = hgsl_hyp_gsl_lib_open(&hgsl->global_hyp, 0, &rval);
+	/* Retry to communicate with BE here */
+	do {
+		ret = hgsl_hyp_gsl_lib_open(&hgsl->global_hyp, 0, &rval);
+	} while (ret == -EAGAIN && retry_count--);
 	if (rval)
 		ret = -EINVAL;
 	else
 		hgsl->global_hyp_inited = true;
 out:
-	if (ret)
+	if (ret) {
+		LOGE("Failed to open gsl lib ret: %d retry_count: %u\n",
+				ret, retry_count);
 		hgsl_hyp_close(&hgsl->global_hyp);
+	}
 
 	return ret;
 }
@@ -1670,7 +1679,7 @@ static int hgsl_ioctl_get_shadowts_mem(struct file *filep, unsigned long arg)
 		get_dma_buf(dma_buf);
 		params.fd = dma_buf_fd(dma_buf, O_CLOEXEC);
 		if (params.fd < 0) {
-			LOGE("dma buf to fd failed\n");
+			LOGE("dma buf to fd failed with %d\n", params.fd);
 			ret = -ENOMEM;
 			dma_buf_put(dma_buf);
 			goto out;
@@ -2270,7 +2279,7 @@ static int hgsl_ioctl_mem_alloc(struct file *filep, unsigned long arg)
 	params.fd = dma_buf_fd(mem_node->dma_buf, O_CLOEXEC);
 
 	if (params.fd < 0) {
-		LOGE("dma_buf_fd failed, size 0x%x", mem_node->memdesc.size);
+		LOGE("dma_buf_fd failed with %d, size 0x%x", params.fd, mem_node->memdesc.size);
 		ret = -EINVAL;
 		dma_buf_put(mem_node->dma_buf);
 		goto out;
@@ -2603,7 +2612,7 @@ static int hgsl_ioctl_mem_get_fd(struct file *filep, unsigned long arg)
 	if (!ret) {
 		params.fd = dma_buf_fd(node_found->dma_buf, O_CLOEXEC);
 		if (params.fd < 0) {
-			LOGE("dma buf to fd failed");
+			LOGE("dma buf to fd failed with %d", params.fd);
 			ret = -EINVAL;
 			dma_buf_put(node_found->dma_buf);
 		} else if (copy_to_user(USRPTR(arg), &params, sizeof(params))) {
@@ -3784,6 +3793,76 @@ static int hgsl_ioctl_timeline_wait(struct file *filep,
 	return ret;
 }
 
+static int hgsl_ioctl_gslprofiler_per_proc_gpu_busy(struct file *filep, unsigned long arg)
+{
+	struct hgsl_priv *priv = filep->private_data;
+	struct hgsl_ioctl_gslprofiler_per_proc_gpu_busy_params param;
+	struct gsl_profiler_get_per_proc_gpu_busy_percentage_t *busy = NULL;
+	int ret = 0;
+
+	if (copy_from_user(&param, USRPTR(arg), sizeof(param))) {
+		LOGE("failed to copy user to param");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	busy = hgsl_malloc(sizeof(struct gsl_profiler_get_per_proc_gpu_busy_percentage_t));
+	if (busy == NULL) {
+		LOGE("failed to allocate memory");
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	ret = hgsl_hyp_gslprofiler_per_proc_gpu_busy(&priv->hyp_priv, &param, busy);
+	if (ret == 0) {
+		if (copy_to_user(USRPTR(param.busy), busy,
+				sizeof(struct gsl_profiler_get_per_proc_gpu_busy_percentage_t))) {
+			LOGE("failed to copy busy to user");
+			ret = -EFAULT;
+			goto out;
+		}
+	}
+
+out:
+	hgsl_free(busy);
+	return ret;
+}
+
+static int hgsl_ioctl_gslprofiler_per_proc_gpu_pmem(struct file *filep, unsigned long arg)
+{
+	struct hgsl_priv *priv = filep->private_data;
+	struct hgsl_ioctl_gslprofiler_per_proc_gpu_pmem_params param;
+	struct gsl_profiler_get_per_proc_gpu_pmem_usage_t *pmem = NULL;
+	int ret = 0;
+
+	if (copy_from_user(&param, USRPTR(arg), sizeof(param)))	{
+		LOGE("failed to copy user to param");
+		ret = -EFAULT;
+		goto out;
+	}
+
+	pmem = hgsl_malloc(sizeof(struct gsl_profiler_get_per_proc_gpu_pmem_usage_t));
+	if (pmem == NULL) {
+		LOGE("failed to allocate memory");
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	ret = hgsl_hyp_gslprofiler_per_proc_gpu_pmem(&priv->hyp_priv, &param, pmem);
+	if (ret == 0) {
+		if (copy_to_user(USRPTR(param.pmem), pmem,
+				sizeof(struct gsl_profiler_get_per_proc_gpu_pmem_usage_t))) {
+			LOGE("failed to copy pmem to user");
+			ret = -EFAULT;
+			goto out;
+		}
+	}
+
+out:
+	hgsl_free(pmem);
+	return ret;
+}
+
 static const struct hgsl_ioctl hgsl_ioctl_func_table[] = {
 	HGSL_IOCTL_FUNC(HGSL_IOCTL_ISSUE_IB,
 			hgsl_ioctl_issueib),
@@ -3851,6 +3930,10 @@ static const struct hgsl_ioctl hgsl_ioctl_func_table[] = {
 			hgsl_ioctl_timeline_query),
 	HGSL_IOCTL_FUNC(HGSL_IOCTL_TIMELINE_WAIT,
 			hgsl_ioctl_timeline_wait),
+	HGSL_IOCTL_FUNC(HGSL_IOCTL_GSLPROFILER_PER_PROC_GPU_BUSY,
+			hgsl_ioctl_gslprofiler_per_proc_gpu_busy),
+	HGSL_IOCTL_FUNC(HGSL_IOCTL_GSLPROFILER_PER_PROC_GPU_PMEM,
+			hgsl_ioctl_gslprofiler_per_proc_gpu_pmem),
 };
 
 static long hgsl_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
