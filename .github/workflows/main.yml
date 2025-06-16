@@ -342,6 +342,7 @@ jobs:
           mkdir -p "$(dirname "$CONFIG_FILE")"
 
           CONFIGS+=(
+            "CONFIG_LOCALVERSION_AUTO=n"
             "CONFIG_KSU=y"
             "CONFIG_KSU_MANUAL_HOOKS=y"
             "CONFIG_KPM=y"
