@@ -1,4 +1,6 @@
 # Xiaomi Topaz Defconfig
+# Basic Optimizations
+CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
 # Freq limits
 CONFIG_CPU_MAX_FREQ=y
 CONFIG_DISABLE_FREQ_LIMIT=y
