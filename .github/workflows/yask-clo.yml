@@ -203,11 +203,13 @@ jobs:
           set -ex
           CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
           CONFIGS=(
+            "CONFIG_64BIT=y"
             "CONFIG_KSU=y"
-            "CONFIG_KSU_MANUAL_HOOKS=y"
+            "CONFIG_KSU_MANUAL_HOOK=y"
             "CONFIG_KPM=y"
             "CONFIG_KALLSYMS=y"
-            "CONFIG_KSU_WITH_KPROBES=n"
+            "CONFIG_KSU_CMDLINE=y"
+            "CONFIG_KSU_ALLOWLIST_WORKAROUND=y"
             "CONFIG_KSU_SUSFS=y"
             "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"
             "CONFIG_KSU_SUSFS_SUS_PATH=y"
