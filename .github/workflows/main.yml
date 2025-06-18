@@ -393,7 +393,7 @@ jobs:
           args: ${{ steps.generate-args.outputs.args }}
         run: |
           export KBUILD_BUILD_USER="bromanprjkt"
-          export KBUILD_BUILD_HOST="Github"
+          export KBUILD_BUILD_HOST="GitHub"
         
           make ${args} \
             LLVM=1 \
