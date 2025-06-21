@@ -41,6 +41,7 @@
 /*===    Dependency    ===*/
 #define LZ4_HC_STATIC_LINKING_ONLY
 #include "lz4hc.h"
+#include <linux/slab.h>  // for kmalloc, kfree
 
 
 /*! HEAPMODE :
@@ -1825,7 +1826,13 @@ static int LZ4HC_compress_optimal ( LZ4HC_CCtx_internal* ctx,
 #if defined(LZ4HC_HEAPMODE) && LZ4HC_HEAPMODE==1
     LZ4HC_optimal_t* const opt = (LZ4HC_optimal_t*)ALLOC(sizeof(LZ4HC_optimal_t) * (LZ4_OPT_NUM + TRAILING_LITERALS));
 #else
-    LZ4HC_optimal_t opt[LZ4_OPT_NUM + TRAILING_LITERALS];   /* ~64 KB, which is a bit large for stack... */
+LZ4HC_optimal_t *opt;
+
+opt = kmalloc_array(LZ4_OPT_NUM + TRAILING_LITERALS, sizeof(LZ4HC_optimal_t), GFP_KERNEL);
+if (!opt) {
+    retval = -ENOMEM;
+    goto _return_label;
+}
 #endif
 
     const BYTE* ip = (const BYTE*) source;
