@@ -3595,6 +3595,9 @@ static char *custom_module_blacklist[] = {
     "cpumaxfreq",
 #endif
 #ifdef CONFIG_MACH_XIAOMI_TOPAZ
+	/* Useless modules*/
+	"msm_performance",
+
     /* Useless logs */
     "f_fs_ipc_log",
 
@@ -3605,9 +3608,9 @@ static char *custom_module_blacklist[] = {
     "stm_console", "stm_core", "stm_ftrace", "stm_p_basic", "stm_p_ost",
 
     /* Coresight */
-    "coresight", "coresight-csr", "coresight-cti", "coresight-dummy", "coresight-funnel",
-    "coresight-hwevent", "coresight-remote-etm", "coresight-replicator", "coresight-stm",
-    "coresight-tgu", "coresight-tmc", "coresight-tpda", "coresight-tpdm",
+    "coresight", "coresight_csr", "coresight_cti", "coresight_dummy", "coresight_funnel",
+    "coresight_hwevent", "coresight_remote_etm", "coresight_replicator", "coresight_stm",
+    "coresight_tgu", "coresight_tmc", "coresight_tpda", "coresight_tpdm",
 #endif
 };
 
