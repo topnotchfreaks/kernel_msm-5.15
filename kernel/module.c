@@ -3589,6 +3589,24 @@ static char *custom_module_blacklist[] = {
 #if IS_BUILTIN(CONFIG_ZSMALLOC)
     "zsmalloc",
 #endif
+#ifdef CONFIG_MACH_XIAOMI_TOPAZ
+	/* Useless modules*/
+	"msm_performance",
+
+    /* Useless logs */
+    "f_fs_ipc_log",
+
+    /* Debug */
+    "qcom_cpufreq_hw_debug", "qcom_iommu_debug", "qti_battery_debug", "rdbg", "spmi_glink_debug", "ehset",
+
+    /* STM (System Trace Module devices) */
+    "stm_console", "stm_core", "stm_ftrace", "stm_p_basic", "stm_p_ost",
+
+    /* Coresight */
+    "coresight", "coresight_csr", "coresight_cti", "coresight_dummy", "coresight_funnel",
+    "coresight_hwevent", "coresight_remote_etm", "coresight_replicator", "coresight_stm",
+    "coresight_tgu", "coresight_tmc", "coresight_tpda", "coresight_tpdm",
+#endif
 };
 
 static bool blacklisted(const char *module_name)
