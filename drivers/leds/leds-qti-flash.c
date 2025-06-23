@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #define pr_fmt(fmt)	"qti-flash: %s: " fmt, __func__
 
@@ -964,7 +964,7 @@ static int qti_flash_switch_disable(struct flash_switch_data *snode)
 	return rc;
 }
 
-static void qti_flash_led_switch_brightness_set(
+static int qti_flash_led_switch_brightness_set(
 		struct led_classdev *led_cdev, enum led_brightness value)
 {
 	struct flash_switch_data *snode = NULL;
@@ -976,7 +976,7 @@ static void qti_flash_led_switch_brightness_set(
 	if (snode->enabled == state) {
 		pr_debug("Switch  is already %s!\n",
 			state ? "enabled" : "disabled");
-		return;
+		return rc;
 	}
 
 	if (state) {
@@ -986,7 +986,7 @@ static void qti_flash_led_switch_brightness_set(
 			hrtimer_start(&snode->on_timer,
 					ms_to_ktime(snode->on_time_ms),
 					HRTIMER_MODE_REL);
-			return;
+			return rc;
 		}
 
 		rc = qti_flash_switch_enable(snode);
@@ -999,6 +999,8 @@ static void qti_flash_led_switch_brightness_set(
 			state ? "enable" : "disable", rc);
 	else
 		snode->enabled = state;
+
+	return rc;
 }
 
 static struct led_classdev *trigger_to_lcdev(struct led_trigger *trig)
@@ -1909,7 +1911,7 @@ static int register_switch_device(struct qti_flash_led *led,
 	snode->off_timer.function = off_timer_function;
 
 	snode->led = led;
-	snode->cdev.brightness_set = qti_flash_led_switch_brightness_set;
+	snode->cdev.brightness_set_blocking = qti_flash_led_switch_brightness_set;
 	snode->cdev.brightness_get = qti_flash_led_brightness_get;
 
 	rc = devm_led_classdev_register(&led->pdev->dev, &snode->cdev);
