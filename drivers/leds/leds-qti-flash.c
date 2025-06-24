@@ -464,18 +464,6 @@ static int qti_flash_led_module_control(struct qti_flash_led *led,
 
 			led->module_en = true;
 		}
-
-		val = FLASH_MODULE_DISABLE;
-		rc = qti_flash_poll_vreg_ok(led);
-		if (rc < 0) {
-			/* Disable the module */
-			rc = qti_flash_led_write(led, FLASH_ENABLE_CONTROL,
-						&val, 1);
-			if (rc < 0)
-				return rc;
-
-			led->module_en = false;
-		}
 	} else {
 		if (led->module_en && !led->chan_en_map) {
 			val = FLASH_MODULE_DISABLE;
@@ -530,6 +518,16 @@ static int qti_flash_led_strobe(struct qti_flash_led *led,
 		rc = qti_flash_led_module_control(led, enable);
 		if (rc < 0)
 			goto error;
+		spin_unlock(&led->lock);
+
+		rc = qti_flash_poll_vreg_ok(led);
+		spin_lock(&led->lock);
+		if (rc < 0) {
+			/* Disable the module */
+			rc = qti_flash_led_module_control(led, false);
+			if (rc < 0)
+				goto error;
+		}
 
 		for (i = 0; i < led->num_fnodes; i++) {
 			if ((mask & BIT(led->fnode[i].id)) &&
@@ -586,8 +584,6 @@ static int qti_flash_led_strobe(struct qti_flash_led *led,
 		}
 
 		rc = qti_flash_led_module_control(led, enable);
-		if (rc < 0)
-			goto error;
 	}
 
 error:
