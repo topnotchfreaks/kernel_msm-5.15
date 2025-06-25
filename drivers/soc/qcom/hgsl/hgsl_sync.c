@@ -794,7 +794,7 @@ static void hgsl_isync_fence_release(struct dma_fence *base)
 		hgsl_isync_timeline_put(fence->timeline);
 	}
 
-	dma_fence_free(base);
+	kfree(fence);
 }
 
 static void hgsl_isync_fence_value_str(struct dma_fence *base,
