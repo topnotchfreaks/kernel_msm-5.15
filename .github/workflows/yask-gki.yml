@@ -29,7 +29,7 @@ jobs:
       kernelDevice: gki
       DEFCONFIG_NAME: gki_defconfig
       OUT_DIR: "out"
-      localVersion: ""
+      localVersion: "-YASK/GKI"
 
     steps:
       - name: "✨ Setup workspace"
