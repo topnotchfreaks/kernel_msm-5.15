@@ -39,6 +39,46 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential bc curl flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
 
+      - name: "🚀 Setup ccache (optimized for kernel)"
+        run: |
+          sudo apt-get install -y ccache
+          
+          mkdir -p $HOME/.ccache
+          
+          ccache --version
+          ccache --max-size=4G
+          ccache --set-config=compression=true
+          ccache --set-config=compression_level=1
+          
+          ccache --set-config=sloppiness="time_macros,include_file_mtime,include_file_ctime,file_macro,pch_defines"
+          ccache --set-config=hash_dir=true
+          ccache --set-config=base_dir="${{ github.workspace }}"
+          
+          echo "CCACHE_DIR=$HOME/.ccache" >> $GITHUB_ENV
+          echo "CCACHE_MAXSIZE=4G" >> $GITHUB_ENV
+          echo "CCACHE_COMPRESS=true" >> $GITHUB_ENV
+          echo "CCACHE_COMPRESSLEVEL=1" >> $GITHUB_ENV
+          echo "CCACHE_SLOPPINESS=time_macros,include_file_mtime,include_file_ctime,file_macro,pch_defines" >> $GITHUB_ENV
+          echo "CCACHE_HASHDIR=true" >> $GITHUB_ENV
+          echo "CCACHE_BASEDIR=${{ github.workspace }}" >> $GITHUB_ENV
+          echo "CCACHE_NOHASHDIR=false" >> $GITHUB_ENV
+          echo "CCACHE_HARDLINK=true" >> $GITHUB_ENV
+          echo "CCACHE_COMPILERCHECK=%compiler% -dumpmachine; %compiler% -dumpversion" >> $GITHUB_ENV
+          
+          ccache --zero-stats
+          ccache --show-stats
+
+      - name: "📦 Cache ccache directory"
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-${{ env.kernelBranch }}-${{ env.DEFCONFIG_NAME }}-${{ hashFiles('**/Kconfig*', '**/*.mk') }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ env.kernelBranch }}-${{ env.DEFCONFIG_NAME }}-${{ hashFiles('**/Kconfig*', '**/*.mk') }}-
+            ccache-${{ env.kernelBranch }}-${{ env.DEFCONFIG_NAME }}-
+            ccache-${{ env.kernelBranch }}-
+            ccache-
+
       - name: "🌟 Clone kernel source => (${{ env.kernelRepo }})"
         working-directory: ./${{ env.kernelDir }}
         run: |
@@ -104,6 +144,21 @@ jobs:
             echo "vm.swappiness=80" | sudo tee -a /etc/sysctl.conf
             sudo sysctl -p
           
+      - name: "🔧 Setup kernel-specific ccache optimizations"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          cat > .ccache-ignore << 'EOF'
+          include/generated/autoconf.h
+          include/generated/compile.h
+          include/generated/utsrelease.h
+          scripts/mod/devicetable-offsets.h
+          EOF
+          
+          IGNORE_HEADERS=$(cat .ccache-ignore | tr '\n' ':' | sed 's/:$//')
+          echo "CCACHE_IGNOREHEADERS=${{ github.workspace }}/${{ env.kernelDir }}/${{ env.kernelName }}/$IGNORE_HEADERS" >> $GITHUB_ENV
+          
+          echo "✅ Kernel-specific ccache optimizations applied"
+      
       - name: "😎 Set args for GKI kernels"
         id: generate-args
         working-directory: ./${{ env.kernelDir }}
@@ -119,7 +174,7 @@ jobs:
             args="$args CROSS_COMPILE=aarch64-linux-gnu-"
             args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
             args="$args AR=llvm-ar"
-            args="$args CC=clang"
+            args="$args CC=\"ccache clang\""
             echo "args=$args" >> $GITHUB_OUTPUT
 
       - name: "🛠 Set localversion name in defconfig"
@@ -242,23 +297,52 @@ jobs:
         run: |
           make ${{ env.args }} ${{ env.DEFCONFIG_NAME }}
 
+      - name: "📊 Show ccache stats (before build)"
+        run: |
+          echo "=== CCACHE STATS BEFORE BUILD ==="
+          ccache --show-stats
+
       - name: "🎶 Build kernel"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         env:
           args: ${{ steps.generate-args.outputs.args }}
         run: |
           export KBUILD_BUILD_USER="Automated"
-          export KBUILD_BUILD_HOST="GitHub-Actions"
-
+          export KBUILD_BUILD_HOST="GH-Actions"
+          
           make ${{ env.args }} \
             LLVM=1 \
             LTO=thin \
-            CC=clang \
+            CC="ccache clang" \
+            HOSTCC="ccache clang" \
             AR=llvm-ar \
             NM=llvm-nm \
             OBJCOPY="llvm-objcopy" \
             STRIP="llvm-strip" \
             -j$(nproc --all)
+
+      - name: "📊 Show ccache stats (after build)"
+        if: always()
+        run: |
+          echo "=== CCACHE STATS AFTER BUILD ==="
+          ccache --show-stats
+          
+          # Calculate and display hit rate
+          HITS=$(ccache --show-stats | grep "cache hit" | grep -o '[0-9]*' | head -1 || echo "0")
+          MISSES=$(ccache --show-stats | grep "cache miss" | grep -o '[0-9]*' | head -1 || echo "0")
+          TOTAL=$((HITS + MISSES))
+          if [ $TOTAL -gt 0 ]; then
+            HIT_RATE=$((HITS * 100 / TOTAL))
+            echo "=== CCACHE HIT RATE: ${HIT_RATE}% ==="
+            if [ $HIT_RATE -lt 50 ]; then
+              echo "⚠️  Low hit rate detected. Consider checking ccache configuration."
+            else
+              echo "✅ Good ccache performance!"
+            fi
+          fi
+          
+          echo "=== CACHE SIZE ==="
+          du -sh $HOME/.ccache || echo "Cache directory not found"
 
       - name: "🩹 Patch Image with KPM"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
