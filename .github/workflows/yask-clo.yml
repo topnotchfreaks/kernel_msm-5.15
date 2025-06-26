@@ -174,7 +174,7 @@ jobs:
             args="$args CROSS_COMPILE=aarch64-linux-gnu-"
             args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
             args="$args AR=llvm-ar"
-            args="$args CC=\"ccache clang\""
+            args="$args CC=clang"
             echo "args=$args" >> $GITHUB_OUTPUT
 
       - name: "🛠 Set localversion name in defconfig"
