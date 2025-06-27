@@ -202,6 +202,29 @@ jobs:
           printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
           echo "✅ SUSFS configs added"
 
+      - name: "⚙️ Add Additional configs"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex
+          CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
+
+          sed -i '/CONFIG_NO_HZ/d' "$CONFIG_FILE"
+
+          CONFIGS=(
+            "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"
+            "CONFIG_HZ_300=y"
+            "CONFIG_HZ=300"
+            "CONFIG_NO_HZ_IDLE=y"
+            "CONFIG_TCP_CONG_ADVANCED=y"
+            "CONFIG_TCP_CONG_BIC=n"
+            "CONFIG_TCP_CONG_WESTWOOD=y"
+            "CONFIG_TCP_CONG_HTCP=n"
+            "CONFIG_TCP_CONG_BBR=y"
+            "CONFIG_DEFAULT_WESTWOOD=y"
+          )
+          printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
+          echo "✅ configs added"
+
       - name: "📝 Append custom Makefile line"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -444,6 +467,29 @@ jobs:
           )
           printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
           echo "✅ SUSFS configs added"
+
+      - name: "⚙️ Add Additional configs"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex
+          CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
+
+          sed -i '/CONFIG_NO_HZ/d' "$CONFIG_FILE"
+
+          CONFIGS=(
+            "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"
+            "CONFIG_HZ_300=y"
+            "CONFIG_HZ=300"
+            "CONFIG_NO_HZ_IDLE=y"
+            "CONFIG_TCP_CONG_ADVANCED=y"
+            "CONFIG_TCP_CONG_BIC=n"
+            "CONFIG_TCP_CONG_WESTWOOD=y"
+            "CONFIG_TCP_CONG_HTCP=n"
+            "CONFIG_TCP_CONG_BBR=y"
+            "CONFIG_DEFAULT_WESTWOOD=y"
+          )
+          printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
+          echo "✅ configs added"
 
       - name: "📝 Append custom Makefile line"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
