@@ -224,12 +224,7 @@ jobs:
             "CONFIG_HZ_300=y"
             "CONFIG_HZ=300"
             "CONFIG_NO_HZ_IDLE=y"
-            "CONFIG_TCP_CONG_ADVANCED=y"
-            "CONFIG_TCP_CONG_BIC=n"
-            "CONFIG_TCP_CONG_WESTWOOD=y"
-            "CONFIG_TCP_CONG_HTCP=n"
-            "CONFIG_TCP_CONG_BBR=y"
-            "CONFIG_DEFAULT_WESTWOOD=y"
+            "CONFIG_ZRAM_DEF_COMP_LZ4=y"
           )
           printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
           echo "✅ configs added"
@@ -506,6 +501,7 @@ jobs:
             "CONFIG_HZ_300=y"
             "CONFIG_HZ=300"
             "CONFIG_NO_HZ_IDLE=y"
+            "CONFIG_ZRAM_DEF_COMP_LZ4=y"
           )
           printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
           echo "✅ configs added"
