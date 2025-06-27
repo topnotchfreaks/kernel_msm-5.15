@@ -587,6 +587,18 @@ jobs:
     runs-on: ubuntu-latest
     needs: [Build-GKI, Build-CLO]
     steps:
+      - name: "📥 Download GKI kernel artifact"
+        uses: actions/download-artifact@v4
+        with:
+          name: gki-kernel
+          path: ./kernels/
+
+      - name: "📥 Download CLO kernel artifact"
+        uses: actions/download-artifact@v4
+        with:
+          name: clo-kernel
+          path: ./kernels/
+
       - name: "📦 Create ZIP file with both kernels"
         run: |
           set -e
