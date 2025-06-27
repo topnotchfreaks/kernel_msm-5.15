@@ -506,12 +506,6 @@ jobs:
             "CONFIG_HZ_300=y"
             "CONFIG_HZ=300"
             "CONFIG_NO_HZ_IDLE=y"
-            "CONFIG_TCP_CONG_ADVANCED=y"
-            "CONFIG_TCP_CONG_BIC=n"
-            "CONFIG_TCP_CONG_WESTWOOD=y"
-            "CONFIG_TCP_CONG_HTCP=n"
-            "CONFIG_TCP_CONG_BBR=y"
-            "CONFIG_DEFAULT_WESTWOOD=y"
           )
           printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
           echo "✅ configs added"
@@ -621,3 +615,16 @@ jobs:
         with:
           files: ${{ env.ZIP_NAME }}
           tag_name: "YASK"
+
+      - name: "📤 Upload to Telegram"
+        if: success()
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_BOT_YAOB }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
+          FILE_PATH: "${{ env.kernelDir }}/${{ env.OUT_DIR }}/arch/arm64/boot/Image.gki"
+        run: |
+          curl -F chat_id="$TELEGRAM_CHAT_ID" \
+               -F document=@"$FILE_PATH" \
+               -F caption="✅ Kernel Build Successful!\n🧬 *Branch:* `${{ env.kernelBranch }}`\n🧩 *Device:* `${{ env.kernelDevice }}`\n🔧 *Config:* `${{ env.DEFCONFIG_NAME }}`" \
+               -F parse_mode="Markdown" \
+               "https://api.telegram.org/bot$TELEGRAM_TOKEN/sendDocument"
