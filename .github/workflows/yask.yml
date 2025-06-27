@@ -1,4 +1,4 @@
-name: "Build YASK Combined"
+name: "Build YASK"
 
 env:
   OUT_DIR: "out"
