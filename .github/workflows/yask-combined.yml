@@ -293,6 +293,13 @@ jobs:
           rm -rf Image
           mv oImage Image.gki
 
+      - name: "📤 Upload GKI kernel artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          name: gki-kernel
+          path: ${{ env.kernelDir }}/${{ env.OUT_DIR }}/arch/arm64/boot/Image.gki
+          retention-days: 1
+
   Build-CLO:
     name: "🐎 Build YASK CLO kernel"
     runs-on: ubuntu-latest
@@ -568,6 +575,13 @@ jobs:
           rm -rf Image
           mv oImage Image.clo
 
+      - name: "📤 Upload CLO kernel artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          name: clo-kernel
+          path: ${{ env.kernelDir }}/${{ env.OUT_DIR }}/arch/arm64/boot/Image.clo
+          retention-days: 1
+
   Package-Kernels:
     name: "📦 Package Kernels"
     runs-on: ubuntu-latest
@@ -579,8 +593,8 @@ jobs:
 
           [ ! -d "AnyKernel3" ] && git clone --depth=1 https://github.com/topnotchfreaks/AnyKernel3 -b YASK AnyKernel3
 
-          cp common_gki/out/arch/arm64/boot/Image.gki AnyKernel3/Image.gki
-          cp common_clo/out/arch/arm64/boot/Image.clo AnyKernel3/Image.clo
+          cp kernels/Image.gki AnyKernel3/Image.gki
+          cp kernels/Image.clo AnyKernel3/Image.clo
 
           ZIP_NAME="YASK-AIO_$(date +'%Y-%m-%d').zip"
           cd AnyKernel3
