@@ -104,6 +104,15 @@ jobs:
             echo "vm.swappiness=80" | sudo tee -a /etc/sysctl.conf
             sudo sysctl -p
           
+      - name: "🛠 Set localversion name in defconfig"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        env:
+          LOCALVERSION: ${{ env.localVersion }}
+        run: |
+          if [ -n "$LOCALVERSION" ]; then
+            echo "CONFIG_LOCALVERSION=\"$LOCALVERSION\"" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          fi      
+
       - name: "🧩 Apply Kernel Fixup Patch"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -370,6 +379,15 @@ jobs:
             echo "vm.swappiness=80" | sudo tee -a /etc/sysctl.conf
             sudo sysctl -p
           
+      - name: "🛠 Set localversion name in defconfig"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        env:
+          LOCALVERSION: ${{ env.localVersion }}
+        run: |
+          if [ -n "$LOCALVERSION" ]; then
+            echo "CONFIG_LOCALVERSION=\"$LOCALVERSION\"" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          fi     
+
       - name: "🧩 Apply Kernel Fixup Patch"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
