@@ -615,18 +615,3 @@ jobs:
         with:
           files: ${{ env.ZIP_NAME }}
           tag_name: "YASK"
-
-      - name: "📤 Send kernel ZIP to Telegram"
-        uses: appleboy/telegram-action@v1
-        with:
-          token: ${{ secrets.TELEGRAM_YASK_BOT_TOKEN }}
-          chat_id: ${{ secrets.TELEGRAM_CHANEL_ID }}
-          file: ${{ env.ZIP_NAME }}
-          caption: "Kernel Build Time: $(date +'%Y-%m-%d') \n
-                    Kernel Version: GKI & CLO \n
-                    Kernel Name: YASK \n
-                    Kernel Type: AIO \n
-                    Kernel Size: $(du -h ${{ env.ZIP_NAME }} | cut -f1) \n
-                    Kernel Maintainer: @belowzeroiq \n
-                    Kernel Build: GitHub Actions \n"
-                    
