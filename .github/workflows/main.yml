@@ -695,7 +695,7 @@ jobs:
           cp kernels/Image.noksu AnyKernel3/Image.noksu
           cp kernels/Image.ksu AnyKernel3/Image.ksu
 
-          ZIP_NAME="${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip"
+          ZIP_NAME="Anykernel3_${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
@@ -712,17 +712,14 @@ jobs:
 
       - name: "📤 Send kernel ZIP to Telegram"
         run: |
-          UPLOAD_ZIP_NAME="Anykernel3_${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip"
-          KSU_MSG="All in one kernel package:"
-
           if [[ -f "${{ env.ZIP_PATH }}" ]]; then
             curl -s -F document=@"${{ env.ZIP_PATH }}" \
-                 -F caption="✅ Build Date $(date '+%Y-%m-%d %H:%M:%S') ${KSU_MSG}" \
+                 -F caption="✅ Build Date $(date '+%Y-%m-%d %H:%M:%S')" \
                  -F chat_id=${{ secrets.TELEGRAM_USER_ID }} \
                  "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument"
           else
             curl -s -X POST \
                  -d chat_id=${{ secrets.TELEGRAM_USER_ID }} \
-                 -d text="❌ Kernel build failed or no output file found. ${KSU_MSG}" \
+                 -d text="❌ Kernel build failed or no output file found." \
                  "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage"
           fi
