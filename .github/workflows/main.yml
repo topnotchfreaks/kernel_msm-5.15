@@ -297,7 +297,7 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
             cd ..
-            mv "${{ env.OUT_DIR }}/arch/arm64/boot/Image" "${{ env.OUT_DIR }}/arch/arm64/boot/Image.ksu"
+            mv "${{ env.OUT_DIR }}/arch/arm64/boot/Image" "${{ env.OUT_DIR }}/arch/arm64/boot/Image.noksu"
 
       - name: "📤 Upload NoKSU kernel artifact"
         uses: actions/upload-artifact@v4
