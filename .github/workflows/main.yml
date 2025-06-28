@@ -695,7 +695,7 @@ jobs:
           cp kernels/Image.noksu AnyKernel3/Image.noksu
           cp kernels/Image.ksu AnyKernel3/Image.ksu
 
-          ZIP_NAME="Anykernel3_${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip"
+          ZIP_NAME="${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
