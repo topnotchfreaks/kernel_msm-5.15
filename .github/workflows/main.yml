@@ -296,12 +296,8 @@ jobs:
       - name: "📦 Rename for packaging"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          if [ -d "${{ env.OUT_DIR }}/arch/arm64/boot" ]; then
-            mv "${{ env.OUT_DIR }}/arch/arm64/boot/Image" "${{ env.OUT_DIR }}/arch/arm64/boot/Image.noksu"
-          else
-            echo "❌ Output directory not found!"
-            exit 1
-          fi
+            cd ..
+            mv "${{ env.OUT_DIR }}/arch/arm64/boot/Image" "${{ env.OUT_DIR }}/arch/arm64/boot/Image.ksu"
 
       - name: "📤 Upload NoKSU kernel artifact"
         uses: actions/upload-artifact@v4
@@ -656,12 +652,8 @@ jobs:
       - name: "📦 Rename for packaging"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          if [ -d "${{ env.OUT_DIR }}/arch/arm64/boot" ]; then
+            cd ..
             mv "${{ env.OUT_DIR }}/arch/arm64/boot/Image" "${{ env.OUT_DIR }}/arch/arm64/boot/Image.ksu"
-          else
-            echo "❌ Output directory not found!"
-            exit 1
-          fi
 
       - name: "📤 Upload KSU kernel artifact"
         uses: actions/upload-artifact@v4
