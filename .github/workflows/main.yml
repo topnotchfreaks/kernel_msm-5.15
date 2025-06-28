@@ -311,8 +311,8 @@ jobs:
             fi
           }
         
-          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Implement-SUSFS-v1.5.7-syscall-hooks.patch"
-          PATCH_FILE="0001-Implement-SUSFS-v1.5.7-syscall-hooks.patch"
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Implement-SUSFS-v1.5.8-syscall-hooks.patch"
+          PATCH_FILE="0001-Implement-SUSFS-v1.5.8-syscall-hooks.patch"
         
           log "Downloading SUSFS patch from $PATCH_URL"
           curl -L -o "$PATCH_FILE" "$PATCH_URL"

@@ -172,8 +172,8 @@ jobs:
         run: |
           set -ex
           log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
-          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Implement-SUSFS-v1.5.7-syscall-hooks.patch"
-          PATCH_FILE="0001-Implement-SUSFS-v1.5.7-syscall-hooks.patch"
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Implement-SUSFS-v1.5.8-syscall-hooks.patch"
+          PATCH_FILE="0001-Implement-SUSFS-v1.5.8-syscall-hooks.patch"
           curl -L -o "$PATCH_FILE" "$PATCH_URL"
           [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
           patch -p1 < "$PATCH_FILE" || log "Warning: Some hunks failed"
@@ -455,8 +455,8 @@ jobs:
         run: |
           set -ex
           log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
-          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Implement-SUSFS-v1.5.7-syscall-hooks.patch"
-          PATCH_FILE="0001-Implement-SUSFS-v1.5.7-syscall-hooks.patch"
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Implement-SUSFS-v1.5.8-syscall-hooks.patch"
+          PATCH_FILE="0001-Implement-SUSFS-v1.5.8-syscall-hooks.patch"
           curl -L -o "$PATCH_FILE" "$PATCH_URL"
           [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
           patch -p1 < "$PATCH_FILE" || log "Warning: Some hunks failed"
