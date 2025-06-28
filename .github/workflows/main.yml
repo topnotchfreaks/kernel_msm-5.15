@@ -690,7 +690,7 @@ jobs:
         run: |
           set -e
 
-          [ ! -d "AnyKernel3" ] && git clone --depth=1 https://github.com/topnotchfreaks/AnyKernel3 -b master AnyKernel3
+          git clone --depth=1 https://github.com/topnotchfreaks/AnyKernel3 -b master AnyKernel3
 
           cp kernels/Image.noksu AnyKernel3/Image.noksu
           cp kernels/Image.ksu AnyKernel3/Image.ksu
@@ -699,38 +699,30 @@ jobs:
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
+
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+          echo "ZIP_PATH=$(pwd)/$ZIP_NAME" >> $GITHUB_ENV
 
       - name: "⬆️ Upload Kernel Artifact"
         uses: actions/upload-artifact@v4
         with:
           name: Anykernel3_${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip
-          path: ./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip
+          path: ${{ env.ZIP_PATH }}
           retention-days: 7
 
       - name: "📤 Send kernel ZIP to Telegram"
         run: |
           UPLOAD_ZIP_NAME="Anykernel3_${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip"
-
-          mv "./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip" \
-             "./${{ env.kernelDir }}/${{ env.kernelName }}/${UPLOAD_ZIP_NAME}"
-
-          ANYKERNEL3_PATH="./${{ env.kernelDir }}/${{ env.kernelName }}/${UPLOAD_ZIP_NAME}"
-
           KSU_MSG="All in one kernel package:"
 
-          if [[ -f "$ANYKERNEL3_PATH" ]]; then
-            curl -s -F document=@"$ANYKERNEL3_PATH" \
-                 -F caption="
-                 ✅ Build Date $(date '+%Y-%m-%d %H:%M:%S')
-                 ${KSU_MSG}" \
+          if [[ -f "${{ env.ZIP_PATH }}" ]]; then
+            curl -s -F document=@"${{ env.ZIP_PATH }}" \
+                 -F caption="✅ Build Date $(date '+%Y-%m-%d %H:%M:%S') ${KSU_MSG}" \
                  -F chat_id=${{ secrets.TELEGRAM_USER_ID }} \
                  "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument"
           else
             curl -s -X POST \
                  -d chat_id=${{ secrets.TELEGRAM_USER_ID }} \
-                 -d text="
-                 ❌ Kernel build failed or no output file found.
-                 ${KSU_MSG}" \
+                 -d text="❌ Kernel build failed or no output file found. ${KSU_MSG}" \
                  "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage"
           fi
