@@ -72,8 +72,7 @@ jobs:
             "all")
               matrix='{"variant":[
                 {"name":"stock","kernelsu":"None","suffix":""},
-                {"name":"sukisu-stable","kernelsu":"SukiSU-Ultra-SuSFS-stable","suffix":"-SukiSU"},
-                {"name":"sukisu-dev","kernelsu":"SukiSU-Ultra-SuSFS-dev","suffix":"-SukiSU-Dev"}
+                {"name":"sukisu-stable","kernelsu":"SukiSU-Ultra-SuSFS-stable","suffix":""}
               ]}'
               ;;
             "stock-only")
@@ -83,8 +82,7 @@ jobs:
               ;;
             "kernelsu-only")
               matrix='{"variant":[
-                {"name":"sukisu-stable","kernelsu":"SukiSU-Ultra-SuSFS-stable","suffix":"-SukiSU"},
-                {"name":"sukisu-dev","kernelsu":"SukiSU-Ultra-SuSFS-dev","suffix":"-SukiSU-Dev"}
+                {"name":"sukisu-stable","kernelsu":"SukiSU-Ultra-SuSFS-stable","suffix":""}
               ]}'
               ;;
           esac
@@ -314,11 +312,7 @@ jobs:
             rm -rf "./drivers/kernelsu"
           fi
 
-          if [[ "${{ env.KSU_CHOICE }}" == "SukiSU-Ultra-SuSFS-stable" ]]; then
-            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
-          elif [[ "${{ env.KSU_CHOICE }}" == "SukiSU-Ultra-SuSFS-dev" ]]; then
-            curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-test
-          fi
+          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
 
           echo "✅ KernelSU updated successfully"
 
@@ -491,8 +485,6 @@ jobs:
           KSU_MSG=""
           if [[ "${{ env.KSU_CHOICE }}" == "SukiSU-Ultra-SuSFS-stable" ]]; then
             KSU_MSG="KernelSU: SukiSU-Stable"
-          elif [[ "${{ env.KSU_CHOICE }}" == "SukiSU-Ultra-SuSFS-dev" ]]; then
-            KSU_MSG="KernelSU: SukiSU-dev"
           elif [[ "${{ env.KSU_CHOICE }}" == "None" ]]; then
             KSU_MSG="KernelSU: None (Stock)"
           else
