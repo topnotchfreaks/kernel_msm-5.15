@@ -665,8 +665,15 @@ jobs:
   Package-Kernels:
     name: "📦 Package Kernels"
     runs-on: ubuntu-latest
+    env:
+      kernelDir: ${{ github.event.inputs.kernelSourceName }}_${{ github.event.inputs.kernelDevice }}
+      kernelName: ${{ github.event.inputs.kernelSourceName }}
+      kernelBranch: ${{ github.event.inputs.kernelBranch }}
     needs: [Build-NoKSU-Kernel, Build-KSU-Kernel]
     steps:
+      - name: "🕒 Set BUILD_TIME"
+        run: echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+
       - name: "📥 Download NoKSU kernel artifact"
         uses: actions/download-artifact@v4
         with:
