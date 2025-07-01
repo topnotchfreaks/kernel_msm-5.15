@@ -177,7 +177,7 @@ jobs:
 
           # Clone SUSFS source repository
           log "Cloning SUSFS4KSU repository..."
-          git clone --depth=1 https://$GITHUB_TOKEN@github.com/simonpunk/susfs4ksu.git ../susfs4ksu
+          git clone --depth=1 https://$GITHUB_TOKEN@github.com/ShirkNeko/susfs4ksu.git ../susfs4ksu -b gki-android13-5.15
 
       - name: "😋 Setup SUSFS"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -533,7 +533,7 @@ jobs:
 
           # Clone SUSFS source repository
           log "Cloning SUSFS4KSU repository..."
-          git clone --depth=1 https://$GITHUB_TOKEN@github.com/simonpunk/susfs4ksu.git ../susfs4ksu
+          git clone --depth=1 https://$GITHUB_TOKEN@github.com/ShirkNeko/susfs4ksu.git ../susfs4ksu -b gki-android13-5.15
 
       - name: "😋 Setup SUSFS"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
