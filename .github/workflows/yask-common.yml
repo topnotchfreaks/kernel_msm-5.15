@@ -44,7 +44,7 @@ jobs:
         run: |
           set -x
           # Initialize repo with your custom manifest
-          repo init -u https://github.com/topnotchfreaks/kernel_manifest -b main --depth=1
+          repo init -u https://github.com/topnotchfreaks/kernel_manifest -b common --depth=1
           repo sync -c -j$(nproc --all)
           
           # Clone the specific kernel source
@@ -244,7 +244,7 @@ jobs:
         run: |
           set -x
           # Initialize repo with your custom manifest
-          repo init -u https://github.com/topnotchfreaks/kernel_manifest -b main --depth=1
+          repo init -u https://github.com/topnotchfreaks/kernel_manifest -b common --depth=1
           repo sync -c -j$(nproc --all)
           
           # Clone the specific CLO kernel source
