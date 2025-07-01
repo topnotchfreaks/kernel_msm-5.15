@@ -217,8 +217,6 @@ jobs:
           set -ex
           CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
 
-          sed -i '/CONFIG_NO_HZ/d' "$CONFIG_FILE"
-
           CONFIGS=(
             "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"
             "CONFIG_ZRAM_DEF_COMP_LZ4=y"
@@ -496,8 +494,6 @@ jobs:
         run: |
           set -ex
           CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
-
-          sed -i '/CONFIG_NO_HZ/d' "$CONFIG_FILE"
 
           CONFIGS=(
             "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"
