@@ -169,15 +169,15 @@ jobs:
 
       - name: "😋 Clone SUSFS Source"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           set -ex
           log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
-          
+
           # Clone SUSFS source repository
           log "Cloning SUSFS4KSU repository..."
-          git clone --depth=1 https://github.com/simonpunk/susfs4ksu.git ../susfs4ksu
-          
-          log "✅ SUSFS source cloned"
+          git clone --depth=1 https://$GITHUB_TOKEN@github.com/simonpunk/susfs4ksu.git ../susfs4ksu
 
       - name: "😋 Setup SUSFS"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -525,15 +525,15 @@ jobs:
 
       - name: "😋 Clone SUSFS Source"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           set -ex
           log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
-          
+
           # Clone SUSFS source repository
           log "Cloning SUSFS4KSU repository..."
-          git clone --depth=1 https://github.com/simonpunk/susfs4ksu.git ../susfs4ksu
-          
-          log "✅ SUSFS source cloned"
+          git clone --depth=1 https://$GITHUB_TOKEN@github.com/simonpunk/susfs4ksu.git ../susfs4ksu
 
       - name: "😋 Setup SUSFS"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
