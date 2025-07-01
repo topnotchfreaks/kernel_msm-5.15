@@ -221,9 +221,6 @@ jobs:
 
           CONFIGS=(
             "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"
-            "CONFIG_HZ_300=y"
-            "CONFIG_HZ=300"
-            "CONFIG_NO_HZ_IDLE=y"
             "CONFIG_ZRAM_DEF_COMP_LZ4=y"
             "CONFIG_TCP_CONG_ADVANCED=y"
             "CONFIG_TCP_CONG_BIC=n"
@@ -504,9 +501,6 @@ jobs:
 
           CONFIGS=(
             "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"
-            "CONFIG_HZ_300=y"
-            "CONFIG_HZ=300"
-            "CONFIG_NO_HZ_IDLE=y"
             "CONFIG_ZRAM_DEF_COMP_LZ4=y"
             "CONFIG_TCP_CONG_ADVANCED=y"
             "CONFIG_TCP_CONG_BIC=n"
