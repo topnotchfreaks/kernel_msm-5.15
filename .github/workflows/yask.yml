@@ -257,6 +257,53 @@ jobs:
           
           log "✅ SukiSU hooks applied successfully"
 
+      - name: "🔧 Fix KernelSU Redefinition"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex
+          log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
+
+          KERNELSU_COMPAT_FILE="./drivers/kernelsu/kernel_compat.c"
+
+          if [ -f "$KERNELSU_COMPAT_FILE" ]; then
+            log "Fixing KernelSU redefinition in kernel_compat.c..."
+
+            # Create a backup
+            cp "$KERNELSU_COMPAT_FILE" "${KERNELSU_COMPAT_FILE}.backup"
+
+            # Remove duplicate ksu_access_ok function (lines 92-96 approximately)
+            # This removes the second definition while keeping the first one
+            sed -i '/^int ksu_access_ok.*{$/,/^}$/{ 
+              # If this is the second occurrence (after line 85), delete it
+              /^int ksu_access_ok.*{$/{
+                N
+                N
+                N
+                N
+                /.*return.*access_ok.*/{
+                  d
+                }
+              }
+            }' "$KERNELSU_COMPAT_FILE"
+
+            ## Alternative approach: Use awk to remove duplicate function
+            #awk '
+            #  /^int ksu_access_ok.*{$/ {
+            #    if (seen_ksu_access_ok) {
+            #      # Skip this function and its body
+            #      while (getline && $0 !~ /^}$/) continue
+            #      next
+            #    }
+            #    seen_ksu_access_ok = 1
+            #  }
+            #  { print }
+            #' "${KERNELSU_COMPAT_FILE}.backup" > "$KERNELSU_COMPAT_FILE"
+
+            log "✅ KernelSU redefinition fixed"
+          else
+            log "⚠️ KernelSU kernel_compat.c not found, skipping fix"
+          fi
+
       - name: "⚙️ Add SUSFS configs"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
@@ -612,6 +659,53 @@ jobs:
           fi
           
           log "✅ SukiSU hooks applied successfully"
+
+      - name: "🔧 Fix KernelSU Redefinition"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex
+          log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
+              
+          KERNELSU_COMPAT_FILE="./drivers/kernelsu/kernel_compat.c"
+              
+          if [ -f "$KERNELSU_COMPAT_FILE" ]; then
+            log "Fixing KernelSU redefinition in kernel_compat.c..."
+              
+            # Create a backup
+            cp "$KERNELSU_COMPAT_FILE" "${KERNELSU_COMPAT_FILE}.backup"
+              
+            # Remove duplicate ksu_access_ok function (lines 92-96 approximately)
+            # This removes the second definition while keeping the first one
+            sed -i '/^int ksu_access_ok.*{$/,/^}$/{ 
+              # If this is the second occurrence (after line 85), delete it
+              /^int ksu_access_ok.*{$/{
+                N
+                N
+                N
+                N
+                /.*return.*access_ok.*/{
+                  d
+                }
+              }
+            }' "$KERNELSU_COMPAT_FILE"
+              
+            ## Alternative approach: Use awk to remove duplicate function
+            #awk '
+            #  /^int ksu_access_ok.*{$/ {
+            #    if (seen_ksu_access_ok) {
+            #      # Skip this function and its body
+            #      while (getline && $0 !~ /^}$/) continue
+            #      next
+            #    }
+            #    seen_ksu_access_ok = 1
+            #  }
+            #  { print }
+            #' "${KERNELSU_COMPAT_FILE}.backup" > "$KERNELSU_COMPAT_FILE"
+              
+            log "✅ KernelSU redefinition fixed"
+          else
+            log "⚠️ KernelSU kernel_compat.c not found, skipping fix"
+          fi
 
       - name: "⚙️ Add SUSFS configs"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
