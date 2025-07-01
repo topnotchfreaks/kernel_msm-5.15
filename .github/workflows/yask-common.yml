@@ -174,8 +174,6 @@ jobs:
           set -ex
           CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
 
-          sed -i '/CONFIG_NO_HZ/d' "$CONFIG_FILE"
-
           CONFIGS=(
             "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"
             "CONFIG_ZRAM_DEF_COMP_LZ4=y"
@@ -193,6 +191,10 @@ jobs:
         working-directory: ./${{ env.kernelDir }}
         run: |
           set -ex
+          cd kernel/msm-5.15
+          sed -i '/POST_DEFCONFIG_CMDS="check_defconfig"/d' "build.config.gki"
+          cd ../..
+
           export KBUILD_BUILD_USER="Automated"
           export KBUILD_BUILD_HOST="GitHub"
         
@@ -372,8 +374,6 @@ jobs:
           set -ex
           CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
 
-          sed -i '/CONFIG_NO_HZ/d' "$CONFIG_FILE"
-
           CONFIGS=(
             "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"
             "CONFIG_ZRAM_DEF_COMP_LZ4=y"
@@ -391,6 +391,10 @@ jobs:
         working-directory: ./${{ env.kernelDir }}
         run: |
           set -ex
+          cd kernel/msm-5.15
+          sed -i '/POST_DEFCONFIG_CMDS="check_defconfig"/d' "build.config.gki"
+          cd ../..
+
           export KBUILD_BUILD_USER="Automated"
           export KBUILD_BUILD_HOST="GitHub"
 
