@@ -42,7 +42,7 @@ jobs:
           cd ${{ env.KERNEL_DIR }}
           
           # Initialize repo with the manifest
-          repo init -u https://android.googlesource.com/kernel/manifest -b common-android13-5.15-lts
+          repo init -u https://android.googlesource.com/kernel/manifest -b common-android13-5.15-lts --depth=1
           repo sync -j$(nproc)
           
           echo "✅ Google kernel tools initialized"
@@ -262,7 +262,7 @@ jobs:
         run: |
           set -e
           
-          repo init -u https://github.com/topnotchfreaks/kernel_manifest -b main
+          repo init -u https://github.com/topnotchfreaks/kernel_manifest -b main --depth=1
           repo sync -j$(nproc)
           
           # Then clone CLO kernel separately
