@@ -197,7 +197,7 @@ jobs:
           export KBUILD_BUILD_HOST="GitHub"
         
           # Build using the official build script
-          LTO=thin BUILD_CONFIG=build.config.gki build/build.sh -j$(nproc --all)
+          LTO=thin BUILD_CONFIG=kernel/msm-5.15/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
 
       - name: "🩹 Patch Image with KPM"
         working-directory: ./${{ env.kernelDir }}
@@ -395,7 +395,7 @@ jobs:
           export KBUILD_BUILD_HOST="GitHub"
 
           # Build using the official build script
-          LTO=thin BUILD_CONFIG=build.config.clo build/build.sh -j$(nproc --all)
+          LTO=thin BUILD_CONFIG=kernel/msm-5.15/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
 
       - name: "🩹 Patch Image with KPM"
         working-directory: ./${{ env.kernelDir }}
