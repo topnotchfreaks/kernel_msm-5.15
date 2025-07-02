@@ -279,12 +279,10 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         env:
           args: ${{ steps.generate-args.outputs.args }}
-          DEFCONFIG_NAME: ${{ env.DEFCONFIG_NAME }}
+          CONFIG_FILE: "./${{ env.kernelDir }}/${{ env.kernelName }}/arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
         run: |
           export KBUILD_BUILD_USER="belowzeroiq"
           export KBUILD_BUILD_HOST="GitHub"
-
-          CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
 
           # Delete the FULL LTO line
           sed -i '/CONFIG_LTO_CLANG_FULL/d' "$CONFIG_FILE"
@@ -637,12 +635,10 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         env:
           args: ${{ steps.generate-args.outputs.args }}
-          DEFCONFIG_NAME: ${{ env.DEFCONFIG_NAME }}
+          CONFIG_FILE: "./${{ env.kernelDir }}/${{ env.kernelName }}/arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
         run: |
           export KBUILD_BUILD_USER="belowzeroiq"
           export KBUILD_BUILD_HOST="GitHub"
-
-          CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
 
           # Delete the FULL LTO line
           sed -i '/CONFIG_LTO_CLANG_FULL/d' "$CONFIG_FILE"
