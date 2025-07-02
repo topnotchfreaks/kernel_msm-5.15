@@ -51,6 +51,31 @@ jobs:
           git clone --recursive --branch ${{ env.kernelBranch }} \
             ${{ env.kernelRepo }} kernel/msm-5.15 --depth=1
 
+      - name: "🔧 Setup Custom Clang Toolchain"
+        working-directory: ./${{ env.kernelDir }}
+        run: |
+          set -ex
+
+          # Remove existing clang if present
+          [ -d "prebuilts/clang" ] && rm -rf prebuilts/clang
+
+          # Create directory structure
+          mkdir -p prebuilts/clang/host/linux-x86
+
+          # Clone the specific clang toolchain
+          git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 prebuilts/clang/host/linux-x86
+
+      - name: "🔧 Change clang version"
+        working-directory: ./${{ env.kernelDir }}/kernel/msm-5.15
+        run: |
+          set -ex
+
+          if grep -q '^CLANG_VERSION=' build.config.constants; then
+            sed -i 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' build.config.constants
+          else
+            echo 'CLANG_VERSION=r547379' >> build.config.constants
+          fi
+
       - name: 📐 Setup swap 20G
         uses: pierotofy/set-swap-space@master
         with:
@@ -199,7 +224,7 @@ jobs:
           export KBUILD_BUILD_HOST="GitHub"
         
           # Build using the official build script
-          LTO=thin BUILD_CONFIG=kernel/msm-5.15/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          LTO=thin BUILD_CONFIG=kernel/msm-5.15/build.config.gki.aarch64 build/build.sh -j8
 
       - name: "🩹 Patch Image with KPM"
         working-directory: ./${{ env.kernelDir }}
@@ -250,6 +275,31 @@ jobs:
           # Clone the specific CLO kernel source
           git clone --recursive --branch ${{ env.kernelBranch }} \
             ${{ env.kernelRepo }} kernel/msm-5.15 --depth=1
+
+      - name: "🔧 Setup Custom Clang Toolchain"
+        working-directory: ./${{ env.kernelDir }}
+        run: |
+          set -ex
+
+          # Remove existing clang if present
+          [ -d "prebuilts/clang" ] && rm -rf prebuilts/clang
+
+          # Create directory structure
+          mkdir -p prebuilts/clang/host/linux-x86
+
+          # Clone the specific clang toolchain
+          git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 prebuilts/clang/host/linux-x86
+
+      - name: "🔧 Change clang version"
+        working-directory: ./${{ env.kernelDir }}/kernel/msm-5.15
+        run: |
+          set -ex
+
+          if grep -q '^CLANG_VERSION=' build.config.constants; then
+            sed -i 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' build.config.constants
+          else
+            echo 'CLANG_VERSION=r547379' >> build.config.constants
+          fi
 
       - name: 📐 Setup swap 20G
         uses: pierotofy/set-swap-space@master
@@ -399,7 +449,7 @@ jobs:
           export KBUILD_BUILD_HOST="GitHub"
 
           # Build using the official build script
-          LTO=thin BUILD_CONFIG=kernel/msm-5.15/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          LTO=thin BUILD_CONFIG=kernel/msm-5.15/build.config.gki.aarch64 build/build.sh -j8
 
       - name: "🩹 Patch Image with KPM"
         working-directory: ./${{ env.kernelDir }}
