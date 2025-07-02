@@ -279,30 +279,19 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         env:
           args: ${{ steps.generate-args.outputs.args }}
-          CONFIG_FILE: "./${{ env.kernelDir }}/${{ env.kernelName }}/arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
         run: |
           export KBUILD_BUILD_USER="belowzeroiq"
           export KBUILD_BUILD_HOST="GitHub"
-
-          # Delete the FULL LTO line
-          sed -i '/CONFIG_LTO_CLANG_FULL/d' "$CONFIG_FILE"
-
-          # Add THIN LTO line
-          echo "CONFIG_LTO_CLANG_THIN=y" >> "$CONFIG_FILE"
-
-          # Delete the CFI_CLANG line
-          sed -i '/CONFIG_CFI_CLANG/d' "$CONFIG_FILE"
-          echo "# CONFIG_CFI_CLANG is not set" >> "$CONFIG_FILE"
-
-          make ${{ env.args }} \
+        
+          make ${args} \
             LLVM=1 \
             LTO=thin \
             CC=clang \
             AR=llvm-ar \
             NM=llvm-nm \
-            OBJCOPY="llvm-objcopy" \
-            STRIP="llvm-strip" \
-            -j$(nproc --all)
+            OBJCOPY=llvm-objcopy \
+            STRIP=llvm-strip \
+            -j8
 
       - name: "📦 Rename for packaging"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -635,30 +624,19 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         env:
           args: ${{ steps.generate-args.outputs.args }}
-          CONFIG_FILE: "./${{ env.kernelDir }}/${{ env.kernelName }}/arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
         run: |
           export KBUILD_BUILD_USER="belowzeroiq"
           export KBUILD_BUILD_HOST="GitHub"
-
-          # Delete the FULL LTO line
-          sed -i '/CONFIG_LTO_CLANG_FULL/d' "$CONFIG_FILE"
-
-          # Add THIN LTO line
-          echo "CONFIG_LTO_CLANG_THIN=y" >> "$CONFIG_FILE"
-
-          # Delete the CFI_CLANG line
-          sed -i '/CONFIG_CFI_CLANG/d' "$CONFIG_FILE"
-          echo "# CONFIG_CFI_CLANG is not set" >> "$CONFIG_FILE"
-
-          make ${{ env.args }} \
+        
+          make ${args} \
             LLVM=1 \
             LTO=thin \
             CC=clang \
             AR=llvm-ar \
             NM=llvm-nm \
-            OBJCOPY="llvm-objcopy" \
-            STRIP="llvm-strip" \
-            -j$(nproc --all)
+            OBJCOPY=llvm-objcopy \
+            STRIP=llvm-strip \
+            -j8
 
       - name: "🩹 Patch Image with KPM"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
