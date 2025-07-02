@@ -450,7 +450,7 @@ jobs:
           cp kernels/Image.gki AnyKernel3/Image.gki
           cp kernels/Image.clo AnyKernel3/Image.clo
 
-          ZIP_NAME="Anykernel3_YASK-AIO_$(date +'%Y-%m-%d').zip"
+          ZIP_NAME="Anykernel3_YASK-COMMON-AIO_$(date +'%Y-%m-%d').zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
