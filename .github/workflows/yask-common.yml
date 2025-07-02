@@ -47,6 +47,9 @@ jobs:
           repo init -u https://android.googlesource.com/kernel/manifest -b common-android13-5.15-lts --depth=1
           repo sync -c -j$(nproc --all)
           
+          # remove any existing kernel directory
+          [ -d "common" ] && rm -rf common
+          
           # Clone the specific kernel source
           git clone --recursive --branch ${{ env.kernelBranch }} \
             ${{ env.kernelRepo }} kernel/msm-5.15 --depth=1
@@ -247,6 +250,9 @@ jobs:
           repo init -u https://android.googlesource.com/kernel/manifest -b common-android13-5.15-lts --depth=1
           repo sync -c -j$(nproc --all)
           
+          # remove any existing kernel directory
+          [ -d "common" ] && rm -rf common
+
           # Clone the specific CLO kernel source
           git clone --recursive --branch ${{ env.kernelBranch }} \
             ${{ env.kernelRepo }} kernel/msm-5.15 --depth=1
