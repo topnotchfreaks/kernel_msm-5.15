@@ -178,6 +178,7 @@ jobs:
           CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
 
           CONFIGS=(
+            "CONFIG_LOCALVERSION_AUTO=n"
             "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"
             "CONFIG_ZRAM_DEF_COMP_LZ4=y"
             "CONFIG_TCP_CONG_ADVANCED=y"
@@ -381,6 +382,7 @@ jobs:
           CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
 
           CONFIGS=(
+            "CONFIG_LOCALVERSION_AUTO=n"
             "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"
             "CONFIG_ZRAM_DEF_COMP_LZ4=y"
             "CONFIG_TCP_CONG_ADVANCED=y"
