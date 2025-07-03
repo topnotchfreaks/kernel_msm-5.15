@@ -170,43 +170,61 @@ jobs:
       - name: 😋 Setup SUSFS
         env:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
+          ANDROID_VERSION: "13"
+          KERNEL_VERSION: "5.15"
+          SUSFS_BRANCH: "gki-android13-5.15"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          set -ex
+          set -e
           
           log() {
             echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
           }
-
-          apply_patch() {
-            local patch="$1"
-            local error_msg="$2"
-            log "Attempting to apply patch: $(basename "$patch")"
-            if ! patch -p1 < "$patch"; then
-              log "Warning: Some hunks failed while applying patch $(basename "$patch")"
-            fi
-          }
-
-          # Get the latest release assets from topnotchfreaks/kernel_patches
-          log "Fetching latest release information"
-          PATCHES_URL=$(curl -s https://api.github.com/repos/topnotchfreaks/kernel_patches/releases/latest | grep -o 'browser_download_url.*\.patch' | cut -d\" -f3 | head -n 1)
-
-          if [ -z "$PATCHES_URL" ]; then
-            log "Error: No patch files found in the latest release"
+          
+          log "Setting up SUSFS for Android $ANDROID_VERSION, Kernel $KERNEL_VERSION"
+          
+          # Get available patches from latest release
+          log "Fetching available patches..."
+          PATCHES=$(curl -s "https://api.github.com/repos/topnotchfreaks/kernel_patches/releases/latest" | \
+                    grep -o 'browser_download_url.*\.patch' | cut -d\" -f3)
+          
+          if [ -z "$PATCHES" ]; then
+            log "Error: No patches found"
             exit 1
           fi
-
-          PATCH_FILE="susfs_patch.patch"
-          log "Downloading SUSFS patch from $PATCHES_URL"
-          curl -L -o "$PATCH_FILE" "$PATCHES_URL"
-
-          if [ ! -f "$PATCH_FILE" ]; then
-            log "Patch file $PATCH_FILE does not exist after download"
+          
+          # Find best matching patch using actual naming convention
+          # Format: 0001-Implement-SUSFS-v1.5.8-for-Android-13-Kernel-5.15.patch
+          SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
+                           grep "Android-${ANDROID_VERSION}" | \
+                           grep "Kernel-${KERNEL_VERSION}" | head -n 1)
+          
+          # Fallback to any SUSFS patch for same Android/Kernel version
+          if [ -z "$SELECTED_PATCH" ]; then
+            SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
+                             grep "Android-${ANDROID_VERSION}" | head -n 1)
+          fi
+          
+          # Final fallback to any SUSFS patch
+          if [ -z "$SELECTED_PATCH" ]; then
+            SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | head -n 1)
+          fi
+          
+          if [ -z "$SELECTED_PATCH" ]; then
+            log "Error: No SUSFS patch found"
             exit 1
           fi
-
-          apply_patch "$PATCH_FILE"
-          log "✅ SUSFS patch from GitHub release applied successfully"
+          
+          # Download and apply patch
+          log "Downloading patch: $SELECTED_PATCH"
+          curl -L -o "susfs_patch.patch" "$SELECTED_PATCH"
+          
+          log "Applying SUSFS patch..."
+          if ! patch -p1 < "susfs_patch.patch"; then
+            log "Warning: Some hunks failed while applying patch"
+          fi
+          
+          log "✅ SUSFS patch applied successfully"
       
       - name: "😋 Setup SUSFS Syscall hooks"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -489,43 +507,61 @@ jobs:
       - name: 😋 Setup SUSFS
         env:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
+          ANDROID_VERSION: "13"
+          KERNEL_VERSION: "5.15"
+          SUSFS_BRANCH: "gki-android13-5.15"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          set -ex
+          set -e
           
           log() {
             echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
           }
-
-          apply_patch() {
-            local patch="$1"
-            local error_msg="$2"
-            log "Attempting to apply patch: $(basename "$patch")"
-            if ! patch -p1 < "$patch"; then
-              log "Warning: Some hunks failed while applying patch $(basename "$patch")"
-            fi
-          }
-
-          # Get the latest release assets from topnotchfreaks/kernel_patches
-          log "Fetching latest release information"
-          PATCHES_URL=$(curl -s https://api.github.com/repos/topnotchfreaks/kernel_patches/releases/latest | grep -o 'browser_download_url.*\.patch' | cut -d\" -f3 | head -n 1)
-
-          if [ -z "$PATCHES_URL" ]; then
-            log "Error: No patch files found in the latest release"
+          
+          log "Setting up SUSFS for Android $ANDROID_VERSION, Kernel $KERNEL_VERSION"
+          
+          # Get available patches from latest release
+          log "Fetching available patches..."
+          PATCHES=$(curl -s "https://api.github.com/repos/topnotchfreaks/kernel_patches/releases/latest" | \
+                    grep -o 'browser_download_url.*\.patch' | cut -d\" -f3)
+          
+          if [ -z "$PATCHES" ]; then
+            log "Error: No patches found"
             exit 1
           fi
-
-          PATCH_FILE="susfs_patch.patch"
-          log "Downloading SUSFS patch from $PATCHES_URL"
-          curl -L -o "$PATCH_FILE" "$PATCHES_URL"
-
-          if [ ! -f "$PATCH_FILE" ]; then
-            log "Patch file $PATCH_FILE does not exist after download"
+          
+          # Find best matching patch using actual naming convention
+          # Format: 0001-Implement-SUSFS-v1.5.8-for-Android-13-Kernel-5.15.patch
+          SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
+                           grep "Android-${ANDROID_VERSION}" | \
+                           grep "Kernel-${KERNEL_VERSION}" | head -n 1)
+          
+          # Fallback to any SUSFS patch for same Android/Kernel version
+          if [ -z "$SELECTED_PATCH" ]; then
+            SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
+                             grep "Android-${ANDROID_VERSION}" | head -n 1)
+          fi
+          
+          # Final fallback to any SUSFS patch
+          if [ -z "$SELECTED_PATCH" ]; then
+            SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | head -n 1)
+          fi
+          
+          if [ -z "$SELECTED_PATCH" ]; then
+            log "Error: No SUSFS patch found"
             exit 1
           fi
-
-          apply_patch "$PATCH_FILE"
-          log "✅ SUSFS patch from GitHub release applied successfully"
+          
+          # Download and apply patch
+          log "Downloading patch: $SELECTED_PATCH"
+          curl -L -o "susfs_patch.patch" "$SELECTED_PATCH"
+          
+          log "Applying SUSFS patch..."
+          if ! patch -p1 < "susfs_patch.patch"; then
+            log "Warning: Some hunks failed while applying patch"
+          fi
+          
+          log "✅ SUSFS patch applied successfully"
       
       - name: "😋 Setup SUSFS Syscall hooks"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
