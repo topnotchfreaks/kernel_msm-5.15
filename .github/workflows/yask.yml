@@ -167,17 +167,58 @@ jobs:
           curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
           echo "✅ KernelSU updated"
 
-      - name: "😋 Setup SUSFS"
+      - name: 😋 Setup SUSFS
+        env:
+          ARCH: ${{ steps.generate-args.outputs.ARCH }}
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex
+          
+          log() {
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+          }
+
+          apply_patch() {
+            local patch="$1"
+            local error_msg="$2"
+            log "Attempting to apply patch: $(basename "$patch")"
+            if ! patch -p1 < "$patch"; then
+              log "Warning: Some hunks failed while applying patch $(basename "$patch")"
+            fi
+          }
+
+          # Get the latest release assets from topnotchfreaks/kernel_patches
+          log "Fetching latest release information"
+          PATCHES_URL=$(curl -s https://api.github.com/repos/topnotchfreaks/kernel_patches/releases/latest | grep -o 'browser_download_url.*\.patch' | cut -d\" -f3 | head -n 1)
+
+          if [ -z "$PATCHES_URL" ]; then
+            log "Error: No patch files found in the latest release"
+            exit 1
+          fi
+
+          PATCH_FILE="susfs_patch.patch"
+          log "Downloading SUSFS patch from $PATCHES_URL"
+          curl -L -o "$PATCH_FILE" "$PATCHES_URL"
+
+          if [ ! -f "$PATCH_FILE" ]; then
+            log "Patch file $PATCH_FILE does not exist after download"
+            exit 1
+          fi
+
+          apply_patch "$PATCH_FILE"
+          log "✅ SUSFS patch from GitHub release applied successfully"
+      
+      - name: "😋 Setup SUSFS Syscall hooks"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -ex
           log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
-          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Implement-SUSFS-v1.5.8-syscall-hooks.patch"
-          PATCH_FILE="0001-Implement-SUSFS-v1.5.8-syscall-hooks.patch"
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-SUSFS-syscall-hooks.patch"
+          PATCH_FILE="0001-SUSFS-syscall-hooks.patch"
           curl -L -o "$PATCH_FILE" "$PATCH_URL"
           [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
           patch -p1 < "$PATCH_FILE" || log "Warning: Some hunks failed"
-          log "✅ SUSFS patch applied"
+          log "✅ Syscall hooks patch applied"
 
       - name: "⚙️ Add SUSFS configs"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -445,17 +486,58 @@ jobs:
           curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
           echo "✅ KernelSU updated"
 
-      - name: "😋 Setup SUSFS"
+      - name: 😋 Setup SUSFS
+        env:
+          ARCH: ${{ steps.generate-args.outputs.ARCH }}
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex
+          
+          log() {
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+          }
+
+          apply_patch() {
+            local patch="$1"
+            local error_msg="$2"
+            log "Attempting to apply patch: $(basename "$patch")"
+            if ! patch -p1 < "$patch"; then
+              log "Warning: Some hunks failed while applying patch $(basename "$patch")"
+            fi
+          }
+
+          # Get the latest release assets from topnotchfreaks/kernel_patches
+          log "Fetching latest release information"
+          PATCHES_URL=$(curl -s https://api.github.com/repos/topnotchfreaks/kernel_patches/releases/latest | grep -o 'browser_download_url.*\.patch' | cut -d\" -f3 | head -n 1)
+
+          if [ -z "$PATCHES_URL" ]; then
+            log "Error: No patch files found in the latest release"
+            exit 1
+          fi
+
+          PATCH_FILE="susfs_patch.patch"
+          log "Downloading SUSFS patch from $PATCHES_URL"
+          curl -L -o "$PATCH_FILE" "$PATCHES_URL"
+
+          if [ ! -f "$PATCH_FILE" ]; then
+            log "Patch file $PATCH_FILE does not exist after download"
+            exit 1
+          fi
+
+          apply_patch "$PATCH_FILE"
+          log "✅ SUSFS patch from GitHub release applied successfully"
+      
+      - name: "😋 Setup SUSFS Syscall hooks"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -ex
           log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
-          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Implement-SUSFS-v1.5.8-syscall-hooks.patch"
-          PATCH_FILE="0001-Implement-SUSFS-v1.5.8-syscall-hooks.patch"
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-SUSFS-syscall-hooks.patch"
+          PATCH_FILE="0001-SUSFS-syscall-hooks.patch"
           curl -L -o "$PATCH_FILE" "$PATCH_URL"
           [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
           patch -p1 < "$PATCH_FILE" || log "Warning: Some hunks failed"
-          log "✅ SUSFS patch applied"
+          log "✅ Syscall hooks patch applied"
 
       - name: "⚙️ Add SUSFS configs"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
