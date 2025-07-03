@@ -556,74 +556,44 @@ jobs:
         run: |
           set -ex
         
-          log() {
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+          echo "🔄 Getting SUSFS version..."
+          SUSFS_VERSION=$(curl -s https://raw.githubusercontent.com/ShirkNeko/susfs4ksu/${SUSFS_BRANCH}/kernel_patches/include/linux/susfs.h | grep -oP '#define SUSFS_VERSION "\K[^"]+')
+          PATCH_URL="https://github.com/topnotchfreaks/kernel_patches/releases/latest/download/0001-Implement-SUSFS-${SUSFS_VERSION}-for-Android-${ANDROID_VERSION}-Kernel-${KERNEL_VERSION}.patch"
+          
+          echo "⬇️ Downloading SUSFS patch..."
+          curl -L -o susfs.patch "$PATCH_URL"
+          dos2unix susfs.patch 2>/dev/null || true
+        
+          echo "🔧 Applying patch with smart fallback..."
+          {
+            # First try clean apply
+            git apply --ignore-whitespace susfs.patch && echo "✅ Clean apply succeeded" ||
+            (
+              # If failed, extract task_mmu.c part and apply separately
+              echo "⚠️ Full apply failed, trying targeted approach..."
+              awk '/diff --git a\/fs\/proc\/task_mmu.c/,/diff --git|^--$/' susfs.patch > task_mmu.patch
+              [ -s task_mmu.patch ] && (
+                echo "🔧 Applying task_mmu.c changes with relaxed rules..."
+                patch -p1 --no-backup-if-mismatch -F3 -l < task_mmu.patch
+              )
+              
+              # Apply remaining changes
+              echo "🔧 Applying non-critical changes..."
+              grep -v 'diff --git a/fs/proc/task_mmu.c' susfs.patch | \
+                grep -v '^index ' > remaining.patch
+              [ -s remaining.patch ] && git apply --ignore-whitespace remaining.patch
+            )
           }
         
-          # Get SUSFS version
-          SUSFS_VERSION=$(curl -s https://raw.githubusercontent.com/ShirkNeko/susfs4ksu/${SUSFS_BRANCH}/kernel_patches/include/linux/susfs.h | grep -oP '#define SUSFS_VERSION "\K[^"]+')
-
-          # Construct patch filename
-          PATCH_FILENAME="0001-Implement-SUSFS-${SUSFS_VERSION}-for-Android-${ANDROID_VERSION}-Kernel-${KERNEL_VERSION}.patch"
-          PATCH_URL="https://github.com/topnotchfreaks/kernel_patches/releases/latest/download/${PATCH_FILENAME}"
-          PATCH_FILE="susfs.patch"
-        
-          log "Downloading SUSFS patch from: ${PATCH_URL}"
-
-          # Download with retries and ensure LF line endings
-          for i in {1..3}; do
-            if curl -L -o "$PATCH_FILE" "$PATCH_URL"; then
-              # Convert to LF line endings if needed
-              dos2unix "$PATCH_FILE" 2>/dev/null || true
-              if [ -s "$PATCH_FILE" ]; then
-                break
-              else
-                log "⚠️ Attempt $i: Downloaded empty file, retrying..."
-                rm -f "$PATCH_FILE"
-              fi
-            else
-              log "⚠️ Attempt $i: Download failed, retrying..."
-            fi
-            sleep 2
-          done
-        
-          if [ ! -s "$PATCH_FILE" ]; then
-            log "❌ Failed to download valid patch file after 3 attempts"
-            exit 1
-          fi
-        
-          log "Applying SUSFS patch using optimal method..."
-
-          # First try git apply with whitespace ignoring
-          if git apply --ignore-space-change --ignore-whitespace --verbose "$PATCH_FILE"; then
-            log "✅ Patch applied cleanly with git apply"
-          else
-            log "⚠️ git apply failed, trying with more relaxed settings..."
-
-            # Try patch command with context adjustment
-            if patch -p1 --no-backup-if-mismatch -l < "$PATCH_FILE"; then
-              log "✅ Patch applied with relaxed settings"
-            else
-              log "❌ Failed to apply SUSFS patch"
-              log "Debug info:"
-              log "File versions:"
-              git --no-pager diff --name-status
-              log "Patch contents (first/last 5 lines):"
-              head -n 5 "$PATCH_FILE"
-              tail -n 5 "$PATCH_FILE"
-              exit 1
-            fi
-          fi
-        
-          log "Verifying critical changes in task_mmu.c..."
+          echo "🔍 Verifying critical changes..."
           if ! grep -q "susfs" fs/proc/task_mmu.c; then
-            log "❌ Critical: SUSFS modifications not found in task_mmu.c"
-            log "Current task_mmu.c context:"
-            grep -A5 -B5 "show_map_vma" fs/proc/task_mmu.c || true
+            echo "❌ Error: Critical SUSFS changes missing from task_mmu.c"
+            echo "Here's the context around the expected change location:"
+            grep -A10 -B10 "show_map_vma" fs/proc/task_mmu.c || true
             exit 1
           fi
         
-          log "✅ SUSFS ${SUSFS_VERSION} for Android ${ANDROID_VERSION} (Kernel ${KERNEL_VERSION}) successfully applied"
+          echo "🎉 SUSFS ${SUSFS_VERSION} successfully integrated"
 
       - name: "😋 Setup SUSFS Syscall hooks"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
