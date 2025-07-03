@@ -562,14 +562,14 @@ jobs:
         
           # Get SUSFS version
           SUSFS_VERSION=$(curl -s https://raw.githubusercontent.com/ShirkNeko/susfs4ksu/${SUSFS_BRANCH}/kernel_patches/include/linux/susfs.h | grep -oP '#define SUSFS_VERSION "\K[^"]+')
-          
+
           # Construct patch filename
           PATCH_FILENAME="0001-Implement-SUSFS-${SUSFS_VERSION}-for-Android-${ANDROID_VERSION}-Kernel-${KERNEL_VERSION}.patch"
           PATCH_URL="https://github.com/topnotchfreaks/kernel_patches/releases/latest/download/${PATCH_FILENAME}"
           PATCH_FILE="susfs.patch"
         
           log "Downloading SUSFS patch from: ${PATCH_URL}"
-          
+
           # Download with retries and ensure LF line endings
           for i in {1..3}; do
             if curl -L -o "$PATCH_FILE" "$PATCH_URL"; then
@@ -593,13 +593,13 @@ jobs:
           fi
         
           log "Applying SUSFS patch using optimal method..."
-          
+
           # First try git apply with whitespace ignoring
           if git apply --ignore-space-change --ignore-whitespace --verbose "$PATCH_FILE"; then
             log "✅ Patch applied cleanly with git apply"
           else
             log "⚠️ git apply failed, trying with more relaxed settings..."
-            
+
             # Try patch command with context adjustment
             if patch -p1 --no-backup-if-mismatch -l < "$PATCH_FILE"; then
               log "✅ Patch applied with relaxed settings"
@@ -624,6 +624,18 @@ jobs:
           fi
         
           log "✅ SUSFS ${SUSFS_VERSION} for Android ${ANDROID_VERSION} (Kernel ${KERNEL_VERSION}) successfully applied"
+
+      - name: "😋 Setup SUSFS Syscall hooks"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex
+          log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-SUSFS-syscall-hooks.patch"
+          PATCH_FILE="0001-SUSFS-syscall-hooks.patch"
+          curl -L -o "$PATCH_FILE" "$PATCH_URL"
+          [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
+          patch -p1 < "$PATCH_FILE" || log "Warning: Some hunks failed"
+          log "✅ Syscall hooks patch applied"
 
       - name: ⚙️ Add SUSFS configs
         env:
