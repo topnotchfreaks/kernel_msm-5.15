@@ -43,7 +43,6 @@ Built on **Linux Kernel 5.15** (msm-5.15 branch) for Qualcomm MSM platforms.
 | Feature | Description |
 |---------|-------------|
 | 🐧 **Linux Kernel 5.15** | Latest stable kernel with security & performance improvements |
-| 📱 **Device Support** | Custom drivers, device trees for topaz/tapas variants |
 | 🤖 **Automated Building** | GitHub Actions for cloud-based kernel compilation |
 | 🔐 **KSU + SUSFS** | Integrated KernelSU with SUSFS for advanced root features |
 | 📦 **Ready-to-Flash** | AnyKernel3 ZIP files for easy installation |
@@ -149,7 +148,5 @@ We welcome contributions! Here's how you can help:
 ## 📞 **Need Help?**
 
 - **🐛 Issues**: Open an issue on this repository
-- **💬 Discussions**: Use GitHub Discussions
-- **📚 Documentation**: Check the wiki (coming soon)
 
 **Happy building! 🎉**
