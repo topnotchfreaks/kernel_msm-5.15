@@ -167,95 +167,76 @@ jobs:
           curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
           echo "✅ KernelSU updated"
 
-      - name: "😋 Clone SUSFS Source"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+      - name: 😋 Setup SUSFS
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          ARCH: ${{ steps.generate-args.outputs.ARCH }}
+          ANDROID_VERSION: "13"
+          KERNEL_VERSION: "5.15"
+          SUSFS_BRANCH: "gki-android13-5.15"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          set -ex
-          log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
-
-          # Clone SUSFS source repository
-          log "Cloning SUSFS4KSU repository..."
-          git clone --depth=1 https://$GITHUB_TOKEN@github.com/ShirkNeko/susfs4ksu.git ../susfs4ksu -b gki-android13-5.15
-
-      - name: "😋 Setup SUSFS"
+          set -e
+          
+          log() {
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+          }
+          
+          log "Setting up SUSFS for Android $ANDROID_VERSION, Kernel $KERNEL_VERSION"
+          
+          # Get available patches from latest release
+          log "Fetching available patches..."
+          PATCHES=$(curl -s "https://api.github.com/repos/topnotchfreaks/kernel_patches/releases/latest" | \
+                    grep -o 'browser_download_url.*\.patch' | cut -d\" -f3)
+          
+          if [ -z "$PATCHES" ]; then
+            log "Error: No patches found"
+            exit 1
+          fi
+          
+          # Find best matching patch using actual naming convention
+          # Format: 0001-Implement-SUSFS-v1.5.8-for-Android-13-Kernel-5.15.patch
+          SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
+                           grep "Android-${ANDROID_VERSION}" | \
+                           grep "Kernel-${KERNEL_VERSION}" | head -n 1)
+          
+          # Fallback to any SUSFS patch for same Android/Kernel version
+          if [ -z "$SELECTED_PATCH" ]; then
+            SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
+                             grep "Android-${ANDROID_VERSION}" | head -n 1)
+          fi
+          
+          # Final fallback to any SUSFS patch
+          if [ -z "$SELECTED_PATCH" ]; then
+            SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | head -n 1)
+          fi
+          
+          if [ -z "$SELECTED_PATCH" ]; then
+            log "Error: No SUSFS patch found"
+            exit 1
+          fi
+          
+          # Download and apply patch
+          log "Downloading patch: $SELECTED_PATCH"
+          curl -L -o "susfs_patch.patch" "$SELECTED_PATCH"
+          
+          log "Applying SUSFS patch..."
+          if ! patch -p1 < "susfs_patch.patch"; then
+            log "Warning: Some hunks failed while applying patch"
+          fi
+          
+          log "✅ SUSFS patch applied successfully"
+      
+      - name: "😋 Setup SUSFS Syscall hooks"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -ex
           log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
-          
-          log "Applying SUSFS patches for SukiSU..."
-          
-          # Copy main SUSFS kernel patches
-          log "Copying SUSFS kernel patches..."
-          cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch ./
-          
-          # Copy filesystem patches
-          if [ -d "../susfs4ksu/kernel_patches/fs" ]; then
-            log "Copying filesystem patches..."
-            cp -r ../susfs4ksu/kernel_patches/fs/* ./fs/ 2>/dev/null || true
-          fi
-          
-          # Copy include patches
-          if [ -d "../susfs4ksu/kernel_patches/include/linux" ]; then
-            log "Copying include patches..."
-            cp -r ../susfs4ksu/kernel_patches/include/linux/* ./include/linux/ 2>/dev/null || true
-          fi
-          
-          # Apply SukiSU-specific SUSFS patches
-          if [ -d "./KernelSU" ]; then
-            log "Applying SUSFS patches for SukiSU KernelSU..."
-            cd ./KernelSU
-            # SukiSU uses the same base SUSFS patches as Official KernelSU
-            cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-            patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch || log "Warning: Some hunks failed"
-            cd ..
-          fi
-          
-          # Apply main kernel patch
-          log "Applying main SUSFS kernel patch..."
-          KERNEL_BRANCH="android13-5.15"
-          
-          # Check if this is a deprecated branch and apply appropriate patches
-          if [[ "${{ env.kernelBranch }}" == *"deprecated"* ]] && [[ "$KERNEL_BRANCH" == "android12-5.10" ]]; then
-            patch -p1 < 50_add_susfs_in_gki-android13-5.15.patch || log "Warning: Some hunks failed"
-            
-            # Apply additional legacy patch
-            curl -LSs "https://github.com/zzh20188/GKI_KernelSU_SUSFS/raw/refs/heads/legacy/fdinfo.c.patch" -o fdinfo.c.patch
-            patch -p1 < fdinfo.c.patch || log "Warning: Some hunks failed"
-          else
-            patch -p1 --fuzz=3 < 50_add_susfs_in_gki-android13-5.15.patch || log "Warning: Some hunks failed"
-          fi
-          
-          log "✅ SUSFS patches applied successfully"
-
-      - name: "🔗 Apply SukiSU Hooks"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          set -ex
-          log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
-          
-          log "Applying hooks for SukiSU..."
-          
-          # Check if SukiSU_patch directory exists, if not clone it
-          if [ ! -d "../../SukiSU_patch" ]; then
-            log "Cloning SukiSU_patch repository..."
-            cd ../..
-            git clone --depth=1 https://github.com/ShirkNeko/SukiSU_patch.git SukiSU_patch
-            cd ${{ env.kernelDir }}/${{ env.kernelName }}
-          fi
-          
-          # Apply SukiSU syscall hooks
-          if [ -f "../../SukiSU_patch/hooks/syscall_hooks.patch" ]; then
-            log "Applying SukiSU syscall hooks patch..."
-            cp ../../SukiSU_patch/hooks/syscall_hooks.patch ./
-            patch -p1 -F 3 < syscall_hooks.patch || log "Warning: Some hunks failed in syscall hooks"
-          else
-            log "⚠️ SukiSU syscall hooks patch not found, skipping..."
-          fi
-          
-          log "✅ SukiSU hooks applied successfully"
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-SUSFS-syscall-hooks.patch"
+          PATCH_FILE="0001-SUSFS-syscall-hooks.patch"
+          curl -L -o "$PATCH_FILE" "$PATCH_URL"
+          [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
+          patch -p1 < "$PATCH_FILE" || log "Warning: Some hunks failed"
+          log "✅ Syscall hooks patch applied"
 
       - name: "⚙️ Add SUSFS configs"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -381,7 +362,7 @@ jobs:
       kernelDir: common_clo
       kernelName: clo
       kernelRepo: https://git.codelinaro.org/clo/la/kernel/msm-5.15
-      kernelBranch: kernel.lnx.5.15.r1-rel
+      kernelBranch: kernel.lnx.5.15.r16-rel
       kernelDevice: gki
       DEFCONFIG_NAME: gki_defconfig
       OUT_DIR: "out"
@@ -523,95 +504,76 @@ jobs:
           curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
           echo "✅ KernelSU updated"
 
-      - name: "😋 Clone SUSFS Source"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+      - name: 😋 Setup SUSFS
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          ARCH: ${{ steps.generate-args.outputs.ARCH }}
+          ANDROID_VERSION: "13"
+          KERNEL_VERSION: "5.15"
+          SUSFS_BRANCH: "gki-android13-5.15"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          set -ex
-          log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
-
-          # Clone SUSFS source repository
-          log "Cloning SUSFS4KSU repository..."
-          git clone --depth=1 https://$GITHUB_TOKEN@github.com/ShirkNeko/susfs4ksu.git ../susfs4ksu -b gki-android13-5.15
-
-      - name: "😋 Setup SUSFS"
+          set -e
+          
+          log() {
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+          }
+          
+          log "Setting up SUSFS for Android $ANDROID_VERSION, Kernel $KERNEL_VERSION"
+          
+          # Get available patches from latest release
+          log "Fetching available patches..."
+          PATCHES=$(curl -s "https://api.github.com/repos/topnotchfreaks/kernel_patches/releases/latest" | \
+                    grep -o 'browser_download_url.*\.patch' | cut -d\" -f3)
+          
+          if [ -z "$PATCHES" ]; then
+            log "Error: No patches found"
+            exit 1
+          fi
+          
+          # Find best matching patch using actual naming convention
+          # Format: 0001-Implement-SUSFS-v1.5.8-for-Android-13-Kernel-5.15.patch
+          SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
+                           grep "Android-${ANDROID_VERSION}" | \
+                           grep "Kernel-${KERNEL_VERSION}" | head -n 1)
+          
+          # Fallback to any SUSFS patch for same Android/Kernel version
+          if [ -z "$SELECTED_PATCH" ]; then
+            SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
+                             grep "Android-${ANDROID_VERSION}" | head -n 1)
+          fi
+          
+          # Final fallback to any SUSFS patch
+          if [ -z "$SELECTED_PATCH" ]; then
+            SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | head -n 1)
+          fi
+          
+          if [ -z "$SELECTED_PATCH" ]; then
+            log "Error: No SUSFS patch found"
+            exit 1
+          fi
+          
+          # Download and apply patch
+          log "Downloading patch: $SELECTED_PATCH"
+          curl -L -o "susfs_patch.patch" "$SELECTED_PATCH"
+          
+          log "Applying SUSFS patch..."
+          if ! patch -p1 < "susfs_patch.patch"; then
+            log "Warning: Some hunks failed while applying patch"
+          fi
+          
+          log "✅ SUSFS patch applied successfully"
+      
+      - name: "😋 Setup SUSFS Syscall hooks"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -ex
           log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
-          
-          log "Applying SUSFS patches for SukiSU..."
-          
-          # Copy main SUSFS kernel patches
-          log "Copying SUSFS kernel patches..."
-          cp ../susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch ./
-          
-          # Copy filesystem patches
-          if [ -d "../susfs4ksu/kernel_patches/fs" ]; then
-            log "Copying filesystem patches..."
-            cp -r ../susfs4ksu/kernel_patches/fs/* ./fs/ 2>/dev/null || true
-          fi
-          
-          # Copy include patches
-          if [ -d "../susfs4ksu/kernel_patches/include/linux" ]; then
-            log "Copying include patches..."
-            cp -r ../susfs4ksu/kernel_patches/include/linux/* ./include/linux/ 2>/dev/null || true
-          fi
-          
-          # Apply SukiSU-specific SUSFS patches
-          if [ -d "./KernelSU" ]; then
-            log "Applying SUSFS patches for SukiSU KernelSU..."
-            cd ./KernelSU
-            # SukiSU uses the same base SUSFS patches as Official KernelSU
-            cp ../../susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch ./
-            patch -p1 --forward --fuzz=3 < 10_enable_susfs_for_ksu.patch || log "Warning: Some hunks failed"
-            cd ..
-          fi
-          
-          # Apply main kernel patch
-          log "Applying main SUSFS kernel patch..."
-          KERNEL_BRANCH="android13-5.15"
-          
-          # Check if this is a deprecated branch and apply appropriate patches
-          if [[ "${{ env.kernelBranch }}" == *"deprecated"* ]] && [[ "$KERNEL_BRANCH" == "android12-5.10" ]]; then
-            patch -p1 < 50_add_susfs_in_gki-android13-5.15.patch || log "Warning: Some hunks failed"
-            
-            # Apply additional legacy patch
-            curl -LSs "https://github.com/zzh20188/GKI_KernelSU_SUSFS/raw/refs/heads/legacy/fdinfo.c.patch" -o fdinfo.c.patch
-            patch -p1 < fdinfo.c.patch || log "Warning: Some hunks failed"
-          else
-            patch -p1 --fuzz=3 < 50_add_susfs_in_gki-android13-5.15.patch || log "Warning: Some hunks failed"
-          fi
-          
-          log "✅ SUSFS patches applied successfully"
-
-      - name: "🔗 Apply SukiSU Hooks"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          set -ex
-          log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
-          
-          log "Applying hooks for SukiSU..."
-          
-          # Check if SukiSU_patch directory exists, if not clone it
-          if [ ! -d "../../SukiSU_patch" ]; then
-            log "Cloning SukiSU_patch repository..."
-            cd ../..
-            git clone --depth=1 https://github.com/ShirkNeko/SukiSU_patch.git SukiSU_patch
-            cd ${{ env.kernelDir }}/${{ env.kernelName }}
-          fi
-          
-          # Apply SukiSU syscall hooks
-          if [ -f "../../SukiSU_patch/hooks/syscall_hooks.patch" ]; then
-            log "Applying SukiSU syscall hooks patch..."
-            cp ../../SukiSU_patch/hooks/syscall_hooks.patch ./
-            patch -p1 -F 3 < syscall_hooks.patch || log "Warning: Some hunks failed in syscall hooks"
-          else
-            log "⚠️ SukiSU syscall hooks patch not found, skipping..."
-          fi
-          
-          log "✅ SukiSU hooks applied successfully"
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-SUSFS-syscall-hooks.patch"
+          PATCH_FILE="0001-SUSFS-syscall-hooks.patch"
+          curl -L -o "$PATCH_FILE" "$PATCH_URL"
+          [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
+          patch -p1 < "$PATCH_FILE" || log "Warning: Some hunks failed"
+          log "✅ Syscall hooks patch applied"
 
       - name: "⚙️ Add SUSFS configs"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}

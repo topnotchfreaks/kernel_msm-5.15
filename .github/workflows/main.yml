@@ -31,6 +31,18 @@ on:
         required: true
         type: string
         default: "kernel_msm-5.15"
+      SUSFSBranch:
+        description: "SUSFS branch (default if empty)"
+        required: false
+        type: choice
+        options:
+          - "gki-android12-5.10"
+          - "gki-android13-5.10"
+          - "gki-android13-5.15"
+          - "gki-android14-5.15"
+          - "gki-android14-6.1"
+          - "gki-android15-6.6"
+        default: "gki-android13-5.15"
       localVersion:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
@@ -316,6 +328,15 @@ jobs:
       kernelBranch: ${{ github.event.inputs.kernelBranch }}
       kernelDevice: ${{ github.event.inputs.kernelDevice }}
       DEFCONFIG_NAME: ${{ github.event.inputs.kernelDevice }}_defconfig
+      SUSFS_BRANCH: ${{ github.event.inputs.SUSFSBranch || 'gki-android13-5.15' }}
+      ANDROID_VERSION: ${{ contains(github.event.inputs.SUSFSBranch, 'android12') && '12' || 
+                       contains(github.event.inputs.SUSFSBranch, 'android13') && '13' ||
+                       contains(github.event.inputs.SUSFSBranch, 'android14') && '14' ||
+                       contains(github.event.inputs.SUSFSBranch, 'android15') && '15' || '13' }}
+      KERNEL_VERSION: ${{ contains(github.event.inputs.SUSFSBranch, '5.10') && '5.10' ||
+                       contains(github.event.inputs.SUSFSBranch, '5.15') && '5.15' ||
+                       contains(github.event.inputs.SUSFSBranch, '6.1') && '6.1' ||
+                       contains(github.event.inputs.SUSFSBranch, '6.6') && '6.6' || '5.15' }}
 
     steps:
       - name: "✨ Setup workspace"
@@ -526,40 +547,75 @@ jobs:
           echo "✅ KernelSU updated successfully"
 
       - name: 😋 Setup SUSFS
-        env: 
+        env:
           ARCH: ${{ steps.generate-args.outputs.ARCH }}
+          ANDROID_VERSION: ${{ env.ANDROID_VERSION }}
+          KERNEL_VERSION: ${{ env.KERNEL_VERSION }}
+          SUSFS_BRANCH: ${{ env.SUSFS_BRANCH }}
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          set -ex
-        
+          set -e
+          
           log() {
             echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
           }
-        
-          apply_patch() {
-            local patch="$1"
-            local error_msg="$2"
-        
-            log "Attempting to apply patch: $(basename "$patch")"
-            if ! patch -p1 < "$patch"; then
-              log "Warning: Some hunks failed while applying patch $(basename "$patch")"
-            fi
-          }
-        
-          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Implement-SUSFS-v1.5.8-syscall-hooks.patch"
-          PATCH_FILE="0001-Implement-SUSFS-v1.5.8-syscall-hooks.patch"
-        
-          log "Downloading SUSFS patch from $PATCH_URL"
-          curl -L -o "$PATCH_FILE" "$PATCH_URL"
-        
-          if [ ! -f "$PATCH_FILE" ]; then
-            log "Patch file $PATCH_FILE does not exist after download"
+          
+          log "Setting up SUSFS for Android $ANDROID_VERSION, Kernel $KERNEL_VERSION"
+          
+          # Get available patches from latest release
+          log "Fetching available patches..."
+          PATCHES=$(curl -s "https://api.github.com/repos/topnotchfreaks/kernel_patches/releases/latest" | \
+                    grep -o 'browser_download_url.*\.patch' | cut -d\" -f3)
+          
+          if [ -z "$PATCHES" ]; then
+            log "Error: No patches found"
             exit 1
           fi
-        
-          apply_patch "$PATCH_FILE"
-        
-          log "✅ External SUSFS patch applied successfully"
+          
+          # Find best matching patch using actual naming convention
+          # Format: 0001-Implement-SUSFS-v1.5.8-for-Android-13-Kernel-5.15.patch
+          SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
+                           grep "Android-${ANDROID_VERSION}" | \
+                           grep "Kernel-${KERNEL_VERSION}" | head -n 1)
+          
+          # Fallback to any SUSFS patch for same Android/Kernel version
+          if [ -z "$SELECTED_PATCH" ]; then
+            SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
+                             grep "Android-${ANDROID_VERSION}" | head -n 1)
+          fi
+          
+          # Final fallback to any SUSFS patch
+          if [ -z "$SELECTED_PATCH" ]; then
+            SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | head -n 1)
+          fi
+          
+          if [ -z "$SELECTED_PATCH" ]; then
+            log "Error: No SUSFS patch found"
+            exit 1
+          fi
+          
+          # Download and apply patch
+          log "Downloading patch: $SELECTED_PATCH"
+          curl -L -o "susfs_patch.patch" "$SELECTED_PATCH"
+          
+          log "Applying SUSFS patch..."
+          if ! patch -p1 < "susfs_patch.patch"; then
+            log "Warning: Some hunks failed while applying patch"
+          fi
+          
+          log "✅ SUSFS patch applied successfully"
+
+      - name: "😋 Setup SUSFS Syscall hooks"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex
+          log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-SUSFS-syscall-hooks.patch"
+          PATCH_FILE="0001-SUSFS-syscall-hooks.patch"
+          curl -L -o "$PATCH_FILE" "$PATCH_URL"
+          [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
+          patch -p1 < "$PATCH_FILE" || log "Warning: Some hunks failed"
+          log "✅ Syscall hooks patch applied"
 
       - name: ⚙️ Add SUSFS configs
         env:
