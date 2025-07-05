@@ -139,7 +139,7 @@ jobs:
           ANDROID_VERSION: "13"
           KERNEL_VERSION: "5.15"
           SUSFS_BRANCH: "gki-android13-5.15"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+          working-directory: ./${{ env.kernelDir }}/kernel/msm-5.15
         run: |
           set -e
           
@@ -193,7 +193,7 @@ jobs:
           log "✅ SUSFS patch applied successfully"
       
       - name: "😋 Setup SUSFS Syscall hooks"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        working-directory: ./${{ env.kernelDir }}/kernel/msm-5.15
         run: |
           set -ex
           log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
@@ -411,7 +411,7 @@ jobs:
           ANDROID_VERSION: "13"
           KERNEL_VERSION: "5.15"
           SUSFS_BRANCH: "gki-android13-5.15"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        working-directory: ./${{ env.kernelDir }}/kernel/msm-5.15
         run: |
           set -e
           
@@ -465,7 +465,7 @@ jobs:
           log "✅ SUSFS patch applied successfully"
       
       - name: "😋 Setup SUSFS Syscall hooks"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        working-directory: ./${{ env.kernelDir }}/kernel/msm-5.15
         run: |
           set -ex
           log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
