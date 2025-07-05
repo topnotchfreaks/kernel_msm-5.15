@@ -54,6 +54,12 @@ jobs:
           git clone --recursive --branch ${{ env.kernelBranch }} \
             ${{ env.kernelRepo }} kernel/msm-5.15 --depth=1
 
+          # remove any existing clang directory
+          [ -d "prebuilts/clang" ] && rm -rf prebuilts/clang
+
+          # Clone latest AOSP clang toolchain
+          git clone --recursive --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b main prebuilts/clang/host/linux-x86
+
       - name: 📐 Setup swap 8G
         uses: pierotofy/set-swap-space@master
         with:
