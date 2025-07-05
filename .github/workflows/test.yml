@@ -60,10 +60,10 @@ jobs:
           # Clone latest AOSP clang toolchain
           git clone --recursive --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b main prebuilts/clang/host/linux-x86
 
-      - name: 📐 Setup swap 8G
+      - name: 📐 Setup swap 5G
         uses: pierotofy/set-swap-space@master
         with:
-            swap-size-gb: 8
+            swap-size-gb: 5
 
       - name: 📐 Tune Swap
         run: |
@@ -332,10 +332,10 @@ jobs:
           git clone --recursive --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 \
             -b main prebuilts/clang/host/linux-x86
 
-      - name: 📐 Setup swap 8G
+      - name: 📐 Setup swap 5G
         uses: pierotofy/set-swap-space@master
         with:
-            swap-size-gb: 8
+            swap-size-gb: 5
 
       - name: 📐 Tune Swap
         run: |
