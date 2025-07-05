@@ -58,6 +58,13 @@ jobs:
           # Clone latest AOSP clang toolchain
           git clone --recursive --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b main prebuilts/clang/host/linux-x86
 
+          # remove unused clang toolchains
+          rm -rf prebuilts/clang/host/linux-x86/clang-r450784e || true
+          rm -rf prebuilts/clang/host/linux-x86/clang-r536225 || true
+          rm -rf prebuilts/clang/host/linux-x86/clang-r530567 || true
+          rm -rf prebuilts/clang/host/linux-x86/clang-r522817 || true
+          rm -rf prebuilts/clang/host/linux-x86/clang-r3289846 || true
+
       - name: 📐 Setup swap 5G
         uses: pierotofy/set-swap-space@master
         with:
@@ -329,6 +336,13 @@ jobs:
           # Clone latest AOSP clang toolchain
           git clone --recursive --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 \
             -b main prebuilts/clang/host/linux-x86
+
+          # remove unused clang toolchains
+          rm -rf prebuilts/clang/host/linux-x86/clang-r450784e || true
+          rm -rf prebuilts/clang/host/linux-x86/clang-r536225 || true
+          rm -rf prebuilts/clang/host/linux-x86/clang-r530567 || true
+          rm -rf prebuilts/clang/host/linux-x86/clang-r522817 || true
+          rm -rf prebuilts/clang/host/linux-x86/clang-r3289846 || true
 
       - name: 📐 Setup swap 5G
         uses: pierotofy/set-swap-space@master
