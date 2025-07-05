@@ -54,10 +54,10 @@ jobs:
           git clone --recursive --branch ${{ env.kernelBranch }} \
             ${{ env.kernelRepo }} kernel/msm-5.15 --depth=1
 
-      - name: 📐 Setup swap 20G
+      - name: 📐 Setup swap 8G
         uses: pierotofy/set-swap-space@master
         with:
-            swap-size-gb: 20
+            swap-size-gb: 8
 
       - name: 📐 Tune Swap
         run: |
@@ -326,10 +326,10 @@ jobs:
           git clone --recursive --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 \
             -b main prebuilts/clang/host/linux-x86
 
-      - name: 📐 Setup swap 20G
+      - name: 📐 Setup swap 8G
         uses: pierotofy/set-swap-space@master
         with:
-            swap-size-gb: 20
+            swap-size-gb: 8
 
       - name: 📐 Tune Swap
         run: |
