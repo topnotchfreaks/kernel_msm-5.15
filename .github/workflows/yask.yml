@@ -718,6 +718,43 @@ jobs:
           cp kernels/Image.gki AnyKernel3/Image.gki
           cp kernels/Image.clo AnyKernel3/Image.clo
 
+          cat > AnyKernel3/banner << EOF
+          ╔═════════════════════════════════════════════════════╗
+          ║                                                     ║
+          ║          ██╗   ██╗ █████╗ ███████╗██╗  ██╗          ║
+          ║          ╚██╗ ██╔╝██╔══██╗██╔════╝██║ ██╔╝          ║
+          ║           ╚████╔╝ ███████║███████╗█████╔╝           ║
+          ║            ╚██╔╝  ██╔══██║╚════██║██╔═██╗           ║
+          ║             ██║   ██║  ██║███████║██║  ██╗          ║
+          ║             ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝          ║
+          ║                                                     ║
+          ║               Yet Another Stock Kernel              ║
+          ║                   by @belowzeroiq                   ║
+          ║                                                     ║
+          ║              Powered by Github Actions              ║
+          ║                                                     ║
+          ╠═════════════════════════════════════════════════════╣
+          ║                                                     ║
+          ║     Kernel version:                                 ║
+          ║     • YASK-GKI Kernel (android13-5.15-lts)          ║
+          ║     • YASK-CLO Kernel (kernel.lnx.5.15.r1/16-rel)   ║
+          ║                                                     ║
+          ║     Features:                                       ║
+          ║     • -O2 Optimization                              ║
+          ║     • Extra TCP Congestion                          ║
+          ║     • Greenforce Clang 21                           ║
+          ║     • LineageOS disguise                            ║
+          ║     • SukiSU-Ultra v3.1.7 + KPM                     ║
+          ║     • SUSFS v1.5.9 (manual hook)                    ║
+          ║                                                     ║
+          ║     Please ensure:                                  ║
+          ║     • Your device is compatible                     ║
+          ║     • You have a backup of your current kernel      ║
+          ║                                                     ║
+          ╚═════════════════════════════════════════════════════╝
+          Installing YASK Kernel...
+          EOF
+
           ZIP_NAME="Anykernel3_YASK-AIO_$(date +'%Y-%m-%d').zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
