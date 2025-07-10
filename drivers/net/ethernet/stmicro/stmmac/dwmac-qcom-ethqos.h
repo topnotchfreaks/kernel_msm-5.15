@@ -291,6 +291,9 @@ struct qcom_ethqos {
 	int curr_serdes_speed;
 	/* Boolean flag for turning off GDSC during suspend */
 	bool gdsc_off_on_suspend;
+	struct pinctrl *pinctrl;
+	struct pinctrl_state *rgmii_txc_suspend_state;
+	struct pinctrl_state *rgmii_txc_resume_state;
 };
 
 struct pps_cfg {
