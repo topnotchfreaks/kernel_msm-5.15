@@ -109,6 +109,22 @@ config ANDROID_VENDOR_OEM_DATA
 
 	  If even slightly unsure, say Y.
 
+config BINDER_OPT
+	bool "critical task opt of binder"
+	help
+	  Mark important binder calls from ui thread.
+
+config PERF_CRITICAL_RT_TASK
+	bool "Enable set rt binder thread" if EXPERT
+	help
+	  This option speeds ui feature by setting BlastBufferQueue binder
+	  thread to FIFO.
+
+config SF_BINDER
+	bool "Enable surfaceflinger binder thread" if EXPERT
+	help
+	  Xiaomi restore surfaceflinger binder priority FIFO
+
 endif # if ANDROID
 
 endmenu

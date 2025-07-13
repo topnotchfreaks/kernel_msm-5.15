@@ -1352,6 +1352,17 @@ struct task_struct {
 	 */
 	u64				timer_slack_ns;
 	u64				default_timer_slack_ns;
+#ifdef CONFIG_BINDER_OPT
+ 	unsigned int			top_app;
+ 	unsigned int			inherit_top_app;
+ 	unsigned int    		critical_task;
+#endif
+#ifdef CONFIG_PERF_CRITICAL_RT_TASK
+	unsigned int    		critical_rt_task;
+#endif
+#ifdef CONFIG_SF_BINDER
+	unsigned int			sf_binder_task;
+#endif
 
 #if defined(CONFIG_KASAN_GENERIC) || defined(CONFIG_KASAN_SW_TAGS)
 	unsigned int			kasan_depth;
@@ -2356,5 +2367,16 @@ extern int sched_core_share_pid(unsigned int cmd, pid_t pid, enum pid_type type,
 static inline void sched_core_free(struct task_struct *tsk) { }
 static inline void sched_core_fork(struct task_struct *p) { }
 #endif
+
+#ifdef CONFIG_BINDER_OPT
+extern inline bool is_critical_task(struct task_struct *p);
+extern inline bool is_top_app(struct task_struct *p);
+extern inline bool is_inherit_top_app(struct task_struct *p);
+
+#define INHERIT_DEPTH 2
+extern inline void set_inherit_top_app(struct task_struct *p,
+ 					struct task_struct *from);
+extern inline void restore_inherit_top_app(struct task_struct *p);
+#endif // CONFIG_BINDER_OPT
 
 #endif
