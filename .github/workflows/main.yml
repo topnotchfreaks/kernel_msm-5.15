@@ -57,6 +57,7 @@ on:
           - "ZyC Clang"
           - "Greenforce Clang"
           - "TopNotchFreaks Clang"
+          - "Rv Clang"
 
 jobs:
   Set-repos:
@@ -143,6 +144,9 @@ jobs:
               ;;
             "TopNotchFreaks Clang")
               clang_url=$(get_latest_github_release "topnotchfreaks/clang")
+              ;;
+            "Rv Clang")
+              clang_url=$(get_latest_github_release "Rv-Project/RvClang")
               ;;
             *)
               echo "❌ Unsupported Clang compiler: ${{ github.event.inputs.clangCompiler }}"
