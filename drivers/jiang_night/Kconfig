@@ -1,0 +1,7 @@
+# Kconfig for JiangNight Driver
+config JIANG_NIGHT_DRIVER
+    tristate "JiangNight Advanced Memory Access Driver"
+    default m
+    help
+      This enables the JiangNight driver, providing advanced debugging
+      and memory manipulation capabilities via a misc device.
