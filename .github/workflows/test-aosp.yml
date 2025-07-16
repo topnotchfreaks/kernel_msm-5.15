@@ -1,0 +1,89 @@
+name: "AOSP Kernel Build"
+on:
+  workflow_dispatch:
+    inputs:
+      kernelBranch:
+        description: "AOSP Kernel branch (default if empty)"
+        required: false
+        type: string
+        default: "common-android13-5.15-lts"
+
+jobs:
+  Build-AOSP-Kernel:
+    name: "🛠 Build AOSP Kernel"
+    runs-on: ubuntu-latest
+    env:
+      WORK_DIR: ${{ github.workspace }}
+      KERNEL_DIR: "kernel-build"
+      OUT_DIR: "out"
+      ANDROID_KERNEL_BRANCH: ${{ github.event.inputs.kernelBranch }}
+    
+    steps:
+      - name: "🚀 Setup environment"
+        run: |
+          sudo apt-get update && \
+          sudo apt-get install -y git python3 curl repo zip flex bison libssl-dev \
+          build-essential dwarves libelf-dev gcc-aarch64-linux-gnu rsync
+      
+      - name: "📂 Create kernel directory"
+        working-directory: ${{ env.WORK_DIR}}
+        run: |
+          mkdir -p ${{ env.KERNEL_DIR }}
+          chmod -R 777 ${{ env.KERNEL_DIR }}
+      
+      - name: "📥 Initialize repo"
+        working-directory: ${{ env.WORK_DIR}}
+        run: |
+          repo init -u https://android.googlesource.com/kernel/manifest -b $ANDROID_KERNEL_BRANCH --depth=1
+          repo sync -c --no-tags --no-clone-bundle --prune --optimized-fetch -j8
+
+      - name: "🧩 Apply GKI Fixup Patch"
+        working-directory: ${{ env.WORK_DIR}}/common
+        run: |
+          set -e
+          log() {
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+          }
+          apply_patch() {
+            local patch="$1"
+            log "Applying patch: $(basename "$patch")"
+            if ! patch -p1 < "$patch"; then
+              log "Warning: Some hunks failed in $(basename "$patch")"
+            fi
+          }
+          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-gki-fixup.patch"
+          PATCH_FILE="0001-gki-fixup.patch"
+          log "Downloading patch from: $PATCH_URL"
+          curl -L -o "$PATCH_FILE" "$PATCH_URL"
+          if [ ! -f "$PATCH_FILE" ]; then
+            log "Patch download failed or file not found."
+            exit 1
+          fi
+          apply_patch "$PATCH_FILE"
+          log "✅ GKI fixup patch applied successfully"
+      
+      - name: "🔧 Set up build environment"
+        working-directory: ${{ env.WORK_DIR}}
+        run: |
+          export KBUILD_BUILD_USER="GitHub"
+          export KBUILD_BUILD_HOST="CI"
+      
+      - name: "🏗 Build kernel"
+        working-directory: ${{ env.WORK_DIR}}
+        run: |
+          LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh -j8
+      
+      - name: "📦 Package with AnyKernel3"
+        working-directory: ${{ env.WORK_DIR}}
+        run: |
+          echo "Downloading AnyKernel3..."
+          git clone --depth=1 https://github.com/topnotchfreaks/AnyKernel3.git -b master
+          cp $OUT_DIR/arch/arm64/boot/Image AnyKernel3/Image
+          cd AnyKernel3
+          zip -r9 "../kernel-${DEVICE}-${ANDROID_KERNEL_BRANCH}-$(date +%Y%m%d).zip" * -x .git/*
+      
+      - name: "📤 Upload Artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          name: aosp-kernel
+          path: $KERNEL_DIR/kernel-${{ env.DEVICE }}-${{ env.ANDROID_KERNEL_BRANCH }}-*.zip
