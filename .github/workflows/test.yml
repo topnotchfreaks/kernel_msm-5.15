@@ -636,6 +636,7 @@ jobs:
 
           CONFIGS+=(
             "CONFIG_KSU=y"
+            "CONFIG_KSU_CMDLINE=y"
             "CONFIG_KSU_MANUAL_HOOK=y"
             "CONFIG_KPM=y"
             "CONFIG_KALLSYMS=y"
