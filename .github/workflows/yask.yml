@@ -356,7 +356,7 @@ jobs:
       kernelDir: common_clo
       kernelName: clo
       kernelRepo: https://git.codelinaro.org/clo/la/kernel/msm-5.15
-      kernelBranch: kernel.lnx.5.15.r1-rel
+      kernelBranch: kernel.lnx.5.15.r16-rel
       kernelDevice: gki
       DEFCONFIG_NAME: gki_defconfig
       OUT_DIR: "out"
