@@ -62,7 +62,7 @@ jobs:
             printf "%s" "$latest_url"
           }
 
-          clang_url=$(get_latest_github_release "greenforce-project/greenforce_clang")
+          clang_url=$(get_latest_github_release "topnotchfreaks/clang")
           echo "✅ Clang URL: $clang_url"
           mkdir -p clang
 
@@ -289,12 +289,6 @@ jobs:
           printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
           echo "✅ configs added"
 
-      - name: "📝 Append custom Makefile line"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
-          echo "Custom Makefile line added"
-
       - name: "😎 Set args for GKI kernels"
         id: generate-args
         working-directory: ./${{ env.kernelDir }}
@@ -399,7 +393,7 @@ jobs:
             printf "%s" "$latest_url"
           }
 
-          clang_url=$(get_latest_github_release "greenforce-project/greenforce_clang")
+          clang_url=$(get_latest_github_release "topnotchfreaks/clang")
           echo "✅ Clang URL: $clang_url"
           mkdir -p clang
 
@@ -626,12 +620,6 @@ jobs:
           printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
           echo "✅ configs added"
 
-      - name: "📝 Append custom Makefile line"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
-          echo "Custom Makefile line added"
-
       - name: "😎 Set args for CLO kernels"
         id: generate-args
         working-directory: ./${{ env.kernelDir }}
@@ -742,7 +730,7 @@ jobs:
           ║     Features:                                       ║
           ║     • -O2 Optimization                              ║
           ║     • Extra TCP Congestion                          ║
-          ║     • Greenforce Clang 21                           ║
+          ║     • TopNotchFreaks Clang 20                       ║
           ║     • LineageOS disguise                            ║
           ║     • SukiSU-Ultra v3.1.7 + KPM                     ║
           ║     • SUSFS v1.5.9 (manual hook)                    ║
