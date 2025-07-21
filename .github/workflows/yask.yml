@@ -68,7 +68,7 @@ jobs:
 
           if [[ "$clang_url" == *.tar.gz ]]; then
             echo "🚀 Downloading latest Clang..."
-            wget --progress=bar:force -O "clang/clang.tar.gz" "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
+            aria2c -x 16 -s 16 --file-allocation=none --dir=clang --out=clang.tar.gz "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
             echo "📦 Extracting Clang..."
             tar -xf clang/clang.tar.gz -C clang || { echo "❌ Extraction failed!"; exit 1; }
             rm -f clang/clang.tar.gz
@@ -399,7 +399,7 @@ jobs:
 
           if [[ "$clang_url" == *.tar.gz ]]; then
             echo "🚀 Downloading latest Clang..."
-            wget --progress=bar:force -O "clang/clang.tar.gz" "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
+            aria2c -x 16 -s 16 --file-allocation=none --dir=clang --out=clang.tar.gz "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
             echo "📦 Extracting Clang..."
             tar -xf clang/clang.tar.gz -C clang || { echo "❌ Extraction failed!"; exit 1; }
             rm -f clang/clang.tar.gz
