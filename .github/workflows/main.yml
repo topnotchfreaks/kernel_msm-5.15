@@ -238,6 +238,18 @@ jobs:
             echo "CONFIG_LOCALVERSION=\"$LOCALVERSION\"" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           fi
 
+      - name: "⚙️ Add Additional configs"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex
+          CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
+
+          CONFIGS=(
+            "CONFIG_KALLSYMS=y"
+          )
+          printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
+          echo "✅ configs added"
+
       - name: "🛠 Setup kernel Tweaks"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
