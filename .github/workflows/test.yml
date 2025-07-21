@@ -87,7 +87,7 @@ jobs:
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
           sudo apt-get update
-          sudo apt-get install -y build-essential bc curl flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
+          sudo apt-get install -y build-essential bc curl aria2 flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
 
       - name: "🌟 Clone kernel source => (${{ env.kernelRepo }})"
         working-directory: ./${{ env.kernelDir }}
@@ -116,24 +116,28 @@ jobs:
               ${{ github.event.inputs.kernelSourceURL }} ${{ env.kernelName }} --depth=1
           fi
 
-      - name: "💫 Get Toolchains"
+      - name: "💫 Get Toolchains (aria2c edition)"
         run: |
-          set -e  # Exit on errors
-      
-          # Function to fetch latest release tar.gz URL from GitHub
+          set -e
+
+          # Helper: fetch latest release tar.gz URL (JSON via aria2c)
           get_latest_github_release() {
-            local repo_url="$1"
-            latest_url=$(curl -sL "https://api.github.com/repos/$repo_url/releases/latest" | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | head -n 1)
-            
-            if [[ -z "$latest_url" ]]; then
-              echo "❌ Failed to fetch latest release from $repo_url!"
+            local repo="$1"
+            local json
+            json=$(mktemp)
+            aria2c -q --allow-overwrite=true -o "$json" \
+                   "https://api.github.com/repos/$repo/releases/latest"
+            local url
+            url=$(jq -r '.assets[] | select(.name | endswith(".tar.gz")) | .browser_download_url' "$json" | head -n1)
+            rm -f "$json"
+            if [[ -z "$url" ]]; then
+              echo "❌ Failed to fetch latest release from $repo!"
               exit 1
             fi
-      
-            printf "%s" "$latest_url"  # Use printf to output only the URL
+            printf '%s\n' "$url"
           }
-      
-          # Determine the Clang URL dynamically
+
+          # Decide which Clang we want
           case "${{ github.event.inputs.clangCompiler }}" in
             "ZyC Clang")
               clang_url=$(get_latest_github_release "ZyCromerZ/Clang")
@@ -149,57 +153,54 @@ jobs:
               exit 1
               ;;
           esac
-      
+
           echo "✅ Clang URL: $clang_url"
-      
-          # Create clang directory
+
           mkdir -p clang
-      
-          # Check if it's an archive or a Git repo
+
           if [[ "$clang_url" == *.tar.gz ]]; then
-            echo "🚀 Downloading latest Clang from: $clang_url..."
-            wget --progress=bar:force -O "clang/clang.tar.gz" "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
-      
-            # Extract Clang
-            echo "📦 Extracting Clang..."
-            tar -xf clang/clang.tar.gz -C clang || { echo "❌ Extraction failed!"; exit 1; }
+            echo "🚀 Downloading Clang with aria2c..."
+            aria2c -x16 -s16 -k1M -q -o "clang/clang.tar.gz" "$clang_url"
+            echo "📦 Extracting..."
+            tar -xf clang/clang.tar.gz -C clang
             rm -f clang/clang.tar.gz
           else
-            echo "🚀 Cloning Clang from $clang_url..."
-            git clone --recursive --depth=1 "$clang_url" clang || { echo "❌ Cloning failed!"; exit 1; }
+            echo "🚀 Cloning Clang repo..."
+            git clone --recursive --depth=1 "$clang_url" clang
           fi
-      
-          # Find Clang's bin directory
-          if [ -d "clang/bin" ]; then
+
+          # Locate bin directory
+          if [[ -d clang/bin ]]; then
             CLANG_PATH="${{ github.workspace }}/clang/bin"
           else
-            CLANG_PATH=$(find clang -type d -name "bin" | head -n 1)
-            CLANG_PATH="${{ github.workspace }}/${CLANG_PATH}"
+            CLANG_PATH=$(find clang -type d -name bin | head -n1)
+            CLANG_PATH="${{ github.workspace }}/$CLANG_PATH"
           fi
-      
-          # Ensure Clang binary exists
-          if [ ! -f "$CLANG_PATH/clang" ]; then
-            echo "❌ Clang binary not found in $CLANG_PATH! Build might fail."
-            ls -R clang  # Debugging: Show extracted files
+
+          [[ -f "$CLANG_PATH/clang" ]] || {
+            echo "❌ clang binary not found!"
             exit 1
-          fi
-      
+          }
+
           echo "✅ Using Clang from $CLANG_PATH"
-          echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
-          echo "$CLANG_PATH" >> $GITHUB_PATH  # Ensures path is updated
-      
-          export PATH="$CLANG_PATH:$PATH"
-          export CLANG_TRIPLE="aarch64-linux-gnu-"
-          export CC=clang
-          export AR="llvm-ar"
-          export AS="llvm-as"
-          export NM="llvm-nm"
-          export OBJCOPY="llvm-objcopy"
-          export OBJDUMP="llvm-objdump"
-          export STRIP="llvm-strip"
-      
-          echo "⚙️ Using Clang version:"
-          clang --version || echo "❌ Clang not found in PATH!"  
+          {
+            echo "CLANG_PATH=$CLANG_PATH"
+            echo "$CLANG_PATH"
+          } >> "$GITHUB_PATH"
+          {
+            echo "CLANG_PATH=$CLANG_PATH"
+            echo "CLANG_TRIPLE=aarch64-linux-gnu-"
+            echo "CC=clang"
+            echo "AR=llvm-ar"
+            echo "AS=llvm-as"
+            echo "NM=llvm-nm"
+            echo "OBJCOPY=llvm-objcopy"
+            echo "OBJDUMP=llvm-objdump"
+            echo "STRIP=llvm-strip"
+          } >> "$GITHUB_ENV"
+
+          echo "⚙️ Clang version:"
+          "$CLANG_PATH/clang" --version  
 
       - name: 📐 Setup swap 20G
         uses: pierotofy/set-swap-space@master
@@ -378,24 +379,28 @@ jobs:
               ${{ github.event.inputs.kernelSourceURL }} ${{ env.kernelName }} --depth=1
           fi
 
-      - name: "💫 Get Toolchains"
+      - name: "💫 Get Toolchains (aria2c edition)"
         run: |
-          set -e  # Exit on errors
-      
-          # Function to fetch latest release tar.gz URL from GitHub
+          set -e
+
+          # Helper: fetch latest release tar.gz URL (JSON via aria2c)
           get_latest_github_release() {
-            local repo_url="$1"
-            latest_url=$(curl -sL "https://api.github.com/repos/$repo_url/releases/latest" | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | head -n 1)
-            
-            if [[ -z "$latest_url" ]]; then
-              echo "❌ Failed to fetch latest release from $repo_url!"
+            local repo="$1"
+            local json
+            json=$(mktemp)
+            aria2c -q --allow-overwrite=true -o "$json" \
+                   "https://api.github.com/repos/$repo/releases/latest"
+            local url
+            url=$(jq -r '.assets[] | select(.name | endswith(".tar.gz")) | .browser_download_url' "$json" | head -n1)
+            rm -f "$json"
+            if [[ -z "$url" ]]; then
+              echo "❌ Failed to fetch latest release from $repo!"
               exit 1
             fi
-      
-            printf "%s" "$latest_url"  # Use printf to output only the URL
+            printf '%s\n' "$url"
           }
-      
-          # Determine the Clang URL dynamically
+
+          # Decide which Clang we want
           case "${{ github.event.inputs.clangCompiler }}" in
             "ZyC Clang")
               clang_url=$(get_latest_github_release "ZyCromerZ/Clang")
@@ -411,57 +416,54 @@ jobs:
               exit 1
               ;;
           esac
-      
+
           echo "✅ Clang URL: $clang_url"
-      
-          # Create clang directory
+
           mkdir -p clang
-      
-          # Check if it's an archive or a Git repo
+
           if [[ "$clang_url" == *.tar.gz ]]; then
-            echo "🚀 Downloading latest Clang from: $clang_url..."
-            wget --progress=bar:force -O "clang/clang.tar.gz" "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
-      
-            # Extract Clang
-            echo "📦 Extracting Clang..."
-            tar -xf clang/clang.tar.gz -C clang || { echo "❌ Extraction failed!"; exit 1; }
+            echo "🚀 Downloading Clang with aria2c..."
+            aria2c -x16 -s16 -k1M -q -o "clang/clang.tar.gz" "$clang_url"
+            echo "📦 Extracting..."
+            tar -xf clang/clang.tar.gz -C clang
             rm -f clang/clang.tar.gz
           else
-            echo "🚀 Cloning Clang from $clang_url..."
-            git clone --recursive --depth=1 "$clang_url" clang || { echo "❌ Cloning failed!"; exit 1; }
+            echo "🚀 Cloning Clang repo..."
+            git clone --recursive --depth=1 "$clang_url" clang
           fi
-      
-          # Find Clang's bin directory
-          if [ -d "clang/bin" ]; then
+
+          # Locate bin directory
+          if [[ -d clang/bin ]]; then
             CLANG_PATH="${{ github.workspace }}/clang/bin"
           else
-            CLANG_PATH=$(find clang -type d -name "bin" | head -n 1)
-            CLANG_PATH="${{ github.workspace }}/${CLANG_PATH}"
+            CLANG_PATH=$(find clang -type d -name bin | head -n1)
+            CLANG_PATH="${{ github.workspace }}/$CLANG_PATH"
           fi
-      
-          # Ensure Clang binary exists
-          if [ ! -f "$CLANG_PATH/clang" ]; then
-            echo "❌ Clang binary not found in $CLANG_PATH! Build might fail."
-            ls -R clang  # Debugging: Show extracted files
+
+          [[ -f "$CLANG_PATH/clang" ]] || {
+            echo "❌ clang binary not found!"
             exit 1
-          fi
-      
+          }
+
           echo "✅ Using Clang from $CLANG_PATH"
-          echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
-          echo "$CLANG_PATH" >> $GITHUB_PATH  # Ensures path is updated
-      
-          export PATH="$CLANG_PATH:$PATH"
-          export CLANG_TRIPLE="aarch64-linux-gnu-"
-          export CC=clang
-          export AR="llvm-ar"
-          export AS="llvm-as"
-          export NM="llvm-nm"
-          export OBJCOPY="llvm-objcopy"
-          export OBJDUMP="llvm-objdump"
-          export STRIP="llvm-strip"
-      
-          echo "⚙️ Using Clang version:"
-          clang --version || echo "❌ Clang not found in PATH!"  
+          {
+            echo "CLANG_PATH=$CLANG_PATH"
+            echo "$CLANG_PATH"
+          } >> "$GITHUB_PATH"
+          {
+            echo "CLANG_PATH=$CLANG_PATH"
+            echo "CLANG_TRIPLE=aarch64-linux-gnu-"
+            echo "CC=clang"
+            echo "AR=llvm-ar"
+            echo "AS=llvm-as"
+            echo "NM=llvm-nm"
+            echo "OBJCOPY=llvm-objcopy"
+            echo "OBJDUMP=llvm-objdump"
+            echo "STRIP=llvm-strip"
+          } >> "$GITHUB_ENV"
+
+          echo "⚙️ Clang version:"
+          "$CLANG_PATH/clang" --version  
 
       - name: 📐 Setup swap 20G
         uses: pierotofy/set-swap-space@master
