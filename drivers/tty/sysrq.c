@@ -487,7 +487,11 @@ static const struct sysrq_key_op *sysrq_key_table[62] = {
 #else
 	NULL,				/* j */
 #endif
+#ifdef CONFIG_LOCKDEP
 	&sysrq_SAK_op,			/* k */
+#else
+	NULL,				/* k */
+#endif
 #ifdef CONFIG_SMP
 	&sysrq_showallcpus_op,		/* l */
 #else
@@ -499,7 +503,11 @@ static const struct sysrq_key_op *sysrq_key_table[62] = {
 	NULL,				/* o */
 	&sysrq_showregs_op,		/* p */
 	&sysrq_show_timers_op,		/* q */
+#ifdef CONFIG_LOCKDEP
 	&sysrq_unraw_op,		/* r */
+#else
+	NULL,				/* r */
+#endif
 	&sysrq_sync_op,			/* s */
 	&sysrq_showstate_op,		/* t */
 	&sysrq_mountro_op,		/* u */
