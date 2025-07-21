@@ -283,6 +283,18 @@ jobs:
             echo "Custom Makefile line added successfully"
           fi
 
+      - name: "⚙️ Add Additional configs"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex
+          CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
+
+          CONFIGS=(
+            "CONFIG_KALLSYMS=y"
+          )
+          printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
+          echo "✅ configs added"
+
       - name: "👍 Make defconfig"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         env:
