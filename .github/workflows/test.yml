@@ -309,6 +309,7 @@ jobs:
         run: |
           export KBUILD_BUILD_USER="belowzeroiq"
           export KBUILD_BUILD_HOST="GitHub"
+          export KMI_ENFORCED=0 # Disable KMI enforcement for testing
         
           make ${args} \
             LLVM=1 \
@@ -318,7 +319,8 @@ jobs:
             NM=llvm-nm \
             OBJCOPY=llvm-objcopy \
             STRIP=llvm-strip \
-            -j8
+            KMI_ENFORCED=0 \
+            -j10
 
       - name: "📦 Rename for packaging"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -702,6 +704,7 @@ jobs:
         run: |
           export KBUILD_BUILD_USER="belowzeroiq"
           export KBUILD_BUILD_HOST="GitHub"
+          export KMI_ENFORCED=0 # Disable KMI enforcement for testing
         
           make ${args} \
             LLVM=1 \
@@ -711,7 +714,8 @@ jobs:
             NM=llvm-nm \
             OBJCOPY=llvm-objcopy \
             STRIP=llvm-strip \
-            -j8
+            KMI_ENFORCED=0 \
+            -j10
 
       - name: "🩹 Patch Image with KPM"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
