@@ -150,6 +150,7 @@ jobs:
           }
           PATCH_URLS=(
             "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-fs-lineageos-disguise.patch"
+            "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Revert-bpf-fix-precision-backtracking-instruction-it.patch"
           )
           for PATCH_URL in "${PATCH_URLS[@]}"; do
             PATCH_FILE=$(basename "$PATCH_URL")
