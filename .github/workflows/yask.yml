@@ -276,6 +276,9 @@ jobs:
           set -ex
           CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
 
+          # Replace full LTO with thin LTO
+          sed -i 's/CONFIG_LTO_CLANG_FULL=y/CONFIG_LTO_CLANG_THIN=y/' "$CONFIG_FILE"
+
           CONFIGS=(
             "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"
             "CONFIG_ZRAM_DEF_COMP_LZ4=y"
@@ -606,6 +609,9 @@ jobs:
         run: |
           set -ex
           CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
+
+          # Replace full LTO with thin LTO
+          sed -i 's/CONFIG_LTO_CLANG_FULL=y/CONFIG_LTO_CLANG_THIN=y/' "$CONFIG_FILE"
 
           CONFIGS=(
             "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"
