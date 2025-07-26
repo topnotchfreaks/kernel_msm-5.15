@@ -32,30 +32,31 @@ jobs:
 
           rm -rf .repo
 
-      - name: "🧩 Apply GKI Fixup Patch"
+      - name: "🧩 Apply GKI Fixup Patches"
+        if: contains(env.ANDROID_KERNEL_BRANCH, '5.15')
         working-directory: ${{ env.WORK_DIR}}/common
         run: |
           set -e
-          log() {
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
-          }
-          apply_patch() {
-            local patch="$1"
-            log "Applying patch: $(basename "$patch")"
-            if ! patch -p1 < "$patch"; then
-              log "Warning: Some hunks failed in $(basename "$patch")"
+          log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
+
+          PATCH_URLS=(
+            "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-gki-fixup.patch"
+            "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Revert-bpf-fix-precision-backtracking-instruction-it.patch"
+          )
+
+          for url in "${PATCH_URLS[@]}"; do
+            filename="$(basename "$url")"
+            log "Downloading: $filename"
+
+            if curl -sL -o "$filename" "$url" && [ -f "$filename" ]; then
+              log "Applying: $filename"
+              patch -p1 < "$filename" || log "Warning: Some hunks failed in $filename"
+            else
+              log "Failed to download: $filename"
             fi
-          }
-          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-gki-fixup.patch"
-          PATCH_FILE="0001-gki-fixup.patch"
-          log "Downloading patch from: $PATCH_URL"
-          curl -L -o "$PATCH_FILE" "$PATCH_URL"
-          if [ ! -f "$PATCH_FILE" ]; then
-            log "Patch download failed or file not found."
-            exit 1
-          fi
-          apply_patch "$PATCH_FILE"
-          log "✅ GKI fixup patch applied successfully"
+          done
+
+          log "✅ Patch processing complete"
       
       - name: "🔧 Set up build environment"
         working-directory: ${{ env.WORK_DIR}}
