@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       WORK_DIR: ${{ github.workspace }}
-      KERNEL_DIR: "kernel-build"
+      KERNEL_DIR: "common"
       OUT_DIR: "out"
       ANDROID_KERNEL_BRANCH: ${{ github.event.inputs.kernelBranch }}
     
@@ -23,12 +23,6 @@ jobs:
         run: |
           sudo apt-get update && \
           sudo apt-get install -y repo rsync
-      
-      - name: "📂 Create kernel directory"
-        working-directory: ${{ env.WORK_DIR}}
-        run: |
-          mkdir -p ${{ env.KERNEL_DIR }}
-          chmod -R 777 ${{ env.KERNEL_DIR }}
       
       - name: "📥 Initialize repo"
         working-directory: ${{ env.WORK_DIR}}
