@@ -229,6 +229,7 @@ jobs:
         run: |
           set -ex
           CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
+          sed -i 's/CONFIG_LTO_CLANG_FULL=y/CONFIG_LTO_CLANG_THIN=y/' "$CONFIG_FILE"
           CONFIGS=(
             "CONFIG_KALLSYMS=y"
           )
@@ -326,7 +327,7 @@ jobs:
           export KBUILD_BUILD_USER="belowzeroiq"
           export KBUILD_BUILD_HOST="GitHub"
           export KMI_ENFORCED=0
-          
+
           make ${args} \
             LLVM=1 \
             LTO=thin \
@@ -506,6 +507,14 @@ jobs:
           if [ -n "$LOCALVERSION" ]; then
             echo "CONFIG_LOCALVERSION=\"$LOCALVERSION\"" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           fi
+
+      - name: "⚙️ Add Additional configs"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex
+          CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
+          sed -i 's/CONFIG_LTO_CLANG_FULL=y/CONFIG_LTO_CLANG_THIN=y/' "$CONFIG_FILE"
+          echo "✅ configs added"
 
       - name: "🛠 Setup kernel Tweaks"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
