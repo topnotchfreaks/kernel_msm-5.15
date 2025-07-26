@@ -287,8 +287,8 @@ jobs:
           else
             if [ "$CLANG_MAJOR" -ge 21 ] && [ "${{ env.KERNEL_VERSION }}" == "5.15" ]; then
               log "Clang version 21 or higher and kernel 5.15 detected, applying compatibility patches"
-              PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-clang-21-compatibility.patch"
-              PATCH_FILE="0001-clang-21-compatibility.patch"
+              PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-treewide-clang-compilation-fixup.patch"
+              PATCH_FILE="0001-treewide-clang-compilation-fixup.patch"
               curl -L -o "$PATCH_FILE" "$PATCH_URL" || { log "Failed to download Clang 21+ compatibility patch"; exit 1; }
               if [ ! -f "$PATCH_FILE" ]; then
                 log "Patch file $PATCH_FILE does not exist after download"
@@ -672,8 +672,8 @@ jobs:
           else
             if [ "$CLANG_MAJOR" -ge 21 ] && [ "${{ env.KERNEL_VERSION }}" == "5.15" ]; then
               log "Clang version 21 or higher and kernel 5.15 detected, applying compatibility patches"
-              PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-clang-21-compatibility.patch"
-              PATCH_FILE="0001-clang-21-compatibility.patch"
+              PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-treewide-clang-compilation-fixup.patch"
+              PATCH_FILE="0001-treewide-clang-compilation-fixup.patch"
               curl -L -o "$PATCH_FILE" "$PATCH_URL" || { log "Failed to download Clang 21+ compatibility patch"; exit 1; }
               if [ ! -f "$PATCH_FILE" ]; then
                 log "Patch file $PATCH_FILE does not exist after download"
