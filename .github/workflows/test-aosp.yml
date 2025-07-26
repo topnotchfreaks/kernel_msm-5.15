@@ -22,8 +22,7 @@ jobs:
       - name: "🚀 Setup environment"
         run: |
           sudo apt-get update && \
-          sudo apt-get install -y git python3 curl repo zip flex bison libssl-dev \
-          build-essential dwarves libelf-dev gcc-aarch64-linux-gnu rsync
+          sudo apt-get install -y repo rsync
       
       - name: "📂 Create kernel directory"
         working-directory: ${{ env.WORK_DIR}}
@@ -36,7 +35,7 @@ jobs:
         run: |
           repo init -u https://android.googlesource.com/kernel/manifest -b $ANDROID_KERNEL_BRANCH --depth=1
           repo sync -c --no-tags --no-clone-bundle --prune --optimized-fetch -j8
-          
+
           rm -rf .repo
 
       - name: "🧩 Apply GKI Fixup Patch"
