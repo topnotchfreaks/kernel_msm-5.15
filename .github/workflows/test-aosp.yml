@@ -36,6 +36,8 @@ jobs:
         run: |
           repo init -u https://android.googlesource.com/kernel/manifest -b $ANDROID_KERNEL_BRANCH --depth=1
           repo sync -c --no-tags --no-clone-bundle --prune --optimized-fetch -j8
+          
+          rm -rf .repo
 
       - name: "🧩 Apply GKI Fixup Patch"
         working-directory: ${{ env.WORK_DIR}}/common
