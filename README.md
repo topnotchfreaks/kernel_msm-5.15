@@ -1,6 +1,3 @@
-# 🌐 Languages
-[Bahasa 🇮🇩](lang/README_id.md) | [日本語 🇯🇵](lang/README_jp.md) | [Portugués 🇧🇷](lang/README_pt.md) | [Espanhol 🇪🇸](lang/README_es.md)
-
 # 🔧 kernel_msm-5.15
 
 **Kernel source and builder for Redmi Note 12 4G NFC (topaz/tapas)**
