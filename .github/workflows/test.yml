@@ -57,6 +57,11 @@ on:
           - "ZyC Clang"
           - "Greenforce Clang"
           - "TopNotchFreaks Clang"
+      isClangPatched:
+        description: "Is Kernel already patched for 21+ compatibility?"
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   Set-repos:
@@ -78,14 +83,16 @@ jobs:
       kernelBranch: ${{ github.event.inputs.kernelBranch }}
       kernelDevice: ${{ github.event.inputs.kernelDevice }}
       DEFCONFIG_NAME: ${{ github.event.inputs.kernelDevice }}_defconfig
+      KERNEL_VERSION: ${{ contains(github.event.inputs.SUSFSBranch, '5.10') && '5.10' ||
+                         contains(github.event.inputs.SUSFSBranch, '5.15') && '5.15' ||
+                         contains(github.event.inputs.SUSFSBranch, '6.1') && '6.1' ||
+                         contains(github.event.inputs.SUSFSBranch, '6.6') && '6.6' || '5.15' }}
 
     steps:
       - name: "✨ Setup workspace"
         run: |
           mkdir -p $kernelDir
-
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
-
           sudo apt-get update
           sudo apt-get install -y build-essential bc curl flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
 
@@ -108,7 +115,6 @@ jobs:
               echo "Unsupported repository source: $PRIVATE_SOURCE"
               exit 1
             fi
-            
             git clone --recursive --branch ${{ github.event.inputs.kernelBranch }} \
               "$REPO_PREFIX$PRIVATE_SOURCE" ${{ env.kernelName }} --depth=1
           else
@@ -118,22 +124,16 @@ jobs:
 
       - name: "💫 Get Toolchains"
         run: |
-          set -e  # Exit on errors
-              
-          # Function to fetch latest release tar.gz URL from GitHub
+          set -e
           get_latest_github_release() {
             local repo_url="$1"
             latest_url=$(curl -sL "https://api.github.com/repos/$repo_url/releases/latest" | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | head -n 1)
-              
             if [[ -z "$latest_url" ]]; then
               echo "❌ Failed to fetch latest release from $repo_url!"
               exit 1
             fi
-              
-            printf "%s" "$latest_url"  # Use printf to output only the URL
+            printf "%s" "$latest_url"
           }
-              
-          # Determine the Clang URL dynamically
           case "${{ github.event.inputs.clangCompiler }}" in
             "ZyC Clang")
               clang_url=$(get_latest_github_release "ZyCromerZ/Clang")
@@ -149,18 +149,11 @@ jobs:
               exit 1
               ;;
           esac
-              
           echo "✅ Clang URL: $clang_url"
-              
-          # Create clang directory
           mkdir -p clang
-              
-          # Check if it's an archive or a Git repo
           if [[ "$clang_url" == *.tar.gz ]]; then
             echo "🚀 Downloading latest Clang from: $clang_url..."
             aria2c -x 16 -s 16 --file-allocation=none --dir=clang --out=clang.tar.gz "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
-              
-            # Extract Clang
             echo "📦 Extracting Clang..."
             tar -xf clang/clang.tar.gz -C clang || { echo "❌ Extraction failed!"; exit 1; }
             rm -f clang/clang.tar.gz
@@ -168,26 +161,20 @@ jobs:
             echo "🚀 Cloning Clang from $clang_url..."
             git clone --recursive --depth=1 "$clang_url" clang || { echo "❌ Cloning failed!"; exit 1; }
           fi
-              
-          # Find Clang's bin directory
           if [ -d "clang/bin" ]; then
             CLANG_PATH="${{ github.workspace }}/clang/bin"
           else
             CLANG_PATH=$(find clang -type d -name "bin" | head -n 1)
             CLANG_PATH="${{ github.workspace }}/${CLANG_PATH}"
           fi
-              
-          # Ensure Clang binary exists
           if [ ! -f "$CLANG_PATH/clang" ]; then
             echo "❌ Clang binary not found in $CLANG_PATH! Build might fail."
-            ls -R clang  # Debugging: Show extracted files
+            ls -R clang
             exit 1
           fi
-              
           echo "✅ Using Clang from $CLANG_PATH"
           echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
-          echo "$CLANG_PATH" >> $GITHUB_PATH  # Ensures path is updated
-              
+          echo "$CLANG_PATH" >> $GITHUB_PATH
           export PATH="$CLANG_PATH:$PATH"
           export CLANG_TRIPLE="aarch64-linux-gnu-"
           export CC=clang
@@ -197,9 +184,8 @@ jobs:
           export OBJCOPY="llvm-objcopy"
           export OBJDUMP="llvm-objdump"
           export STRIP="llvm-strip"
-              
           echo "⚙️ Using Clang version:"
-          clang --version || echo "❌ Clang not found in PATH!" 
+          clang --version || echo "❌ Clang not found in PATH!"
 
       - name: 📐 Setup swap 20G
         uses: pierotofy/set-swap-space@master
@@ -210,7 +196,7 @@ jobs:
         run: |
             echo "vm.swappiness=80" | sudo tee -a /etc/sysctl.conf
             sudo sysctl -p
-          
+
       - name: "😎 Set args for GKI kernels"
         id: generate-args
         working-directory: ./${{ env.kernelDir }}
@@ -238,62 +224,92 @@ jobs:
             echo "CONFIG_LOCALVERSION=\"$LOCALVERSION\"" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
           fi
 
+      - name: "⚙️ Add Additional configs"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -ex
+          CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
+          CONFIGS=(
+            "CONFIG_KALLSYMS=y"
+          )
+          printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
+          echo "✅ configs added"
+
       - name: "🛠 Setup kernel Tweaks"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
-
           log() {
             echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
           }
-
           apply_patch() {
             local patch="$1"
             local error_msg="$2"
-
             log "Attempting to apply patch: $(basename "$patch")"
-
             if ! patch -p1 < "$patch"; then
               log "Warning: Some hunks failed while applying patch $(basename "$patch")"
             fi
           }
           PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-fs-lineageos-disguise.patch"
           PATCH_FILE="0001-fs-lineageos-disguise.patch"
-
           log "Downloading patch from $PATCH_URL"
-
           curl -L -o "$PATCH_FILE" "$PATCH_URL"
-
           if [ ! -f "$PATCH_FILE" ]; then
             log "Patch file $PATCH_FILE does not exist after download"
             exit 1
           fi
-
           apply_patch "$PATCH_FILE"
-
           log "✅ Patch applied successfully"
 
-      - name: "📝 Append custom Makefile line"
+      - name: "📝 Update Makefile for Clang compatibility"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          if [ "${{ github.event.inputs.clangCompiler }}" == "TopNotchFreaks Clang" ]; then
-            echo "Using TopNotchFreaks Clang - no additional flags needed"
+          set -e
+          log() {
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+          }
+          CLANG_VERSION=$($CLANG_PATH/clang --version | head -n 1 | grep -oP '\d+\.\d+\.\d+' || echo "0.0.0")
+          CLANG_MAJOR=$(echo "$CLANG_VERSION" | cut -d. -f1)
+          log "Detected Clang version: $CLANG_VERSION"
+          log "Detected Kernel version: ${{ env.KERNEL_VERSION }}"
+          if [ "${{ github.event.inputs.isClangPatched }}" == "true" ]; then
+            log "Clang is already patched for 21+ compatibility, skipping patch application"
+            if [ "$CLANG_MAJOR" -ge 21 ]; then
+              echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe -Wno-strict-prototypes' >> Makefile
+              log "Added Clang 21+ compatibility flags to Makefile"
+            elif [ "${{ github.event.inputs.clangCompiler }}" != "TopNotchFreaks Clang" ]; then
+              echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
+              log "Added default compatibility flag for non-TopNotchFreaks Clang"
+            else
+              log "Using TopNotchFreaks Clang - no additional flags needed"
+            fi
           else
-            echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
-            echo "Custom Makefile line added successfully"
+            if [ "$CLANG_MAJOR" -ge 21 ] && [ "${{ env.KERNEL_VERSION }}" == "5.15" ]; then
+              log "Clang version 21 or higher and kernel 5.15 detected, applying compatibility patches"
+              PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-clang-21-compatibility.patch"
+              PATCH_FILE="0001-clang-21-compatibility.patch"
+              curl -L -o "$PATCH_FILE" "$PATCH_URL" || { log "Failed to download Clang 21+ compatibility patch"; exit 1; }
+              if [ ! -f "$PATCH_FILE" ]; then
+                log "Patch file $PATCH_FILE does not exist after download"
+                exit 1
+              fi
+              if ! patch -p1 < "$PATCH_FILE"; then
+                log "Warning: Some hunks failed while applying Clang 21+ compatibility patch"
+              fi
+              echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe -Wno-strict-prototypes' >> Makefile
+              log "Added Clang 21+ compatibility flags to Makefile"
+            elif [ "$CLANG_MAJOR" -ge 21 ]; then
+              log "Clang version 21 or higher detected but kernel version is not 5.15, skipping patch application"
+              echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe -Wno-strict-prototypes' >> Makefile
+              log "Added Clang 21+ compatibility flags to Makefile"
+            elif [ "${{ github.event.inputs.clangCompiler }}" != "TopNotchFreaks Clang" ]; then
+              echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
+              log "Added default compatibility flag for non-TopNotchFreaks Clang"
+            else
+              log "Using TopNotchFreaks Clang - no additional flags needed"
+            fi
           fi
-
-      - name: "⚙️ Add Additional configs"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          set -ex
-          CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
-
-          CONFIGS=(
-            "CONFIG_KALLSYMS=y"
-          )
-          printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
-          echo "✅ configs added"
+          log "Makefile updated successfully"
 
       - name: "👍 Make defconfig"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -309,8 +325,8 @@ jobs:
         run: |
           export KBUILD_BUILD_USER="belowzeroiq"
           export KBUILD_BUILD_HOST="GitHub"
-          export KMI_ENFORCED=0 # Disable KMI enforcement for testing
-        
+          export KMI_ENFORCED=0
+          
           make ${args} \
             LLVM=1 \
             LTO=thin \
@@ -320,7 +336,7 @@ jobs:
             OBJCOPY=llvm-objcopy \
             STRIP=llvm-strip \
             KMI_ENFORCED=0 \
-            -j10
+            -j8
 
       - name: "📦 Rename for packaging"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -359,9 +375,7 @@ jobs:
       - name: "✨ Setup workspace"
         run: |
           mkdir -p $kernelDir
-
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
-
           sudo apt-get update
           sudo apt-get install -y build-essential bc curl flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
 
@@ -384,7 +398,6 @@ jobs:
               echo "Unsupported repository source: $PRIVATE_SOURCE"
               exit 1
             fi
-            
             git clone --recursive --branch ${{ github.event.inputs.kernelBranch }} \
               "$REPO_PREFIX$PRIVATE_SOURCE" ${{ env.kernelName }} --depth=1
           else
@@ -394,22 +407,16 @@ jobs:
 
       - name: "💫 Get Toolchains"
         run: |
-          set -e  # Exit on errors
-
-          # Function to fetch latest release tar.gz URL from GitHub
+          set -e
           get_latest_github_release() {
             local repo_url="$1"
             latest_url=$(curl -sL "https://api.github.com/repos/$repo_url/releases/latest" | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | head -n 1)
-
             if [[ -z "$latest_url" ]]; then
               echo "❌ Failed to fetch latest release from $repo_url!"
               exit 1
             fi
-
-            printf "%s" "$latest_url"  # Use printf to output only the URL
+            printf "%s" "$latest_url"
           }
-
-          # Determine the Clang URL dynamically
           case "${{ github.event.inputs.clangCompiler }}" in
             "ZyC Clang")
               clang_url=$(get_latest_github_release "ZyCromerZ/Clang")
@@ -425,18 +432,11 @@ jobs:
               exit 1
               ;;
           esac
-
           echo "✅ Clang URL: $clang_url"
-
-          # Create clang directory
           mkdir -p clang
-
-          # Check if it's an archive or a Git repo
           if [[ "$clang_url" == *.tar.gz ]]; then
             echo "🚀 Downloading latest Clang from: $clang_url..."
             aria2c -x 16 -s 16 --file-allocation=none --dir=clang --out=clang.tar.gz "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
-
-            # Extract Clang
             echo "📦 Extracting Clang..."
             tar -xf clang/clang.tar.gz -C clang || { echo "❌ Extraction failed!"; exit 1; }
             rm -f clang/clang.tar.gz
@@ -444,26 +444,20 @@ jobs:
             echo "🚀 Cloning Clang from $clang_url..."
             git clone --recursive --depth=1 "$clang_url" clang || { echo "❌ Cloning failed!"; exit 1; }
           fi
-
-          # Find Clang's bin directory
           if [ -d "clang/bin" ]; then
             CLANG_PATH="${{ github.workspace }}/clang/bin"
           else
             CLANG_PATH=$(find clang -type d -name "bin" | head -n 1)
             CLANG_PATH="${{ github.workspace }}/${CLANG_PATH}"
           fi
-
-          # Ensure Clang binary exists
           if [ ! -f "$CLANG_PATH/clang" ]; then
             echo "❌ Clang binary not found in $CLANG_PATH! Build might fail."
-            ls -R clang  # Debugging: Show extracted files
+            ls -R clang
             exit 1
           fi
-
           echo "✅ Using Clang from $CLANG_PATH"
           echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
-          echo "$CLANG_PATH" >> $GITHUB_PATH  # Ensures path is updated
-
+          echo "$CLANG_PATH" >> $GITHUB_PATH
           export PATH="$CLANG_PATH:$PATH"
           export CLANG_TRIPLE="aarch64-linux-gnu-"
           export CC=clang
@@ -473,9 +467,8 @@ jobs:
           export OBJCOPY="llvm-objcopy"
           export OBJDUMP="llvm-objdump"
           export STRIP="llvm-strip"
-
           echo "⚙️ Using Clang version:"
-          clang --version || echo "❌ Clang not found in PATH!" 
+          clang --version || echo "❌ Clang not found in PATH!"
 
       - name: 📐 Setup swap 20G
         uses: pierotofy/set-swap-space@master
@@ -486,7 +479,7 @@ jobs:
         run: |
             echo "vm.swappiness=80" | sudo tee -a /etc/sysctl.conf
             sudo sysctl -p
-          
+
       - name: "😎 Set args for GKI kernels"
         id: generate-args
         working-directory: ./${{ env.kernelDir }}
@@ -518,35 +511,26 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
-
           log() {
             echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
           }
-
           apply_patch() {
             local patch="$1"
             local error_msg="$2"
-
             log "Attempting to apply patch: $(basename "$patch")"
-
             if ! patch -p1 < "$patch"; then
               log "Warning: Some hunks failed while applying patch $(basename "$patch")"
             fi
           }
           PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-fs-lineageos-disguise.patch"
           PATCH_FILE="0001-fs-lineageos-disguise.patch"
-
           log "Downloading patch from $PATCH_URL"
-
           curl -L -o "$PATCH_FILE" "$PATCH_URL"
-
           if [ ! -f "$PATCH_FILE" ]; then
             log "Patch file $PATCH_FILE does not exist after download"
             exit 1
           fi
-
           apply_patch "$PATCH_FILE"
-
           log "✅ Patch applied successfully"
 
       - name: "😋 Update KernelSU Version"
@@ -558,9 +542,7 @@ jobs:
           if [ -d "./drivers/kernelsu" ]; then
             rm -rf "./drivers/kernelsu"
           fi
-
           curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
-
           echo "✅ KernelSU updated successfully"
 
       - name: 😋 Setup SUSFS
@@ -572,54 +554,36 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
-          
           log() {
             echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
           }
-          
           log "Setting up SUSFS for Android $ANDROID_VERSION, Kernel $KERNEL_VERSION"
-          
-          # Get available patches from latest release
-          log "Fetching available patches..."
           PATCHES=$(curl -s "https://api.github.com/repos/topnotchfreaks/kernel_patches/releases/latest" | \
                     grep -o 'browser_download_url.*\.patch' | cut -d\" -f3)
-          
           if [ -z "$PATCHES" ]; then
             log "Error: No patches found"
             exit 1
           fi
-          
-          # Find best matching patch using actual naming convention
-          # Format: 0001-Implement-SUSFS-v1.5.8-for-Android-13-Kernel-5.15.patch
           SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
                            grep "Android-${ANDROID_VERSION}" | \
                            grep "Kernel-${KERNEL_VERSION}" | head -n 1)
-          
-          # Fallback to any SUSFS patch for same Android/Kernel version
           if [ -z "$SELECTED_PATCH" ]; then
             SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
                              grep "Android-${ANDROID_VERSION}" | head -n 1)
           fi
-          
-          # Final fallback to any SUSFS patch
           if [ -z "$SELECTED_PATCH" ]; then
             SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | head -n 1)
           fi
-          
           if [ -z "$SELECTED_PATCH" ]; then
             log "Error: No SUSFS patch found"
             exit 1
           fi
-          
-          # Download and apply patch
           log "Downloading patch: $SELECTED_PATCH"
           curl -L -o "susfs_patch.patch" "$SELECTED_PATCH"
-          
           log "Applying SUSFS patch..."
           if ! patch -p1 < "susfs_patch.patch"; then
             log "Warning: Some hunks failed while applying patch"
           fi
-          
           log "✅ SUSFS patch applied successfully"
 
       - name: "😋 Setup SUSFS Syscall hooks"
@@ -640,17 +604,13 @@ jobs:
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -ex
-
           log() {
             echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
           }
-
           CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
           mkdir -p "$(dirname "$CONFIG_FILE")"
-
           CONFIGS+=(
             "CONFIG_KSU=y"
-            "CONFIG_KSU_CMDLINE=y"
             "CONFIG_KSU_MANUAL_HOOK=y"
             "CONFIG_KPM=y"
             "CONFIG_KALLSYMS=y"
@@ -673,22 +633,60 @@ jobs:
             "CONFIG_TMPFS_XATTR=y"
             "CONFIG_TMPFS_POSIX_ACL=y"
           )
-
           printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
-
           log "✅ SUSFS configs added to $CONFIG_FILE"
           log "Current config contents:"
           cat "$CONFIG_FILE"
 
-      - name: "📝 Append custom Makefile line"
+      - name: "📝 Update Makefile for Clang compatibility"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          if [ "${{ github.event.inputs.clangCompiler }}" == "TopNotchFreaks Clang" ]; then
-            echo "Using TopNotchFreaks Clang - no additional flags needed"
+          set -e
+          log() {
+            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+          }
+          CLANG_VERSION=$($CLANG_PATH/clang --version | head -n 1 | grep -oP '\d+\.\d+\.\d+' || echo "0.0.0")
+          CLANG_MAJOR=$(echo "$CLANG_VERSION" | cut -d. -f1)
+          log "Detected Clang version: $CLANG_VERSION"
+          log "Detected Kernel version: ${{ env.KERNEL_VERSION }}"
+          if [ "${{ github.event.inputs.isClangPatched }}" == "true" ]; then
+            log "Clang is already patched for 21+ compatibility, skipping patch application"
+            if [ "$CLANG_MAJOR" -ge 21 ]; then
+              echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe -Wno-strict-prototypes' >> Makefile
+              log "Added Clang 21+ compatibility flags to Makefile"
+            elif [ "${{ github.event.inputs.clangCompiler }}" != "TopNotchFreaks Clang" ]; then
+              echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
+              log "Added default compatibility flag for non-TopNotchFreaks Clang"
+            else
+              log "Using TopNotchFreaks Clang - no additional flags needed"
+            fi
           else
-            echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
-            echo "Custom Makefile line added successfully"
+            if [ "$CLANG_MAJOR" -ge 21 ] && [ "${{ env.KERNEL_VERSION }}" == "5.15" ]; then
+              log "Clang version 21 or higher and kernel 5.15 detected, applying compatibility patches"
+              PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-clang-21-compatibility.patch"
+              PATCH_FILE="0001-clang-21-compatibility.patch"
+              curl -L -o "$PATCH_FILE" "$PATCH_URL" || { log "Failed to download Clang 21+ compatibility patch"; exit 1; }
+              if [ ! -f "$PATCH_FILE" ]; then
+                log "Patch file $PATCH_FILE does not exist after download"
+                exit 1
+              fi
+              if ! patch -p1 < "$PATCH_FILE"; then
+                log "Warning: Some hunks failed while applying Clang 21+ compatibility patch"
+              fi
+              echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe -Wno-strict-prototypes' >> Makefile
+              log "Added Clang 21+ compatibility flags to Makefile"
+            elif [ "$CLANG_MAJOR" -ge 21 ]; then
+              log "Clang version 21 or higher detected but kernel version is not 5.15, skipping patch application"
+              echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe -Wno-strict-prototypes' >> Makefile
+              log "Added Clang 21+ compatibility flags to Makefile"
+            elif [ "${{ github.event.inputs.clangCompiler }}" != "TopNotchFreaks Clang" ]; then
+              echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
+              log "Added default compatibility flag for non-TopNotchFreaks Clang"
+            else
+              log "Using TopNotchFreaks Clang - no additional flags needed"
+            fi
           fi
+          log "Makefile updated successfully"
 
       - name: "👍 Make defconfig"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -704,8 +702,8 @@ jobs:
         run: |
           export KBUILD_BUILD_USER="belowzeroiq"
           export KBUILD_BUILD_HOST="GitHub"
-          export KMI_ENFORCED=0 # Disable KMI enforcement for testing
-        
+          export KMI_ENFORCED=0
+
           make ${args} \
             LLVM=1 \
             LTO=thin \
@@ -715,7 +713,7 @@ jobs:
             OBJCOPY=llvm-objcopy \
             STRIP=llvm-strip \
             KMI_ENFORCED=0 \
-            -j10
+            -j8
 
       - name: "🩹 Patch Image with KPM"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
@@ -768,17 +766,13 @@ jobs:
       - name: "📦 Create ZIP file with both kernels"
         run: |
           set -e
-
           git clone --depth=1 https://github.com/topnotchfreaks/AnyKernel3 -b master AnyKernel3
-
           cp kernels/Image.noksu AnyKernel3/Image.noksu
           cp kernels/Image.ksu AnyKernel3/Image.ksu
-
           ZIP_NAME="Anykernel3_${{ env.kernelBranch }}_${{ env.BUILD_TIME }}.zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
-
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
           echo "ZIP_PATH=$(pwd)/$ZIP_NAME" >> $GITHUB_ENV
 
