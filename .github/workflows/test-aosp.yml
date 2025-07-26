@@ -34,7 +34,7 @@ jobs:
         working-directory: ${{ env.WORK_DIR}}
         run: |
           repo init -u https://android.googlesource.com/kernel/manifest -b $ANDROID_KERNEL_BRANCH --depth=1
-          repo sync -c --no-tags --no-clone-bundle --prune --optimized-fetch -j8
+          repo sync --optimized-fetch -j8
 
           rm -rf .repo
 
@@ -70,9 +70,9 @@ jobs:
           export KBUILD_BUILD_HOST="CI"
       
       - name: "🏗 Build kernel"
-        working-directory: ${{ env.WORK_DIR}}
+        working-directory: ${{ env.WORK_DIR }}
         run: |
-          LTO=full BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh -j8
+          LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh -j8
       
       - name: "📦 Package with AnyKernel3"
         working-directory: ${{ env.WORK_DIR}}
