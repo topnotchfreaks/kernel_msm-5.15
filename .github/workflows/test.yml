@@ -39,15 +39,6 @@ on:
         required: false
         type: boolean
         default: true
-      clangCompiler:
-        description: "Choose Clang compiler"
-        required: true
-        default: "TopNotchFreaks Clang"
-        type: choice
-        options:
-          - "ZyC Clang"
-          - "Greenforce Clang"
-          - "TopNotchFreaks Clang"
       ltoMode:
         description: "Choose LTO mode"
         required: true
@@ -85,16 +76,7 @@ jobs:
 
       - name: "💫 Get Clang Toolchain"
         run: |
-          get_latest_release() {
-            case "${{ github.event.inputs.clangCompiler }}" in
-              "ZyC Clang") echo "ZyCromerZ/Clang" ;;
-              "Greenforce Clang") echo "greenforce-project/greenforce_clang" ;;
-              "TopNotchFreaks Clang") echo "topnotchfreaks/clang" ;;
-            esac
-          }
-          
-          repo=$(get_latest_release)
-          clang_url=$(curl -sL "https://api.github.com/repos/$repo/releases/latest" | \
+          clang_url=$(curl -sL "https://api.github.com/repos/topnotchfreaks/clang/releases/latest" | \
                      grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | head -n 1)
           
           if [ -z "$clang_url" ]; then
