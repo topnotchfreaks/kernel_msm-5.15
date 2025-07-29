@@ -61,7 +61,7 @@ jobs:
           mkdir -p $kernelDir
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
           sudo apt-get update -qq
-          sudo apt-get install -y build-essential bc curl flex cpio git zip libelf-dev gcc-aarch64-linux-gnu libssl-dev clang lld llvm aria2
+          sudo apt-get install -y build-essential bc curl flex cpio git zip libelf-dev gcc-aarch64-linux-gnu libssl-dev clang lld llvm aria2 dwarves
 
       - name: "🌟 Clone kernel source"
         working-directory: ./${{ env.kernelDir }}
