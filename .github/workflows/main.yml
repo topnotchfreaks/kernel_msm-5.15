@@ -214,7 +214,7 @@ jobs:
         if: matrix.variant == 'ksu'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.OUT_DIR }}/arch/arm64/boot
         run: |
-          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kmp/patch_linux" -o patch
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
           chmod +x patch
           ./patch
           mv oImage Image
