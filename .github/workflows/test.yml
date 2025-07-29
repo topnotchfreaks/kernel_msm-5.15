@@ -24,11 +24,6 @@ on:
         required: true
         type: string
         default: "gki"
-      kernelSourceName:
-        description: "Kernel source name"
-        required: true
-        type: string
-        default: "kernel_msm-5.15"
       localVersion:
         description: "Custom localversion name (e.g., -mybuild)"
         required: false
@@ -56,8 +51,8 @@ jobs:
       matrix:
         variant: ${{ fromJSON(inputs.buildKSU == true && '["noksu", "ksu"]' || '["noksu"]') }}
     env:
-      kernelDir: ${{ github.event.inputs.kernelSourceName }}_${{ github.event.inputs.kernelDevice }}
-      kernelName: ${{ github.event.inputs.kernelSourceName }}
+      kernelDir: common_${{ github.event.inputs.kernelDevice }}
+      kernelName: common
       DEFCONFIG_NAME: ${{ github.event.inputs.kernelDevice }}_defconfig
 
     steps:
