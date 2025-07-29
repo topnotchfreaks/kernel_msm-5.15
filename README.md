@@ -1,133 +1,155 @@
-# 🔧 kernel_msm-5.15
+# 🔧 Kernel Build Workflow for Android Devices
 
-**Kernel source and builder for Redmi Note 12 4G NFC (topaz/tapas)**
+**A customizable GitHub Actions workflow for building Linux Kernel 5.15 GKI with KernelSU (KSU) and SUSFS support**
 
 ---
 
 ## ⚠️ **IMPORTANT: Device Compatibility Warning**
 
-> **🚨 This builder is ONLY for Redmi Note 12 4G NFC (topaz/tapas) devices!**
+> **🚨 This workflow is designed for building kernels for specific Android devices!**
 
-### Want to use this for other devices? You MUST change these 6 things:
+To use this workflow for a different device, you must update the following:
 
 | Component | What to Change |
 |-----------|---------------|
-| **🔗 Kernel Source** | Update source URL, branch, and device support |
-| **🔧 Kernel Tweaks** | Modify patches and device-specific tweaks |
-| **📝 Makefile** | Update compiler flags for your hardware |
-| **🔐 KSU/SUSFS** | Adapt root patches for your kernel version |
-| **📦 AnyKernel3** | Use your device's flashing template |
-| **⚙️ Device Config** | Update device name and defconfig settings |
+| **🔗 Kernel Source** | Update `kernelSourceURL` and `kernelBranch` to match your device's kernel source |
+| **🔧 Defconfig** | Set `kernelDevice` to your device's defconfig (e.g., `sm8450_defconfig`) |
+| **📝 Patches** | Modify or add device-specific patches for compatibility |
+| **🔐 KSU/SUSFS** | Ensure KernelSU and SUSFS patches align with your kernel and Android version |
+| **📦 AnyKernel3** | Use a device-specific AnyKernel3 template for flashing |
+| **⚙️ Build Configs** | Adjust compiler flags, LTO mode, and optimizations for your hardware |
 
-### ⚡ **Risks of improper usage:**
+### ⚡ **Risks of Improper Usage:**
 - ❌ Build failures
-- ❌ Broken kernel images  
+- ❌ Incompatible kernel images
 - ❌ Device bootloops
 - ❌ Potential hardware damage
 
-**💡 Always test thoroughly before widespread use!**
+**💡 Always test thoroughly on your device before widespread use!**
 
 ---
 
 ## 📋 **What is this?**
 
-A complete kernel building solution for **Redmi Note 12 4G NFC** devices (codenames: `topaz` and `tapas`).
-
-Built on **Linux Kernel 5.15** (msm-5.15 branch) for Qualcomm MSM platforms.
+A GitHub Actions workflow to build a **Linux Kernel 5.15** for Android devices, with optional support for **KernelSU (KSU)** and **SUSFS** for advanced root functionality. It produces flashable ZIP files using **AnyKernel3**.
 
 ## ✨ **Key Features**
 
 | Feature | Description |
 |---------|-------------|
-| 🐧 **Linux Kernel 5.15** | Latest stable kernel with security & performance improvements |
-| 🤖 **Automated Building** | GitHub Actions for cloud-based kernel compilation |
-| 🔐 **KSU + SUSFS** | Integrated KernelSU with SUSFS for advanced root features |
-| 📦 **Ready-to-Flash** | AnyKernel3 ZIP files for easy installation |
+| 🐧 **Linux Kernel 5.15** | Stable kernel optimized for Android 13 |
+| 🤖 **Automated Builds** | GitHub Actions automates kernel compilation |
+| 🔐 **KSU + SUSFS** | Optional KernelSU with SUSFS for root and advanced filesystem features |
+| ⚙️ **LTO Support** | Choose between Thin or Full LTO for performance optimization |
+| 📦 **Flashable ZIP** | Ready-to-flash AnyKernel3 ZIPs for recovery installation |
+| 📱 **Telegram Notifications** | Optional Telegram integration for build status updates |
 
 ---
 
-## 🚀 **How to Build (GitHub Actions)**
+## 🚀 **How to Use (GitHub Actions)**
 
-### Step 1: Fork the Repository
-Click the **"Fork"** button at the top-right of this page.
+### Step 1: Fork or Clone the Repository
+1. Fork this repository by clicking the **"Fork"** button, or clone it to your own repository.
+2. Ensure you have a GitHub account with Actions enabled.
 
-### Step 2: Trigger the Build
-1. Go to the **Actions** tab in your forked repository
-2. Select **"Build kernels"** workflow
-3. Click **"Run workflow"**
-4. Configure build options (optional):
-   - Kernel source URL
-   - Branch name
-   - Device type
-   - Compiler choice
+### Step 2: Configure Workflow Inputs
+1. Go to the **Actions** tab in your repository.
+2. Select the **"Test Build"** workflow.
+3. Click **"Run workflow"** and provide the following inputs:
 
-### Step 3: Wait for Build
-- Monitor progress in the Actions tab
-- Build usually takes 20-30 minutes
-- Both **NoKSU** and **KSU** kernels are built
+| Input | Description | Default Value |
+|-------|-------------|---------------|
+| `kernelSourceURL` | URL of the kernel source repository | `https://github.com/topnotchfreaks/kernel_msm-5.15` |
+| `kernelBranch` | Kernel source branch | `codelinaro` |
+| `kernelDevice` | Device defconfig (e.g., `gki_defconfig`) | `gki` |
+| `localVersion` | Custom kernel version suffix (e.g., `-mybuild`) | `""` (empty) |
+| `buildKSU` | Build KSU variant? | `true` (builds both KSU and non-KSU variants) |
+| `ltoMode` | LTO optimization mode | `Thin` (options: `Thin`, `Full`) |
 
-### Step 4: Download Results
-- Find artifacts in the workflow run summary
-- Download the **AnyKernel3 ZIP** file
-- Flash via recovery (TWRP/OrangeFox)
+### Step 3: Run the Workflow
+- Click **"Run workflow"** to start the build process.
+- The workflow builds:
+  - A **non-KSU** kernel variant.
+  - A **KSU** variant (if `buildKSU` is `true`).
+- Build time is typically 20-40 minutes, depending on the LTO mode and hardware.
 
-### 💡 **Build Options Available:**
-- **Clang Compiler**: ZyC, Greenforce, or TopNotchFreaks
-- **Custom Version**: Add your own version suffix
-- **Private Repos**: Support for private kernel sources
+### Step 4: Download Artifacts
+- After the build completes, go to the workflow run summary in the **Actions** tab.
+- Download the following artifacts:
+  - Individual kernel images (`kernel-noksu` and `kernel-ksu`).
+  - A flashable ZIP file (`Kernel-5.15_YYYY-MM-DD.zip`).
+- Flash the ZIP file via a custom recovery (e.g., TWRP or OrangeFox).
 
 ---
 
 ## 📱 **Telegram Integration (Optional)**
 
-Get build results sent directly to your Telegram!
+Receive build status notifications and artifacts directly on Telegram.
 
-### Quick Setup:
-1. **Create Bot**: Message [@BotFather](https://t.me/BotFather) → get `TELEGRAM_BOT_TOKEN`
-2. **Add Secrets**: Go to your repo → Settings → Secrets and variables → Actions
-   - Add `TELEGRAM_BOT_TOKEN` (your bot token)
-   - Add `TELEGRAM_USER_ID` (your Telegram user ID)
-3. **Done!** 🎉 Builds will auto-send to your chat
-
-### Example Integration:
-```bash
-curl -F document=@kernel.zip \
-     -F caption="✅ Build complete!" \
-     -F chat_id=YOUR_CHAT_ID \
-     "https://api.telegram.org/botYOUR_BOT_TOKEN/sendDocument"
-```
-
----
-
-## 📄 **License Information**
-
-| Component | License |
-|-----------|---------|
-| **Kernel Source Code** | GNU General Public License v2.0 ([LICENSE](LICENSE)) |
-| **Builder Scripts & Actions** | GNU General Public License v3.0 ([builder/LICENSE](builder/LICENSE)) |
+### Setup Instructions:
+1. **Create a Telegram Bot**:
+   - Message [@BotFather](https://t.me/BotFather) on Telegram.
+   - Follow the instructions to create a bot and obtain a `TELEGRAM_BOT_TOKEN`.
+2. **Get Your Chat ID**:
+   - Message your bot or a service like [@GetIDsBot](https://t.me/GetIDsBot) to get your `TELEGRAM_USER_ID`.
+3. **Add Secrets to GitHub**:
+   - Go to your repository → **Settings** → **Secrets and variables** → **Actions**.
+   - Add two secrets:
+     - `TELEGRAM_BOT_TOKEN`: Your bot token from BotFather.
+     - `TELEGRAM_USER_ID`: Your Telegram chat ID.
+4. **Enable Notifications**:
+   - The workflow will automatically send build results (success or failure) to your Telegram chat.
 
 ---
 
-## 🤝 **Contributors & Credits**
+## 🛠 **Workflow Details**
+
+### Build Process
+1. **Setup Workspace**: Installs dependencies (Clang, LLVM, etc.) and sets up the build environment.
+2. **Clone Kernel Source**: Clones the specified kernel source and branch.
+3. **Download Clang**: Fetches the latest Clang toolchain from `topnotchfreaks/clang`.
+4. **Configure Environment**: Sets up swap space based on LTO mode (`8G` for Thin, `20G` for Full).
+5. **Apply Patches**:
+   - LineageOS disguise patch.
+   - Clang 21+ compatibility patch (if needed).
+   - KernelSU and SUSFS patches (for KSU variant).
+6. **Build Kernel**:
+   - Configures the kernel with the specified defconfig.
+   - Applies LTO mode (`Thin` or `Full`) and custom `localVersion`.
+   - Compiles the kernel using Clang and LLVM.
+7. **Package Output**:
+   - Creates a flashable ZIP using AnyKernel3.
+   - Uploads kernel images and the ZIP as artifacts.
+8. **Telegram Notification**: Sends build results to Telegram (if configured).
+
+### Supported Configurations
+- **Kernel Version**: 5.15
+- **Android Version**: 13
+- **Compiler**: Clang (fetched from `topnotchfreaks/clang`)
+- **LTO Modes**: Thin (faster builds) or Full (better optimization)
+- **Variants**: Non-KSU and KSU (with SUSFS support)
+
+---
+
+## 🤝 **Credits**
 
 Special thanks to these amazing developers:
 
 - **@PhamtomK12** – Original Kernel Builder Owner
 - **@ssocozy** - Project Contributor
 - **@NVG-064** - Project Contributor
-- **@ShirkNeko** – SUSFS Integration
-- **@thewildjames** – Kernel patches
+- **@ShirkNeko** – SUSFS Integration & susfs4ksu patches
 
 ---
 
 ## 🔧 **Contributing**
 
-We welcome contributions! Here's how you can help:
+We welcome contributions to improve this workflow! Here's how you can help:
 
-1. **🐛 Report Issues**: Found a bug? Open an issue!
-2. **💡 Suggest Features**: Have an idea? Let us know!
-3. **🔧 Submit PRs**: Code improvements welcome!
-4. **📱 Device Support**: Help add support for more devices!
+1. **Report Issues**: Open an issue for bugs or build failures.
+2. **Suggest Features**: Propose new features or optimizations.
+3. **Submit Pull Requests**: Contribute code improvements or new patches.
+4. **Add Device Support**: Help adapt the workflow for other devices.
 
 ---
 
@@ -135,15 +157,16 @@ We welcome contributions! Here's how you can help:
 
 > **🚨 For Advanced Users Only**
 > 
-> - Flashing custom kernels may **void your warranty**
-> - Always **backup your data** before flashing
-> - **Test thoroughly** before daily use
-> - We are **not responsible** for any device damage
+> - Flashing custom kernels may **void your device warranty**.
+> - Always **backup your data** before flashing.
+> - **Test thoroughly** on your device to avoid bootloops or hardware issues.
+> - The contributors are **not responsible** for any device damage.
 
 ---
 
 ## 📞 **Need Help?**
 
-- **🐛 Issues**: Open an issue on this repository
+- **Issues**: Open an issue on this repository.
+- **Community**: Join relevant Telegram groups or X communities for kernel development support.
 
 **Happy building! 🎉**
