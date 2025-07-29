@@ -14,11 +14,6 @@ on:
         required: true
         type: string
         default: "https://github.com/topnotchfreaks/kernel_msm-5.15"
-      kernelPrivateSource:
-        description: "Is private source?"
-        required: false
-        type: boolean
-        default: false
       kernelBranch:
         description: "Kernel branch"
         required: false
@@ -82,26 +77,11 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y build-essential bc curl flex cpio git zip libelf-dev gcc-aarch64-linux-gnu libssl-dev clang lld llvm aria2
 
-      - name: "🌟 Clone kernel source => (${{ env.kernelName }})"
+      - name: "🌟 Clone kernel source"
         working-directory: ./${{ env.kernelDir }}
-        env:
-          PRIVATE_SOURCE: ${{ github.event.inputs.kernelSourceURL }}
         run: |
-          if [ "${{ github.event.inputs.kernelPrivateSource }}" == "true" ]; then
-            if [[ "$PRIVATE_SOURCE" == *"github.com"* ]]; then
-              REPO_URL=$(echo "$PRIVATE_SOURCE" | sed "s|https://github.com/|https://${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/|")
-            elif [[ "$PRIVATE_SOURCE" == *"gitlab.com"* ]]; then
-              REPO_URL=$(echo "$PRIVATE_SOURCE" | sed "s|https://gitlab.com/|https://${{ secrets.PRIVATE_REPO_TOKEN }}@gitlab.com/|")
-            else
-              echo "Unsupported repository source"
-              exit 1
-            fi
-            git clone --quiet --recursive --branch ${{ github.event.inputs.kernelBranch }} \
-              "$REPO_URL" ${{ env.kernelName }} --depth=1
-          else
-            git clone --quiet --recursive --branch ${{ github.event.inputs.kernelBranch }} \
-              ${{ github.event.inputs.kernelSourceURL }} ${{ env.kernelName }} --depth=1
-          fi
+          git clone --recursive --branch ${{ github.event.inputs.kernelBranch }} \
+            ${{ github.event.inputs.kernelSourceURL }} ${{ env.kernelName }} --depth=1
 
       - name: "💫 Get Clang Toolchain"
         run: |
