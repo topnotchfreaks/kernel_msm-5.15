@@ -28,9 +28,17 @@ jobs:
         working-directory: ${{ env.WORK_DIR}}
         run: |
           repo init -u https://android.googlesource.com/kernel/manifest -b $ANDROID_KERNEL_BRANCH --depth=1
-          repo sync --optimized-fetch -j8
+          repo sync --optimized-fetch --prune -j8
 
           rm -rf .repo
+          rm -rf prebuilts/clang/host/linux-x86
+
+          git clone --depth=1 --recursive https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b main prebuilts/clang/host/linux-x86
+
+          sed -i \
+            -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
+            -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' \
+            common/build.config.constants
 
       - name: "🧩 Apply GKI Fixup Patches"
         if: contains(env.ANDROID_KERNEL_BRANCH, '5.15')
