@@ -1,4 +1,9 @@
 name: "AOSP Kernel Build"
+
+env:
+  DEVICE: "GKI"
+  KERNEL_BRANCH: ${{ github.event.inputs.kernelBranch }}
+
 on:
   workflow_dispatch:
     inputs:
@@ -86,7 +91,8 @@ jobs:
         run: |
           echo "Downloading AnyKernel3..."
           git clone --depth=1 https://github.com/topnotchfreaks/AnyKernel3.git -b master
-          cp $OUT_DIR/arch/arm64/boot/Image AnyKernel3/Image
+
+          cp $OUT_DIR/dist/Image AnyKernel3/Image
           cd AnyKernel3
           zip -r9 "../kernel-${DEVICE}-${ANDROID_KERNEL_BRANCH}-$(date +%Y%m%d).zip" * -x .git/*
       
