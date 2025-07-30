@@ -35,6 +35,12 @@ jobs:
 
           git clone --depth=1 --recursive https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b main prebuilts/clang/host/linux-x86
 
+          rm -rf prebuilts/clang/host/linux-x86/clang-3289846
+          rm -rf prebuilts/clang/host/linux-x86/clang-r522817
+          rm -rf prebuilts/clang/host/linux-x86/clang-r530567
+          rm -rf prebuilts/clang/host/linux-x86/clang-r536225
+          rm -rf prebuilts/clang/host/linux-x86/clang-stable
+
           sed -i \
             -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
             -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' \
@@ -65,16 +71,14 @@ jobs:
           done
 
           log "✅ Patch processing complete"
-      
-      - name: "🔧 Set up build environment"
-        working-directory: ${{ env.WORK_DIR}}
-        run: |
-          export KBUILD_BUILD_USER="GitHub"
-          export KBUILD_BUILD_HOST="CI"
-      
+         
       - name: "🏗 Build kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
+          export KBUILD_BUILD_USER="GitHub"
+          export KBUILD_BUILD_HOST="CI"
+          export SOURCE_DATE_EPOCH=$(date +%s)
+
           LTO=thin BUILD_CONFIG=common/build.config.gki.aarch64 build/build.sh -j8
       
       - name: "📦 Package with AnyKernel3"
