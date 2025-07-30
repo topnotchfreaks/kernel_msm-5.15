@@ -9,42 +9,58 @@ on:
   workflow_dispatch:
 
 jobs:
-  Set-repos:
-    name: "🐂 Parse repository"
+  build-kernels:
+    name: "🐎 Build YASK ${{ matrix.kernel.name }} kernel"
     runs-on: ubuntu-latest
-    outputs:
-      repos: ${{ steps.generate-matrix.outputs.repos }}
-    steps:
-      - name: "😄 Checkout"
-        uses: actions/checkout@v4
+    strategy:
+      fail-fast: false
+      matrix:
+        kernel:
+          - name: "GKI"
+            dir: "common_gki"
+            repo_name: "common"
+            repo_url: "https://android.googlesource.com/kernel/common"
+            branch: "android13-5.15-lts"
+            defconfig: "gki_defconfig"
+            local_version: "-YASK/GKI"
+            output_name: "Image.gki"
+            kpm_patch_url: "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux"
+            extra_patches:
+              - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Revert-bpf-fix-precision-backtracking-instruction-it.patch"
+          - name: "CLO"
+            dir: "common_clo"
+            repo_name: "clo"
+            repo_url: "https://git.codelinaro.org/clo/la/kernel/msm-5.15"
+            branch: "kernel.lnx.5.15.r16-rel"
+            defconfig: "gki_defconfig"
+            local_version: "-YASK/CLO"
+            output_name: "Image.clo"
+            kpm_patch_url: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux"
+            extra_patches: []
 
-  Build-GKI:
-    name: "🐎 Build YASK GKI kernel"
-    runs-on: ubuntu-latest
     env:
-      kernelDir: common_gki
-      kernelName: common
-      kernelRepo: https://android.googlesource.com/kernel/common
-      kernelBranch: android13-5.15-lts
-      kernelDevice: gki
-      DEFCONFIG_NAME: gki_defconfig
-      OUT_DIR: "out"
-      localVersion: "-YASK/GKI"
+      KERNEL_DIR: ${{ matrix.kernel.dir }}
+      KERNEL_NAME: ${{ matrix.kernel.repo_name }}
+      KERNEL_REPO: ${{ matrix.kernel.repo_url }}
+      KERNEL_BRANCH: ${{ matrix.kernel.branch }}
+      DEFCONFIG_NAME: ${{ matrix.kernel.defconfig }}
+      LOCAL_VERSION: ${{ matrix.kernel.local_version }}
+      OUTPUT_NAME: ${{ matrix.kernel.output_name }}
 
     steps:
       - name: "✨ Setup workspace"
         run: |
-          mkdir -p $kernelDir
+          mkdir -p ${{ env.KERNEL_DIR }}
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
           sudo apt-get update
-          sudo apt-get install -y build-essential bc curl flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
+          sudo apt-get install -y build-essential bc curl flex cpio rsync git zip dwarves \
+            libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev aria2
 
-      - name: "🌟 Clone kernel source => (${{ env.kernelRepo }})"
-        working-directory: ./${{ env.kernelDir }}
+      - name: "🌟 Clone kernel source"
+        working-directory: ./${{ env.KERNEL_DIR }}
         run: |
-          set -x
-          git clone --recursive --branch ${{ env.kernelBranch }} \
-            ${{ env.kernelRepo }} ${{ env.kernelName }} --depth=1
+          git clone --recursive --branch ${{ env.KERNEL_BRANCH }} \
+            ${{ env.KERNEL_REPO }} ${{ env.KERNEL_NAME }} --depth=1
 
       - name: "💫 Get Toolchains"
         run: |
@@ -52,13 +68,13 @@ jobs:
           
           get_latest_github_release() {
             local repo_url="$1"
-            latest_url=$(curl -sL "https://api.github.com/repos/$repo_url/releases/latest" | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | head -n 1)
+            latest_url=$(curl -sL "https://api.github.com/repos/$repo_url/releases/latest" | \
+              grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | head -n 1)
 
             if [[ -z "$latest_url" ]]; then
               echo "❌ Failed to fetch latest release from $repo_url!"
               exit 1
             fi
-
             printf "%s" "$latest_url"
           }
 
@@ -68,15 +84,16 @@ jobs:
 
           if [[ "$clang_url" == *.tar.gz ]]; then
             echo "🚀 Downloading latest Clang..."
-            aria2c -x 16 -s 16 --file-allocation=none --dir=clang --out=clang.tar.gz "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
+            aria2c -x 16 -s 16 --file-allocation=none --dir=clang --out=clang.tar.gz "$clang_url"
             echo "📦 Extracting Clang..."
-            tar -xf clang/clang.tar.gz -C clang || { echo "❌ Extraction failed!"; exit 1; }
+            tar -xf clang/clang.tar.gz -C clang
             rm -f clang/clang.tar.gz
           else
             echo "🚀 Cloning Clang..."
-            git clone --recursive --depth=1 "$clang_url" clang || { echo "❌ Cloning failed!"; exit 1; }
+            git clone --recursive --depth=1 "$clang_url" clang
           fi
 
+          # Find clang binary path
           if [ -d "clang/bin" ]; then
             CLANG_PATH="${{ github.workspace }}/clang/bin"
           else
@@ -94,87 +111,94 @@ jobs:
           echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
           echo "$CLANG_PATH" >> $GITHUB_PATH
 
-      - name: 📐 Setup swap 20G
-        uses: pierotofy/set-swap-space@master
-        with:
-            swap-size-gb: 20
-
-      - name: 📐 Tune Swap
+      - name: "📐 Setup swap 8G and tune settings"
         run: |
-            echo "vm.swappiness=80" | sudo tee -a /etc/sysctl.conf
-            sudo sysctl -p
+          # Create swap file
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
           
-      - name: "🛠 Set localversion name in defconfig"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        env:
-          LOCALVERSION: ${{ env.localVersion }}
-        run: |
-          if [ -n "$LOCALVERSION" ]; then
-            echo "CONFIG_LOCALVERSION=\"$LOCALVERSION\"" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          fi      
+          # Tune swap settings
+          echo "vm.swappiness=60" | sudo tee -a /etc/sysctl.conf
+          sudo sysctl -p
+          
+          # Verify swap is active
+          swapon --show
 
-      - name: "🧩 Apply Kernel Fixup Patch"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+      - name: "🛠 Configure kernel"
+        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
         run: |
-          set -ex
-          log() {
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
-          }
-          apply_patch() {
-            local patch="$1"
-            log "Applying patch: $(basename "$patch")"
-            if ! patch -p1 < "$patch"; then
-              log "Warning: Some hunks failed in $(basename "$patch")"
-            fi
-          }
-          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-gki-fixup.patch"
-          PATCH_FILE="0001-gki-fixup.patch"
-          curl -L -o "$PATCH_FILE" "$PATCH_URL"
-          [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
-          apply_patch "$PATCH_FILE"
-          log "✅ External patch applied"
+          # Set localversion
+          if [ -n "${{ env.LOCAL_VERSION }}" ]; then
+            echo "CONFIG_LOCALVERSION=\"${{ env.LOCAL_VERSION }}\"" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          fi
 
-      - name: "🛠 Setup kernel Tweaks"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+      - name: "🧩 Apply kernel patches"
+        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
         run: |
           set -e
+          
           log() {
             echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
           }
+          
           apply_patch() {
-            local patch="$1"
-            log "Applying patch: $(basename "$patch")"
-            if ! patch -p1 < "$patch"; then
-              log "Warning: Some hunks failed in $(basename "$patch")"
+            local patch_url="$1"
+            local patch_file=$(basename "$patch_url")
+            
+            log "Downloading and applying patch: $patch_file"
+            curl -L -o "$patch_file" "$patch_url"
+            
+            if [ -f "$patch_file" ]; then
+              if ! patch -p1 < "$patch_file"; then
+                log "Warning: Some hunks failed in $patch_file"
+              fi
+              rm "$patch_file"
+            else
+              log "Error: Failed to download $patch_file"
+              exit 1
             fi
           }
-          PATCH_URLS=(
+
+          # Apply common patches
+          COMMON_PATCHES=(
+            "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-gki-fixup.patch"
             "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-fs-lineageos-disguise.patch"
-            "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Revert-bpf-fix-precision-backtracking-instruction-it.patch"
           )
-          for PATCH_URL in "${PATCH_URLS[@]}"; do
-            PATCH_FILE=$(basename "$PATCH_URL")
-            curl -L -o "$PATCH_FILE" "$PATCH_URL"
-            [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
-            apply_patch "$PATCH_FILE"
+
+          for patch in "${COMMON_PATCHES[@]}"; do
+            apply_patch "$patch"
           done
+
+          # Apply kernel-specific patches
+          EXTRA_PATCHES='${{ toJSON(matrix.kernel.extra_patches) }}'
+          if [ "$EXTRA_PATCHES" != "[]" ] && [ "$EXTRA_PATCHES" != "null" ]; then
+            echo "$EXTRA_PATCHES" | jq -r '.[]' | while read -r patch; do
+              if [ -n "$patch" ]; then
+                apply_patch "$patch"
+              fi
+            done
+          fi
+
           log "✅ All patches applied"
 
-      - name: "😋 Update KernelSU Version"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+      - name: "😋 Setup KernelSU"
+        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
         run: |
+          # Clean existing KernelSU
           [ -d "./KernelSU" ] && rm -rf "./KernelSU"
           [ -d "./drivers/kernelsu" ] && rm -rf "./drivers/kernelsu"
+          
+          # Install KernelSU
           curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
           echo "✅ KernelSU updated"
 
-      - name: 😋 Setup SUSFS
+      - name: "😋 Setup SUSFS"
+        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
         env:
-          ARCH: ${{ steps.generate-args.outputs.ARCH }}
           ANDROID_VERSION: "13"
           KERNEL_VERSION: "5.15"
-          SUSFS_BRANCH: "gki-android13-5.15"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           set -e
           
@@ -185,7 +209,6 @@ jobs:
           log "Setting up SUSFS for Android $ANDROID_VERSION, Kernel $KERNEL_VERSION"
           
           # Get available patches from latest release
-          log "Fetching available patches..."
           PATCHES=$(curl -s "https://api.github.com/repos/topnotchfreaks/kernel_patches/releases/latest" | \
                     grep -o 'browser_download_url.*\.patch' | cut -d\" -f3)
           
@@ -194,57 +217,63 @@ jobs:
             exit 1
           fi
           
-          # Find best matching patch using actual naming convention
-          # Format: 0001-Implement-SUSFS-v1.5.8-for-Android-13-Kernel-5.15.patch
+          # Find best matching SUSFS patch
           SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
                            grep "Android-${ANDROID_VERSION}" | \
                            grep "Kernel-${KERNEL_VERSION}" | head -n 1)
           
-          # Fallback to any SUSFS patch for same Android/Kernel version
-          if [ -z "$SELECTED_PATCH" ]; then
-            SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
-                             grep "Android-${ANDROID_VERSION}" | head -n 1)
-          fi
-          
-          # Final fallback to any SUSFS patch
-          if [ -z "$SELECTED_PATCH" ]; then
-            SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | head -n 1)
-          fi
+          # Fallbacks
+          [ -z "$SELECTED_PATCH" ] && SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
+                                                        grep "Android-${ANDROID_VERSION}" | head -n 1)
+          [ -z "$SELECTED_PATCH" ] && SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | head -n 1)
           
           if [ -z "$SELECTED_PATCH" ]; then
             log "Error: No SUSFS patch found"
             exit 1
           fi
           
-          # Download and apply patch
+          # Download and apply SUSFS patch
           log "Downloading patch: $SELECTED_PATCH"
           curl -L -o "susfs_patch.patch" "$SELECTED_PATCH"
           
           log "Applying SUSFS patch..."
           if ! patch -p1 < "susfs_patch.patch"; then
-            log "Warning: Some hunks failed while applying patch"
+            log "Warning: Some hunks failed while applying SUSFS patch"
           fi
           
           log "✅ SUSFS patch applied successfully"
-      
-      - name: "😋 Setup SUSFS Syscall hooks"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+
+      - name: "😋 Setup SUSFS syscall hooks"
+        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
         run: |
-          set -ex
+          set -e
+          
           log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
+          
           PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-SUSFS-syscall-hooks.patch"
           PATCH_FILE="0001-SUSFS-syscall-hooks.patch"
+          
           curl -L -o "$PATCH_FILE" "$PATCH_URL"
           [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
-          patch -p1 < "$PATCH_FILE" || log "Warning: Some hunks failed"
+          
+          if ! patch -p1 < "$PATCH_FILE"; then
+            log "Warning: Some hunks failed in syscall hooks patch"
+          fi
+          
           log "✅ Syscall hooks patch applied"
 
-      - name: "⚙️ Add SUSFS configs"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+      - name: "⚙️ Add kernel configs"
+        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
         run: |
-          set -ex
-          CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
-          CONFIGS=(
+          set -e
+          
+          CONFIG_FILE="./arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          
+          # Replace full LTO with thin LTO
+          sed -i 's/CONFIG_LTO_CLANG_FULL=y/CONFIG_LTO_CLANG_THIN=y/' "$CONFIG_FILE"
+          
+          # SUSFS configs
+          SUSFS_CONFIGS=(
             "CONFIG_KSU=y"
             "CONFIG_KSU_MANUAL_HOOK=y"
             "CONFIG_KPM=y"
@@ -268,19 +297,9 @@ jobs:
             "CONFIG_TMPFS_XATTR=y"
             "CONFIG_TMPFS_POSIX_ACL=y"
           )
-          printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
-          echo "✅ SUSFS configs added"
-
-      - name: "⚙️ Add Additional configs"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          set -ex
-          CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
-
-          # Replace full LTO with thin LTO
-          sed -i 's/CONFIG_LTO_CLANG_FULL=y/CONFIG_LTO_CLANG_THIN=y/' "$CONFIG_FILE"
-
-          CONFIGS=(
+          
+          # Performance configs
+          PERF_CONFIGS=(
             "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"
             "CONFIG_ZRAM_DEF_COMP_LZ4=y"
             "CONFIG_TCP_CONG_ADVANCED=y"
@@ -290,430 +309,85 @@ jobs:
             "CONFIG_TCP_CONG_BBR=y"
             "CONFIG_DEFAULT_WESTWOOD=y"
           )
-          printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
-          echo "✅ configs added"
+          
+          # Apply all configs
+          printf "%s\n" "${SUSFS_CONFIGS[@]}" "${PERF_CONFIGS[@]}" >> "$CONFIG_FILE"
+          echo "✅ All configs added"
 
-      - name: "😎 Set args for GKI kernels"
+      - name: "😎 Set build arguments"
         id: generate-args
-        working-directory: ./${{ env.kernelDir }}
-        env:
-            params: "${{ toJSON(matrix.repos.params) }}"
+        working-directory: ./${{ env.KERNEL_DIR }}
         run: |
-            args="-j$(nproc --all)"
-            if [ -n "${{ env.OUT_DIR }}" ]; then
-              mkdir -p $(pwd)/${{ env.OUT_DIR }}
-              args="$args O=$(pwd)/${{ env.OUT_DIR }}"
-            fi
-            args="$args ARCH=arm64 LLVM=1 LTO=thin"
-            args="$args CROSS_COMPILE=aarch64-linux-gnu-"
-            args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
-            args="$args AR=llvm-ar"
-            args="$args CC=clang"
-            echo "args=$args" >> $GITHUB_OUTPUT
+          args="-j$(nproc --all)"
+          
+          if [ -n "${{ env.OUT_DIR }}" ]; then
+            mkdir -p "$(pwd)/${{ env.OUT_DIR }}"
+            args="$args O=$(pwd)/${{ env.OUT_DIR }}"
+          fi
+          
+          args="$args ARCH=arm64 LLVM=1 LTO=thin"
+          args="$args CROSS_COMPILE=aarch64-linux-gnu-"
+          args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
+          args="$args AR=llvm-ar CC=clang"
+          
+          echo "args=$args" >> $GITHUB_OUTPUT
 
       - name: "👍 Make defconfig"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        env:
-          args: ${{ steps.generate-args.outputs.args }}
+        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
         run: |
-          make ${{ env.args }} ${{ env.DEFCONFIG_NAME }}
+          make ${{ steps.generate-args.outputs.args }} ${{ env.DEFCONFIG_NAME }}
 
       - name: "🎶 Build kernel"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        env:
-          args: ${{ steps.generate-args.outputs.args }}
+        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
         run: |
           export KBUILD_BUILD_USER="Automated"
           export KBUILD_BUILD_HOST="GitHub"
 
-          make ${{ env.args }} \
-            LLVM=1 \
-            LTO=thin \
-            CC=clang \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            OBJCOPY="llvm-objcopy" \
-            STRIP="llvm-strip" \
-            -j$(nproc --all)
+          make ${{ steps.generate-args.outputs.args }} \
+            LLVM=1 LTO=thin CC=clang AR=llvm-ar \
+            NM=llvm-nm OBJCOPY=llvm-objcopy STRIP=llvm-strip
 
-      - name: "🩹 Patch Image with KPM"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+      - name: "🩹 Patch image with KPM"
+        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
         run: |
           cd "../${{ env.OUT_DIR }}/arch/arm64/boot/"
-          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
-          chmod 777 patch
+          
+          curl -LSs "${{ matrix.kernel.kpm_patch_url }}" -o patch
+          chmod +x patch
           ./patch
-          rm -rf Image
-          mv oImage Image.gki
+          
+          rm -f Image
+          mv oImage "${{ env.OUTPUT_NAME }}"
 
-      - name: "📤 Upload GKI kernel artifact"
+      - name: "📤 Upload kernel artifact"
         uses: actions/upload-artifact@v4
         with:
-          name: gki-kernel
-          path: ${{ env.kernelDir }}/${{ env.OUT_DIR }}/arch/arm64/boot/Image.gki
+          name: ${{ matrix.kernel.name }}-kernel
+          path: ${{ env.KERNEL_DIR }}/${{ env.OUT_DIR }}/arch/arm64/boot/${{ env.OUTPUT_NAME }}
           retention-days: 1
 
-  Build-CLO:
-    name: "🐎 Build YASK CLO kernel"
-    runs-on: ubuntu-latest
-    env:
-      kernelDir: common_clo
-      kernelName: clo
-      kernelRepo: https://git.codelinaro.org/clo/la/kernel/msm-5.15
-      kernelBranch: kernel.lnx.5.15.r16-rel
-      kernelDevice: gki
-      DEFCONFIG_NAME: gki_defconfig
-      OUT_DIR: "out"
-      localVersion: "-YASK/CLO"
-
-    steps:
-      - name: "✨ Setup workspace"
-        run: |
-          mkdir -p $kernelDir
-          echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
-          sudo apt-get update
-          sudo apt-get install -y build-essential bc curl flex cpio rsync git zip dwarves libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev
-
-      - name: "🌟 Clone kernel source => (${{ env.kernelRepo }})"
-        working-directory: ./${{ env.kernelDir }}
-        run: |
-          set -x
-          git clone --recursive --branch ${{ env.kernelBranch }} \
-            ${{ env.kernelRepo }} ${{ env.kernelName }} --depth=1
-
-      - name: "💫 Get Toolchains"
-        run: |
-          set -e
-          
-          get_latest_github_release() {
-            local repo_url="$1"
-            latest_url=$(curl -sL "https://api.github.com/repos/$repo_url/releases/latest" | grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | head -n 1)
-
-            if [[ -z "$latest_url" ]]; then
-              echo "❌ Failed to fetch latest release from $repo_url!"
-              exit 1
-            fi
-
-            printf "%s" "$latest_url"
-          }
-
-          clang_url=$(get_latest_github_release "topnotchfreaks/clang")
-          echo "✅ Clang URL: $clang_url"
-          mkdir -p clang
-
-          if [[ "$clang_url" == *.tar.gz ]]; then
-            echo "🚀 Downloading latest Clang..."
-            aria2c -x 16 -s 16 --file-allocation=none --dir=clang --out=clang.tar.gz "$clang_url" || { echo "❌ Failed to download Clang!"; exit 1; }
-            echo "📦 Extracting Clang..."
-            tar -xf clang/clang.tar.gz -C clang || { echo "❌ Extraction failed!"; exit 1; }
-            rm -f clang/clang.tar.gz
-          else
-            echo "🚀 Cloning Clang..."
-            git clone --recursive --depth=1 "$clang_url" clang || { echo "❌ Cloning failed!"; exit 1; }
-          fi
-
-          if [ -d "clang/bin" ]; then
-            CLANG_PATH="${{ github.workspace }}/clang/bin"
-          else
-            CLANG_PATH=$(find clang -type d -name "bin" | head -n 1)
-            CLANG_PATH="${{ github.workspace }}/${CLANG_PATH}"
-          fi
-
-          if [ ! -f "$CLANG_PATH/clang" ]; then
-            echo "❌ Clang binary not found in $CLANG_PATH!"
-            ls -R clang
-            exit 1
-          fi
-
-          echo "✅ Using Clang from $CLANG_PATH"
-          echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
-          echo "$CLANG_PATH" >> $GITHUB_PATH
-
-      - name: 📐 Setup swap 20G
-        uses: pierotofy/set-swap-space@master
-        with:
-            swap-size-gb: 20
-
-      - name: 📐 Tune Swap
-        run: |
-            echo "vm.swappiness=80" | sudo tee -a /etc/sysctl.conf
-            sudo sysctl -p
-          
-      - name: "🛠 Set localversion name in defconfig"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        env:
-          LOCALVERSION: ${{ env.localVersion }}
-        run: |
-          if [ -n "$LOCALVERSION" ]; then
-            echo "CONFIG_LOCALVERSION=\"$LOCALVERSION\"" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
-          fi     
-
-      - name: "🧩 Apply Kernel Fixup Patch"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          set -ex
-          log() {
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
-          }
-          apply_patch() {
-            local patch="$1"
-            log "Applying patch: $(basename "$patch")"
-            if ! patch -p1 < "$patch"; then
-              log "Warning: Some hunks failed in $(basename "$patch")"
-            fi
-          }
-          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-gki-fixup.patch"
-          PATCH_FILE="0001-gki-fixup.patch"
-          curl -L -o "$PATCH_FILE" "$PATCH_URL"
-          [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
-          apply_patch "$PATCH_FILE"
-          log "✅ External patch applied"
-
-      - name: "🛠 Setup kernel Tweaks"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          set -e
-          log() {
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
-          }
-          apply_patch() {
-            local patch="$1"
-            log "Applying patch: $(basename "$patch")"
-            if ! patch -p1 < "$patch"; then
-              log "Warning: Some hunks failed in $(basename "$patch")"
-            fi
-          }
-          PATCH_URLS=(
-            "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-fs-lineageos-disguise.patch"
-          )
-          for PATCH_URL in "${PATCH_URLS[@]}"; do
-            PATCH_FILE=$(basename "$PATCH_URL")
-            curl -L -o "$PATCH_FILE" "$PATCH_URL"
-            [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
-            apply_patch "$PATCH_FILE"
-          done
-          log "✅ All patches applied"
-
-      - name: "😋 Update KernelSU Version"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          [ -d "./KernelSU" ] && rm -rf "./KernelSU"
-          [ -d "./drivers/kernelsu" ] && rm -rf "./drivers/kernelsu"
-          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
-          echo "✅ KernelSU updated"
-
-      - name: 😋 Setup SUSFS
-        env:
-          ARCH: ${{ steps.generate-args.outputs.ARCH }}
-          ANDROID_VERSION: "13"
-          KERNEL_VERSION: "5.15"
-          SUSFS_BRANCH: "gki-android13-5.15"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          set -e
-          
-          log() {
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
-          }
-          
-          log "Setting up SUSFS for Android $ANDROID_VERSION, Kernel $KERNEL_VERSION"
-          
-          # Get available patches from latest release
-          log "Fetching available patches..."
-          PATCHES=$(curl -s "https://api.github.com/repos/topnotchfreaks/kernel_patches/releases/latest" | \
-                    grep -o 'browser_download_url.*\.patch' | cut -d\" -f3)
-          
-          if [ -z "$PATCHES" ]; then
-            log "Error: No patches found"
-            exit 1
-          fi
-          
-          # Find best matching patch using actual naming convention
-          # Format: 0001-Implement-SUSFS-v1.5.8-for-Android-13-Kernel-5.15.patch
-          SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
-                           grep "Android-${ANDROID_VERSION}" | \
-                           grep "Kernel-${KERNEL_VERSION}" | head -n 1)
-          
-          # Fallback to any SUSFS patch for same Android/Kernel version
-          if [ -z "$SELECTED_PATCH" ]; then
-            SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
-                             grep "Android-${ANDROID_VERSION}" | head -n 1)
-          fi
-          
-          # Final fallback to any SUSFS patch
-          if [ -z "$SELECTED_PATCH" ]; then
-            SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | head -n 1)
-          fi
-          
-          if [ -z "$SELECTED_PATCH" ]; then
-            log "Error: No SUSFS patch found"
-            exit 1
-          fi
-          
-          # Download and apply patch
-          log "Downloading patch: $SELECTED_PATCH"
-          curl -L -o "susfs_patch.patch" "$SELECTED_PATCH"
-          
-          log "Applying SUSFS patch..."
-          if ! patch -p1 < "susfs_patch.patch"; then
-            log "Warning: Some hunks failed while applying patch"
-          fi
-          
-          log "✅ SUSFS patch applied successfully"
-      
-      - name: "😋 Setup SUSFS Syscall hooks"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          set -ex
-          log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
-          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-SUSFS-syscall-hooks.patch"
-          PATCH_FILE="0001-SUSFS-syscall-hooks.patch"
-          curl -L -o "$PATCH_FILE" "$PATCH_URL"
-          [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
-          patch -p1 < "$PATCH_FILE" || log "Warning: Some hunks failed"
-          log "✅ Syscall hooks patch applied"
-
-      - name: "⚙️ Add SUSFS configs"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          set -ex
-          CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
-          CONFIGS=(
-            "CONFIG_KSU=y"
-            "CONFIG_KSU_MANUAL_HOOK=y"
-            "CONFIG_KPM=y"
-            "CONFIG_KALLSYMS=y"
-            "CONFIG_KSU_SUSFS=y"
-            "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"
-            "CONFIG_KSU_SUSFS_SUS_PATH=y"
-            "CONFIG_KSU_SUSFS_SUS_MOUNT=y"
-            "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y"
-            "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y"
-            "CONFIG_KSU_SUSFS_SUS_KSTAT=y"
-            "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n"
-            "CONFIG_KSU_SUSFS_TRY_UMOUNT=y"
-            "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y"
-            "CONFIG_KSU_SUSFS_SPOOF_UNAME=y"
-            "CONFIG_KSU_SUSFS_ENABLE_LOG=y"
-            "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y"
-            "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y"
-            "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"
-            "CONFIG_KSU_SUSFS_SUS_SU=n"
-            "CONFIG_TMPFS_XATTR=y"
-            "CONFIG_TMPFS_POSIX_ACL=y"
-          )
-          printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
-          echo "✅ SUSFS configs added"
-
-      - name: "⚙️ Add Additional configs"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          set -ex
-          CONFIG_FILE="./arch/arm64/configs/${DEFCONFIG_NAME}"
-
-          # Replace full LTO with thin LTO
-          sed -i 's/CONFIG_LTO_CLANG_FULL=y/CONFIG_LTO_CLANG_THIN=y/' "$CONFIG_FILE"
-
-          CONFIGS=(
-            "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"
-            "CONFIG_ZRAM_DEF_COMP_LZ4=y"
-            "CONFIG_TCP_CONG_ADVANCED=y"
-            "CONFIG_TCP_CONG_BIC=n"
-            "CONFIG_TCP_CONG_WESTWOOD=y"
-            "CONFIG_TCP_CONG_HTCP=n"
-            "CONFIG_TCP_CONG_BBR=y"
-            "CONFIG_DEFAULT_WESTWOOD=y"
-          )
-          printf "%s\n" "${CONFIGS[@]}" >> "$CONFIG_FILE"
-          echo "✅ configs added"
-
-      - name: "😎 Set args for CLO kernels"
-        id: generate-args
-        working-directory: ./${{ env.kernelDir }}
-        env:
-            params: "${{ toJSON(matrix.repos.params) }}"
-        run: |
-            args="-j$(nproc --all)"
-            if [ -n "${{ env.OUT_DIR }}" ]; then
-              mkdir -p $(pwd)/${{ env.OUT_DIR }}
-              args="$args O=$(pwd)/${{ env.OUT_DIR }}"
-            fi
-            args="$args ARCH=arm64 LLVM=1 LTO=thin"
-            args="$args CROSS_COMPILE=aarch64-linux-gnu-"
-            args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
-            args="$args AR=llvm-ar"
-            args="$args CC=clang"
-            echo "args=$args" >> $GITHUB_OUTPUT
-
-      - name: "👍 Make defconfig"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        env:
-          args: ${{ steps.generate-args.outputs.args }}
-        run: |
-          make ${{ env.args }} ${{ env.DEFCONFIG_NAME }}
-
-      - name: "🎶 Build kernel"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        env:
-          args: ${{ steps.generate-args.outputs.args }}
-        run: |
-          export KBUILD_BUILD_USER="Automated"
-          export KBUILD_BUILD_HOST="GitHub"
-
-          make ${{ env.args }} \
-            LLVM=1 \
-            LTO=thin \
-            CC=clang \
-            AR=llvm-ar \
-            NM=llvm-nm \
-            OBJCOPY="llvm-objcopy" \
-            STRIP="llvm-strip" \
-            -j$(nproc --all)
-
-      - name: "🩹 Patch Image with KPM"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          cd "../${{ env.OUT_DIR }}/arch/arm64/boot/"
-          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
-          chmod 777 patch
-          ./patch
-          rm -rf Image
-          mv oImage Image.clo
-
-      - name: "📤 Upload CLO kernel artifact"
-        uses: actions/upload-artifact@v4
-        with:
-          name: clo-kernel
-          path: ${{ env.kernelDir }}/${{ env.OUT_DIR }}/arch/arm64/boot/Image.clo
-          retention-days: 1
-
-  Package-Kernels:
+  package-kernels:
     name: "📦 Package Kernels"
     runs-on: ubuntu-latest
-    needs: [Build-GKI, Build-CLO]
+    needs: [build-kernels]
     steps:
-      - name: "📥 Download GKI kernel artifact"
+      - name: "📥 Download kernel artifacts"
         uses: actions/download-artifact@v4
         with:
-          name: gki-kernel
-          path: ./kernels/
+          path: ./artifacts/
 
-      - name: "📥 Download CLO kernel artifact"
-        uses: actions/download-artifact@v4
-        with:
-          name: clo-kernel
-          path: ./kernels/
-
-      - name: "📦 Create ZIP file with both kernels"
+      - name: "📦 Create release package"
         run: |
           set -e
 
-          [ ! -d "AnyKernel3" ] && git clone --depth=1 https://github.com/topnotchfreaks/AnyKernel3 -b YASK AnyKernel3
+          # Clone AnyKernel3
+          git clone --depth=1 https://github.com/topnotchfreaks/AnyKernel3 -b YASK AnyKernel3
 
-          cp kernels/Image.gki AnyKernel3/Image.gki
-          cp kernels/Image.clo AnyKernel3/Image.clo
+          # Copy kernel images
+          find ./artifacts -name "Image.*" -exec cp {} AnyKernel3/ \;
 
-          cat > AnyKernel3/banner << EOF
+          # Create banner
+          cat > AnyKernel3/banner << 'EOF'
           ╔═════════════════════════════════════════════════════╗
           ║                                                     ║
           ║          ██╗   ██╗ █████╗ ███████╗██╗  ██╗          ║
@@ -732,7 +406,7 @@ jobs:
           ║                                                     ║
           ║     Kernel version:                                 ║
           ║     • YASK-GKI Kernel (android13-5.15-lts)          ║
-          ║     • YASK-CLO Kernel (kernel.lnx.5.15.r1/16-rel)   ║
+          ║     • YASK-CLO Kernel (kernel.lnx.5.15.r16-rel)     ║
           ║                                                     ║
           ║     Features:                                       ║
           ║     • -O2 Optimization                              ║
@@ -750,13 +424,16 @@ jobs:
           Installing YASK Kernel...
           EOF
 
+          # Create ZIP
           ZIP_NAME="Anykernel3_YASK-AIO_$(date +'%Y-%m-%d').zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
+          
           echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+          echo "✅ Package created: $ZIP_NAME"
 
-      - name: "⬆️ Upload ZIP to GitHub Release"
+      - name: "⬆️ Upload to GitHub Release"
         uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
