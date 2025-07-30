@@ -250,7 +250,7 @@ jobs:
           
           # Create ZIP
           BUILD_TIME=$(date +'%Y-%m-%d')
-          ZIP_NAME="Kernel-5.15_${BUILD_TIME}.zip"
+          ZIP_NAME="Anykernel3_${{ github.event.inputs.kernelBranch }}_${BUILD_TIME}.zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
@@ -259,7 +259,7 @@ jobs:
       - name: "📤 Upload final package"
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-5.15_${{ env.BUILD_TIME }}.zip
+          name: Anykernel3_${{ github.event.inputs.kernelBranch }}_${{ env.BUILD_TIME }}.zip
           path: ${{ env.ZIP_PATH }}
           retention-days: 7
 
@@ -268,12 +268,12 @@ jobs:
         run: |
           if [[ -f "${{ env.ZIP_PATH }}" ]]; then
             curl -s -F document=@"${{ env.ZIP_PATH }}" \
-                 -F caption="✅ 5.15 Kernel Build Complete - $(date '+%Y-%m-%d %H:%M:%S')" \
+                 -F caption="✅ Kernel Build Complete - $(date '+%Y-%m-%d %H:%M:%S')" \
                  -F chat_id=${{ secrets.TELEGRAM_USER_ID }} \
                  "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument"
           else
             curl -s -X POST \
                  -d chat_id=${{ secrets.TELEGRAM_USER_ID }} \
-                 -d text="❌ 5.15 Kernel build failed" \
+                 -d text="❌ Kernel build failed" \
                  "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage"
           fi
