@@ -234,7 +234,7 @@ void ethqos_free_gpios(struct qcom_ethqos *ethqos)
 }
 EXPORT_SYMBOL(ethqos_free_gpios);
 
-int ethqos_init_pinctrl(struct device *dev)
+int ethqos_init_pinctrl(struct device *dev, struct qcom_ethqos *ethqos)
 {
 	struct pinctrl *pinctrl;
 	struct pinctrl_state *pinctrl_state;
@@ -249,6 +249,10 @@ int ethqos_init_pinctrl(struct device *dev)
 		ETHQOSERR("Failed to get pinctrl, err = %d\n", ret);
 		return ret;
 	}
+
+	ethqos->pinctrl = pinctrl;
+	ethqos->rgmii_txc_suspend_state = NULL;
+	ethqos->rgmii_txc_resume_state = NULL;
 
 	num_names = of_property_count_strings(dev->of_node, "pinctrl-names");
 	if (num_names < 0) {
@@ -274,6 +278,16 @@ int ethqos_init_pinctrl(struct device *dev)
 
 		ETHQOSDBG("pinctrl_lookup_state %s succeeded\n", name);
 
+		if (!strcmp(name, "dev-emac-rgmii_txc_suspend_state")) {
+			ethqos->rgmii_txc_suspend_state = pinctrl_state;
+			ETHQOSINFO("pinctrl_lookup_state %s succeeded\n", name);
+			continue;
+		} else if (!strcmp(name, "dev-emac-rgmii_txc_resume_state")) {
+			ethqos->rgmii_txc_resume_state = pinctrl_state;
+			ETHQOSINFO("pinctrl_lookup_state %s succeeded\n", name);
+			continue;
+		}
+
 		ret = pinctrl_select_state(pinctrl, pinctrl_state);
 		if (ret) {
 			ETHQOSERR("select_state %s failed %d\n", name, ret);
@@ -293,7 +307,7 @@ int ethqos_init_gpio(struct qcom_ethqos *ethqos)
 
 	ethqos->gpio_phy_intr_redirect = -1;
 
-	ret = ethqos_init_pinctrl(&ethqos->pdev->dev);
+	ret = ethqos_init_pinctrl(&ethqos->pdev->dev, ethqos);
 	if (ret) {
 		ETHQOSERR("ethqos_init_pinctrl failed");
 		return ret;
