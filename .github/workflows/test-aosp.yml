@@ -36,20 +36,20 @@ jobs:
           repo sync --optimized-fetch --prune -j8
 
           rm -rf .repo
-          rm -rf prebuilts/clang/host/linux-x86
+          # rm -rf prebuilts/clang/host/linux-x86
 
-          git clone --depth=1 --recursive https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b main prebuilts/clang/host/linux-x86
+          # git clone --depth=1 --recursive https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b main prebuilts/clang/host/linux-x86
 
-          rm -rf prebuilts/clang/host/linux-x86/clang-3289846
-          rm -rf prebuilts/clang/host/linux-x86/clang-r522817
-          rm -rf prebuilts/clang/host/linux-x86/clang-r530567
-          rm -rf prebuilts/clang/host/linux-x86/clang-r536225
-          rm -rf prebuilts/clang/host/linux-x86/clang-stable
+          # rm -rf prebuilts/clang/host/linux-x86/clang-3289846
+          # rm -rf prebuilts/clang/host/linux-x86/clang-r522817
+          # rm -rf prebuilts/clang/host/linux-x86/clang-r530567
+          # rm -rf prebuilts/clang/host/linux-x86/clang-r536225
+          # rm -rf prebuilts/clang/host/linux-x86/clang-stable
 
-          sed -i \
-            -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
-            -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' \
-            common/build.config.constants
+          # sed -i \
+          #   -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
+          #   -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' \
+          #   common/build.config.constants
 
       - name: "🧩 Apply GKI Fixup Patches"
         if: contains(env.ANDROID_KERNEL_BRANCH, '5.15')
@@ -96,8 +96,9 @@ jobs:
           cd AnyKernel3
           zip -r9 "../kernel-${DEVICE}-${ANDROID_KERNEL_BRANCH}-$(date +%Y%m%d).zip" * -x .git/*
       
-      - name: "📤 Upload Artifact"
+      - name: Upload kernel artifact
         uses: actions/upload-artifact@v4
         with:
-          name: aosp-kernel
-          path: $KERNEL_DIR/kernel-${{ env.DEVICE }}-${{ env.ANDROID_KERNEL_BRANCH }}-*.zip
+          name: GKI-$(date +%Y%m%d)
+          path: kernel-GKI-common-android13-5.15-lts-*.zip  # Remove $KERNEL_DIR/
+          if-no-files-found: warn
