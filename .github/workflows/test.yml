@@ -180,12 +180,15 @@ jobs:
 
       - name: "🔨 Build kernel"
         working-directory: ${{ env.WORK_DIR }}
+        env:
+          KBUILD_BUILD_USER: "belowzeroiq"
+          KBUILD_BUILD_HOST: "GitHub"
         run: |
-          export KBUILD_BUILD_USER="belowzeroiq"
-          export KBUILD_BUILD_HOST="GitHub"
           export SOURCE_DATE_EPOCH=$(date +%s)
 
-          LTO=${{ github.event.inputs.ltoMode }} BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j8
+          LTO=${{ github.event.inputs.ltoMode }} \
+          BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 \
+          build/build.sh -j$(nproc --all)
 
       - name: "🩹 Apply KPM patch (KSU variant only)"
         if: matrix.variant == 'ksu'
