@@ -75,24 +75,23 @@ jobs:
         run: |
           repo init -u https://android.googlesource.com/kernel/manifest -b common-android13-5.15-lts --depth=1
           repo sync --optimized-fetch --prune -j8
-
+          
           rm -rf .repo
           rm -rf common
-          rm -rf prebuilts/clang/host/linux-x86
 
-          git clone --depth=1 --recursive https://github.com/topnotchfreaks/linux-x86 -b compile prebuilts/clang/host/linux-x86
+          wget -O prebuilts/clang/host/linux-x86/clang-r547379.tar.gz "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz"
+          tar -xzf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz
+          rm -rf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz
 
           rm -rf prebuilts/clang/host/linux-x86/clang-3289846
-          rm -rf prebuilts/clang/host/linux-x86/clang-r522817
-          rm -rf prebuilts/clang/host/linux-x86/clang-r530567
-          rm -rf prebuilts/clang/host/linux-x86/clang-r536225
+          rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
           rm -rf prebuilts/clang/host/linux-x86/clang-stable
-
+          
           sed -i \
            -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
            -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' \
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.constants
-
+          
           sed -i '/^POST_DEFCONFIG_CMDS="check_defconfig"/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
 
       - name: "📐 Setup build environment"
