@@ -189,7 +189,7 @@ jobs:
 
       - name: "🩹 Apply KPM patch (KSU variant only)"
         if: matrix.variant == 'ksu'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.OUT_DIR }}/arch/arm64/boot
+        working-directory: ${{ env.WORK_DIR }}/out/dist
         run: |
           curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
           chmod +x patch
@@ -197,15 +197,15 @@ jobs:
           mv oImage Image
 
       - name: "📦 Prepare artifact"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        working-directory: ${{ env.WORK_DIR }}
         run: |
-          cp ${{ env.OUT_DIR }}/arch/arm64/boot/Image ../Image.${{ matrix.variant }}
+          cp out/dist/Image Image.${{ matrix.variant }}
 
       - name: "📤 Upload kernel"
         uses: actions/upload-artifact@v4
         with:
           name: kernel-${{ matrix.variant }}
-          path: ${{ env.kernelDir }}/Image.${{ matrix.variant }}
+          path: ${{ env.WORK_DIR }}/Image.${{ matrix.variant }}
           retention-days: 3
 
   Package-Kernels:
