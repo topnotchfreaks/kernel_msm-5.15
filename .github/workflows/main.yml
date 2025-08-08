@@ -107,6 +107,11 @@ jobs:
           
           sed -i '/^POST_DEFCONFIG_CMDS="check_defconfig"/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
 
+          sed -i \
+           -e '/^MODULES_ORDER=/d' \
+           -e '/^MODULES_LIST=/d' \
+           ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
+
       - name: "⚙️ Configure kernel"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
