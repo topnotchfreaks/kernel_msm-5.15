@@ -297,7 +297,11 @@ jobs:
       - name: "🔨 Build kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          LTO=full BUILD_CONFIG=${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          LINUX_COMPILE_BY="belowzeroiq" \
+          LINUX_COMPILE_HOST="GitHub" \
+          LTO=full \
+          BUILD_CONFIG=${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki.aarch64 \
+          build/build.sh -j$(nproc --all)
 
       - name: "🩹 Apply KPM patch"
         working-directory: ${{ env.WORK_DIR }}/out/dist
