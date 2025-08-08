@@ -108,6 +108,12 @@ jobs:
           sed -i '/^POST_DEFCONFIG_CMDS="check_defconfig"/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
 
           sed -i \
+           -e '/^KMI_SYMBOL_LIST_STRICT_MODE=/d' \
+           -e '/^TRIM_NONLISTED_KMI=/d' \
+           -e '/^KMI_ENFORCED=/d' \
+           -e '$a\KMI_SYMBOL_LIST_STRICT_MODE=0' \
+           -e '$a\TRIM_NONLISTED_KMI=0' \
+           -e '$a\KMI_ENFORCED=0' \
            -e '/^MODULES_ORDER=/d' \
            -e '/^MODULES_LIST=/d' \
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64
