@@ -24,7 +24,7 @@ jobs:
             repo_url: "https://android.googlesource.com/kernel/common"
             branch: "android13-5.15-lts"
             defconfig: "gki_defconfig"
-            local_version: "-YASK/GKI"
+            local_version: "-YASK-GKI"
             output_name: "Image.gki"
             kpm_patch_url: "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux"
             extra_patches:
@@ -35,7 +35,7 @@ jobs:
             repo_url: "https://git.codelinaro.org/clo/la/kernel/msm-5.15"
             branch: "kernel.lnx.5.15.r16-rel"
             defconfig: "gki_defconfig"
-            local_version: "-YASK/CLO"
+            local_version: "-YASK-CLO"
             output_name: "Image.clo"
             kpm_patch_url: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux"
             extra_patches: []
