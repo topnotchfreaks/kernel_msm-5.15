@@ -36,11 +36,11 @@ on:
       ltoMode:
         description: "Choose LTO mode"
         required: true
-        default: "Thin"
+        default: "thin"
         type: choice
         options:
-          - "Thin"
-          - "Full"
+          - "thin"
+          - "full"
 
 jobs:
   Build-Kernel:
