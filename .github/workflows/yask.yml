@@ -41,7 +41,7 @@ jobs:
             extra_patches: []
 
     env:
-      KERNEL_DIR: ${{ matrix.kernel.dir }}
+      KERNEL_LOC_DIR: ${{ matrix.kernel.dir }}
       KERNEL_NAME: ${{ matrix.kernel.repo_name }}
       KERNEL_REPO: ${{ matrix.kernel.repo_url }}
       KERNEL_BRANCH: ${{ matrix.kernel.branch }}
@@ -55,13 +55,13 @@ jobs:
     steps:
       - name: "✨ Setup workspace"
         run: |
-          mkdir -p ${{ env.KERNEL_DIR }}
+          mkdir -p ${{ env.KERNEL_LOC_DIR }}
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
           sudo apt-get update -qq
           sudo apt-get install -y repo rsync aria2
 
       - name: "🌟 Clone kernel source"
-        working-directory: ./${{ env.KERNEL_DIR }}
+        working-directory: ./${{ env.KERNEL_LOC_DIR }}
         run: |
           git clone --recursive --branch ${{ env.KERNEL_BRANCH }} \
             ${{ env.KERNEL_REPO }} ${{ env.KERNEL_NAME }} --depth=1
@@ -92,10 +92,10 @@ jobs:
           sed -i \
            -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
            -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' \
-           ${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}/build.config.constants
+           ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.constants
           
           # Remove defconfig check (if exists)
-          sed -i '/^POST_DEFCONFIG_CMDS="check_defconfig"/d' ${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki || true
+          sed -i '/^POST_DEFCONFIG_CMDS="check_defconfig"/d' ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki || true
 
       - name: "📐 Setup build environment"
         run: |
@@ -108,7 +108,7 @@ jobs:
           sudo sysctl -p
 
       - name: "🛠 Configure kernel"
-        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
+        working-directory: ./${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
           # Define the config file path
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
@@ -119,7 +119,7 @@ jobs:
           fi
 
       - name: "🧩 Apply kernel patches"
-        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
+        working-directory: ./${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
           set -e
           
@@ -168,7 +168,7 @@ jobs:
           log "✅ All patches applied"
 
       - name: "😋 Setup KernelSU"
-        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
+        working-directory: ./${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
           # Clean existing KernelSU
           [ -d "./KernelSU" ] && rm -rf "./KernelSU"
@@ -179,7 +179,7 @@ jobs:
           echo "✅ KernelSU updated"
 
       - name: "😋 Setup SUSFS"
-        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
+        working-directory: ./${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
           set -e
           
@@ -225,7 +225,7 @@ jobs:
           log "✅ SUSFS patch applied successfully"
 
       - name: "😋 Setup SUSFS syscall hooks"
-        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
+        working-directory: ./${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
           set -e
           
@@ -244,7 +244,7 @@ jobs:
           log "✅ Syscall hooks patch applied"
 
       - name: "⚙️ Add kernel configs"
-        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
+        working-directory: ./${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
           set -e
           
@@ -295,12 +295,8 @@ jobs:
 
       - name: "🔨 Build kernel"
         working-directory: ${{ env.WORK_DIR }}
-        env:
-          KERNEL_DIR: ${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
-          KBUILD_BUILD_USER: ${{ env.KBUILD_BUILD_USER }}
-          KBUILD_BUILD_HOST: ${{ env.KBUILD_BUILD_HOST }}
         run: |
-          LTO=full BUILD_CONFIG=${{ env.KERNEL_DIR }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
+          LTO=full BUILD_CONFIG=${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
 
       - name: "🩹 Apply KPM patch"
         working-directory: ${{ env.WORK_DIR }}/out/dist
