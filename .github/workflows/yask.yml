@@ -296,13 +296,11 @@ jobs:
       - name: "🔨 Build kernel"
         working-directory: ${{ env.WORK_DIR }}
         env:
-          BUILD_DIR: ${{ env.WORK_DIR }}/${{ matrix.kernel.dir }}/${{ matrix.repo_name }}
+          KERNEL_DIR: ${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
+          KBUILD_BUILD_USER: ${{ env.KBUILD_BUILD_USER }}
+          KBUILD_BUILD_HOST: ${{ env.KBUILD_BUILD_HOST }}
         run: |
-          export SOURCE_DATE_EPOCH=$(date +%s)
-
-          LTO=full \
-          BUILD_CONFIG=${{ env.BUILD_DIR }}/build.config.gki.aarch64 \
-          build/build.sh -j$(nproc --all)
+          LTO=full BUILD_CONFIG=${{ env.KERNEL_DIR }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
 
       - name: "🩹 Apply KPM patch"
         working-directory: ${{ env.WORK_DIR }}/out/dist
