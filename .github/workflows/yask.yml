@@ -357,10 +357,11 @@ jobs:
           ║                                                     ║
           ║     Features:                                       ║
           ║     • AOSP Build System & Toolchain                 ║
-          ║     • Thin LTO Optimization                         ║
+          ║     • Full LTO Optimization                         ║
           ║     • Extra TCP Congestion                          ║
           ║     • AOSP clang-r547379                            ║
           ║     • LineageOS disguise                            ║
+          ║     • LZ4 as default SWAP Algorithm                 ║
           ║     • Latest SukiSU-Ultra Drivers + KPM             ║
           ║     • Latest SUSFS version (manual hook)            ║
           ║                                                     ║
