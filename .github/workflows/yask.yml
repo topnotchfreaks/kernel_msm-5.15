@@ -60,6 +60,13 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y repo rsync aria2
 
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          echo "vm.swappiness=60" | sudo tee -a /etc/sysctl.conf
+          sudo sysctl -p
+
       - name: "🌟 Clone kernel source"
         working-directory: ./${{ env.KERNEL_LOC_DIR }}
         run: |
@@ -97,157 +104,57 @@ jobs:
           # Remove defconfig check (if exists)
           sed -i '/^POST_DEFCONFIG_CMDS="check_defconfig"/d' ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki || true
 
-      - name: "📐 Setup build environment"
+      - name: "🧩 Configure kernel & patches"
+        working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
-          # Setup 8GB swap
-          sudo fallocate -l 8G /swapfile
-          sudo chmod 600 /swapfile
-          sudo mkswap /swapfile
-          sudo swapon /swapfile
-          echo "vm.swappiness=60" | sudo tee -a /etc/sysctl.conf
-          sudo sysctl -p
-
-      - name: "🛠 Configure kernel"
-        working-directory: ./${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
-        run: |
-          # Define the config file path
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          
-          # Set localversion
-          if [ -n "${{ env.LOCAL_VERSION }}" ]; then
-            echo "CONFIG_LOCALVERSION=\"${{ env.LOCAL_VERSION }}\"" >> "$CONFIG_FILE"
-            echo "CONFIG_LOCALVERSION_AUTO=n" >> "$CONFIG_FILE"
-          fi
+          echo "CONFIG_LOCALVERSION=\"${{ env.LOCAL_VERSION }}\"" >> "$CONFIG_FILE"
+          echo "CONFIG_LOCALVERSION_AUTO=n" >> "$CONFIG_FILE"
 
-      - name: "🧩 Apply kernel patches"
-        working-directory: ./${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
-        run: |
-          set -e
-          
-          log() {
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
-          }
-          
+          # Helper
           apply_patch() {
-            local patch_url="$1"
-            local patch_file=$(basename "$patch_url")
-            
-            log "Downloading and applying patch: $patch_file"
-            curl -L -o "$patch_file" "$patch_url"
-            
-            if [ -f "$patch_file" ]; then
-              if ! patch -p1 < "$patch_file"; then
-                log "Warning: Some hunks failed in $patch_file"
-              fi
-              rm "$patch_file"
-            else
-              log "Error: Failed to download $patch_file"
-              exit 1
-            fi
+            local url="$1"
+            local file=$(basename "$url")
+            curl -L -o "$file" "$url"
+            patch -p1 < "$file" || echo "::warning::Hunks failed in $file"
+            rm -f "$file"
           }
 
-          # Apply common patches
-          COMMON_PATCHES=(
-            "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-gki-fixup.patch"
-            "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-fs-lineageos-disguise.patch"
-          )
+          # Common patches
+          apply_patch "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-gki-fixup.patch"
+          apply_patch "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-fs-lineageos-disguise.patch"
 
-          for patch in "${COMMON_PATCHES[@]}"; do
-            apply_patch "$patch"
+          # Kernel-specific patches
+          echo '${{ toJSON(matrix.kernel.extra_patches) }}' | jq -r '.[]' | while read p; do
+            [ -n "$p" ] && apply_patch "$p"
           done
 
-          # Apply kernel-specific patches
-          EXTRA_PATCHES='${{ toJSON(matrix.kernel.extra_patches) }}'
-          if [ "$EXTRA_PATCHES" != "[]" ] && [ "$EXTRA_PATCHES" != "null" ]; then
-            echo "$EXTRA_PATCHES" | jq -r '.[]' | while read -r patch; do
-              if [ -n "$patch" ]; then
-                apply_patch "$patch"
-              fi
-            done
-          fi
-
-          log "✅ All patches applied"
-
-      - name: "😋 Setup KernelSU"
-        working-directory: ./${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
+      - name: "😋 Setup KernelSU & SUSFS & Configs"
+        working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
-          # Clean existing KernelSU
-          [ -d "./KernelSU" ] && rm -rf "./KernelSU"
-          [ -d "./drivers/kernelsu" ] && rm -rf "./drivers/kernelsu"
-          
-          # Install KernelSU
-          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
-          echo "✅ KernelSU updated"
+          # KernelSU
+          rm -rf KernelSU drivers/kernelsu
+          curl -LSs https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh | bash -s susfs-main
 
-      - name: "😋 Setup SUSFS"
-        working-directory: ./${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
-        run: |
-          set -e
-          
-          log() {
-            echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
-          }
-          
-          log "Setting up SUSFS for Android $ANDROID_VERSION, Kernel $KERNEL_VERSION"
-          
-          # Get available patches from latest release
-          PATCHES=$(curl -s "https://api.github.com/repos/topnotchfreaks/kernel_patches/releases/latest" | \
+          # SUSFS patches
+          PATCHES=$(curl -s https://api.github.com/repos/topnotchfreaks/kernel_patches/releases/latest | \
                     grep -o 'browser_download_url.*\.patch' | cut -d\" -f3)
-          
-          if [ -z "$PATCHES" ]; then
-            log "Error: No patches found"
-            exit 1
-          fi
-          
-          # Find best matching SUSFS patch
-          SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
-                           grep "Android-${ANDROID_VERSION}" | \
-                           grep "Kernel-${KERNEL_VERSION}" | head -n 1)
-          
-          # Fallbacks
-          [ -z "$SELECTED_PATCH" ] && SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | \
-                                                        grep "Android-${ANDROID_VERSION}" | head -n 1)
-          [ -z "$SELECTED_PATCH" ] && SELECTED_PATCH=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | head -n 1)
-          
-          if [ -z "$SELECTED_PATCH" ]; then
-            log "Error: No SUSFS patch found"
-            exit 1
-          fi
-          
-          # Download and apply SUSFS patch
-          log "Downloading patch: $SELECTED_PATCH"
-          curl -L -o "susfs_patch.patch" "$SELECTED_PATCH"
-          
-          log "Applying SUSFS patch..."
-          if ! patch -p1 < "susfs_patch.patch"; then
-            log "Warning: Some hunks failed while applying SUSFS patch"
-          fi
-          
-          log "✅ SUSFS patch applied successfully"
+          SELECTED=$(echo "$PATCHES" | \
+                     grep "0001-Implement-SUSFS" | \
+                     grep "Android-${{ env.ANDROID_VERSION }}" | \
+                     grep "Kernel-${{ env.KERNEL_VERSION }}" | head -n 1)
+          [ -z "$SELECTED" ] && SELECTED=$(echo "$PATCHES" | grep "0001-Implement-SUSFS" | head -n 1)
+          [ -z "$SELECTED" ] && { echo "No SUSFS patch"; exit 1; }
 
-      - name: "😋 Setup SUSFS syscall hooks"
-        working-directory: ./${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
-        run: |
-          set -e
-          
-          log() { echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"; }
-          
-          PATCH_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-SUSFS-syscall-hooks.patch"
-          PATCH_FILE="0001-SUSFS-syscall-hooks.patch"
-          
-          curl -L -o "$PATCH_FILE" "$PATCH_URL"
-          [ -f "$PATCH_FILE" ] || { log "Patch download failed"; exit 1; }
-          
-          if ! patch -p1 < "$PATCH_FILE"; then
-            log "Warning: Some hunks failed in syscall hooks patch"
-          fi
-          
-          log "✅ Syscall hooks patch applied"
+          curl -L -o susfs.patch "$SELECTED"
+          patch -p1 < susfs.patch || echo "::warning::SUSFS hunks failed"
+          rm -f susfs.patch
 
-      - name: "⚙️ Add kernel configs"
-        working-directory: ./${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
-        run: |
-          set -e
+          # Syscall hooks
+          curl -L -o syscall.patch \
+            https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-SUSFS-syscall-hooks.patch
+          patch -p1 < syscall.patch || echo "::warning::Syscall hooks hunks failed"
+          rm -f syscall.patch
           
           CONFIG_FILE="./arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           
@@ -349,26 +256,9 @@ jobs:
           ║             ██║   ██║  ██║███████║██║  ██╗          ║
           ║             ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝          ║
           ║                                                     ║
-          ║               Yet Another Stock Kernel              ║
-          ║                   by @belowzeroiq                   ║
-          ║                                                     ║
-          ║              Powered by Github Actions              ║
+          ║                    by belowzeroiq                   ║
           ║                                                     ║
           ╠═════════════════════════════════════════════════════╣
-          ║                                                     ║
-          ║     Kernel version:                                 ║
-          ║     • YASK-GKI Kernel (android13-5.15-lts)          ║
-          ║     • YASK-CLO Kernel (kernel.lnx.5.15.r16-rel)     ║
-          ║                                                     ║
-          ║     Features:                                       ║
-          ║     • AOSP Build System & Toolchain                 ║
-          ║     • Full LTO Optimization                         ║
-          ║     • Extra TCP Congestion                          ║
-          ║     • AOSP clang-r547379                            ║
-          ║     • LineageOS disguise                            ║
-          ║     • LZ4 as default SWAP Algorithm                 ║
-          ║     • Latest SukiSU-Ultra Drivers + KPM             ║
-          ║     • Latest SUSFS version (manual hook)            ║
           ║                                                     ║
           ║     Please ensure:                                  ║
           ║     • Your device is compatible                     ║
