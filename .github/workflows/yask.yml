@@ -2,6 +2,8 @@ name: "Build YASK"
 
 env:
   OUT_DIR: "out"
+  KERNEL_VERSION: "5.15"
+  ANDROID_VERSION: "13"
 
 on:
   schedule:
@@ -24,7 +26,7 @@ jobs:
             defconfig: "gki_defconfig"
             local_version: "-YASK/GKI"
             output_name: "Image.gki"
-            kpm_patch_url: "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux"
+            kmp_patch_url: "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kmp/patch_linux"
             extra_patches:
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Revert-bpf-fix-precision-backtracking-instruction-it.patch"
           - name: "CLO"
@@ -35,7 +37,7 @@ jobs:
             defconfig: "gki_defconfig"
             local_version: "-YASK/CLO"
             output_name: "Image.clo"
-            kpm_patch_url: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux"
+            kmp_patch_url: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kmp/patch_linux"
             extra_patches: []
 
     env:
@@ -46,15 +48,15 @@ jobs:
       DEFCONFIG_NAME: ${{ matrix.kernel.defconfig }}
       LOCAL_VERSION: ${{ matrix.kernel.local_version }}
       OUTPUT_NAME: ${{ matrix.kernel.output_name }}
+      WORK_DIR: ${{ github.workspace }}
 
     steps:
       - name: "✨ Setup workspace"
         run: |
           mkdir -p ${{ env.KERNEL_DIR }}
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
-          sudo apt-get update
-          sudo apt-get install -y build-essential bc curl flex cpio rsync git zip dwarves \
-            libelf-dev gcc-aarch64-linux-gnu libssl-dev python3 clang lld llvm llvm-dev aria2
+          sudo apt-get update -qq
+          sudo apt-get install -y repo rsync aria2
 
       - name: "🌟 Clone kernel source"
         working-directory: ./${{ env.KERNEL_DIR }}
@@ -62,76 +64,56 @@ jobs:
           git clone --recursive --branch ${{ env.KERNEL_BRANCH }} \
             ${{ env.KERNEL_REPO }} ${{ env.KERNEL_NAME }} --depth=1
 
-      - name: "💫 Get Toolchains"
+      - name: "📥 Initialize AOSP repo and toolchains"
+        working-directory: ${{ env.WORK_DIR }}
         run: |
-          set -e
+          # Initialize AOSP repo
+          repo init -u https://android.googlesource.com/kernel/manifest -b common-android13-5.15-lts --depth=1
+          repo sync --optimized-fetch --prune -j8
           
-          get_latest_github_release() {
-            local repo_url="$1"
-            latest_url=$(curl -sL "https://api.github.com/repos/$repo_url/releases/latest" | \
-              grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | head -n 1)
+          # Clean up existing repo and common directories
+          rm -rf .repo
+          rm -rf common
 
-            if [[ -z "$latest_url" ]]; then
-              echo "❌ Failed to fetch latest release from $repo_url!"
-              exit 1
-            fi
-            printf "%s" "$latest_url"
-          }
+          # Download and setup custom clang toolchain
+          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r547379.tar.gz "https://github.com/topnotchfreaks/clang/releases/download/v1.0.0/clang-r547379.tar.gz"
+          mkdir -p prebuilts/clang/host/linux-x86/clang-r547379
+          tar -xzf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz -C prebuilts/clang/host/linux-x86/clang-r547379
+          rm -rf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz
 
-          clang_url=$(get_latest_github_release "topnotchfreaks/clang")
-          echo "✅ Clang URL: $clang_url"
-          mkdir -p clang
+          # Remove unused clang for more space
+          rm -rf prebuilts/clang/host/linux-x86/clang-3289846
+          rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
+          rm -rf prebuilts/clang/host/linux-x86/clang-stable
+          
+          # Update build config constants
+          sed -i \
+           -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
+           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' \
+           ${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}/build.config.constants
+          
+          # Remove defconfig check (if exists)
+          sed -i '/^POST_DEFCONFIG_CMDS="check_defconfig"/d' ${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki || true
 
-          if [[ "$clang_url" == *.tar.gz ]]; then
-            echo "🚀 Downloading latest Clang..."
-            aria2c -x 16 -s 16 --file-allocation=none --dir=clang --out=clang.tar.gz "$clang_url"
-            echo "📦 Extracting Clang..."
-            tar -xf clang/clang.tar.gz -C clang
-            rm -f clang/clang.tar.gz
-          else
-            echo "🚀 Cloning Clang..."
-            git clone --recursive --depth=1 "$clang_url" clang
-          fi
-
-          # Find clang binary path
-          if [ -d "clang/bin" ]; then
-            CLANG_PATH="${{ github.workspace }}/clang/bin"
-          else
-            CLANG_PATH=$(find clang -type d -name "bin" | head -n 1)
-            CLANG_PATH="${{ github.workspace }}/${CLANG_PATH}"
-          fi
-
-          if [ ! -f "$CLANG_PATH/clang" ]; then
-            echo "❌ Clang binary not found in $CLANG_PATH!"
-            ls -R clang
-            exit 1
-          fi
-
-          echo "✅ Using Clang from $CLANG_PATH"
-          echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
-          echo "$CLANG_PATH" >> $GITHUB_PATH
-
-      - name: "📐 Setup swap 8G and tune settings"
+      - name: "📐 Setup build environment"
         run: |
-          # Create swap file
-          sudo fallocate -l 8G /swapfile
+          # Setup 20GB swap
+          sudo fallocate -l 20G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
-          
-          # Tune swap settings
           echo "vm.swappiness=60" | sudo tee -a /etc/sysctl.conf
           sudo sysctl -p
-          
-          # Verify swap is active
-          swapon --show
 
       - name: "🛠 Configure kernel"
         working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
         run: |
+          # Define the config file path
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          
           # Set localversion
           if [ -n "${{ env.LOCAL_VERSION }}" ]; then
-            echo "CONFIG_LOCALVERSION=\"${{ env.LOCAL_VERSION }}\"" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+            echo "CONFIG_LOCALVERSION=\"${{ env.LOCAL_VERSION }}\"" >> "$CONFIG_FILE"
           fi
 
       - name: "🧩 Apply kernel patches"
@@ -196,9 +178,6 @@ jobs:
 
       - name: "😋 Setup SUSFS"
         working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
-        env:
-          ANDROID_VERSION: "13"
-          KERNEL_VERSION: "5.15"
         run: |
           set -e
           
@@ -269,101 +248,74 @@ jobs:
           
           CONFIG_FILE="./arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           
-          # Replace full LTO with thin LTO
-          sed -i 's/CONFIG_LTO_CLANG_FULL=y/CONFIG_LTO_CLANG_THIN=y/' "$CONFIG_FILE"
+          # Basic optimizations
+          echo "CONFIG_KALLSYMS=y" >> "$CONFIG_FILE"
           
           # SUSFS configs
-          SUSFS_CONFIGS=(
-            "CONFIG_KSU=y"
-            "CONFIG_KSU_MANUAL_HOOK=y"
-            "CONFIG_KPM=y"
-            "CONFIG_KALLSYMS=y"
-            "CONFIG_KSU_SUSFS=y"
-            "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y"
-            "CONFIG_KSU_SUSFS_SUS_PATH=y"
-            "CONFIG_KSU_SUSFS_SUS_MOUNT=y"
-            "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y"
-            "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y"
-            "CONFIG_KSU_SUSFS_SUS_KSTAT=y"
-            "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n"
-            "CONFIG_KSU_SUSFS_TRY_UMOUNT=y"
-            "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y"
-            "CONFIG_KSU_SUSFS_SPOOF_UNAME=y"
-            "CONFIG_KSU_SUSFS_ENABLE_LOG=y"
-            "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y"
-            "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y"
-            "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y"
-            "CONFIG_KSU_SUSFS_SUS_SU=n"
-            "CONFIG_TMPFS_XATTR=y"
-            "CONFIG_TMPFS_POSIX_ACL=y"
-          )
-          
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_KSU=y
+          CONFIG_KSU_MANUAL_HOOK=y
+          CONFIG_KPM=y
+          CONFIG_KSU_SUSFS=y
+          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_PATH=y
+          CONFIG_KSU_SUSFS_SUS_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_SUS_KSTAT=y
+          CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n
+          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
+          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
+          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+          CONFIG_KSU_SUSFS_ENABLE_LOG=y
+          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+          CONFIG_KSU_SUSFS_SUS_SU=n
+          CONFIG_TMPFS_XATTR=y
+          CONFIG_TMPFS_POSIX_ACL=y
+          EOF
+
           # Performance configs
-          PERF_CONFIGS=(
-            "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y"
-            "CONFIG_ZRAM_DEF_COMP_LZ4=y"
-            "CONFIG_TCP_CONG_ADVANCED=y"
-            "CONFIG_TCP_CONG_BIC=n"
-            "CONFIG_TCP_CONG_WESTWOOD=y"
-            "CONFIG_TCP_CONG_HTCP=n"
-            "CONFIG_TCP_CONG_BBR=y"
-            "CONFIG_DEFAULT_WESTWOOD=y"
-          )
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
+          CONFIG_ZRAM_DEF_COMP_LZ4=y
+          CONFIG_ZRAM_DEF_COMP="lz4"
+          CONFIG_TCP_CONG_ADVANCED=y
+          CONFIG_TCP_CONG_BIC=n
+          CONFIG_TCP_CONG_WESTWOOD=y
+          CONFIG_TCP_CONG_HTCP=n
+          CONFIG_TCP_CONG_BBR=y
+          CONFIG_DEFAULT_WESTWOOD=y
+          EOF
           
-          # Apply all configs
-          printf "%s\n" "${SUSFS_CONFIGS[@]}" "${PERF_CONFIGS[@]}" >> "$CONFIG_FILE"
           echo "✅ All configs added"
 
-      - name: "😎 Set build arguments"
-        id: generate-args
-        working-directory: ./${{ env.KERNEL_DIR }}
+      - name: "🔨 Build kernel using AOSP build.sh"
+        working-directory: ${{ env.WORK_DIR }}
+        env:
+          KBUILD_BUILD_USER: "Automated"
+          KBUILD_BUILD_HOST: "GitHub"
         run: |
-          args="-j$(nproc --all)"
-          
-          if [ -n "${{ env.OUT_DIR }}" ]; then
-            mkdir -p "$(pwd)/${{ env.OUT_DIR }}"
-            args="$args O=$(pwd)/${{ env.OUT_DIR }}"
-          fi
-          
-          args="$args ARCH=arm64 LLVM=1 LTO=thin"
-          args="$args CROSS_COMPILE=aarch64-linux-gnu-"
-          args="$args CLANG_TRIPLE=aarch64-linux-gnu-"
-          args="$args AR=llvm-ar CC=clang"
-          
-          echo "args=$args" >> $GITHUB_OUTPUT
+          export SOURCE_DATE_EPOCH=$(date +%s)
 
-      - name: "👍 Make defconfig"
-        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
+          LTO=full \
+          BUILD_CONFIG=${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki.aarch64 \
+          build/build.sh -j$(nproc --all)
+
+      - name: "🩹 Apply KPM patch"
+        working-directory: ${{ env.WORK_DIR }}/out/dist
         run: |
-          make ${{ steps.generate-args.outputs.args }} ${{ env.DEFCONFIG_NAME }}
-
-      - name: "🎶 Build kernel"
-        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
-        run: |
-          export KBUILD_BUILD_USER="Automated"
-          export KBUILD_BUILD_HOST="GitHub"
-
-          make ${{ steps.generate-args.outputs.args }} \
-            LLVM=1 LTO=thin CC=clang AR=llvm-ar \
-            NM=llvm-nm OBJCOPY=llvm-objcopy STRIP=llvm-strip
-
-      - name: "🩹 Patch image with KPM"
-        working-directory: ./${{ env.KERNEL_DIR }}/${{ env.KERNEL_NAME }}
-        run: |
-          cd "../${{ env.OUT_DIR }}/arch/arm64/boot/"
-          
           curl -LSs "${{ matrix.kernel.kpm_patch_url }}" -o patch
           chmod +x patch
           ./patch
-          
-          rm -f Image
           mv oImage "${{ env.OUTPUT_NAME }}"
 
       - name: "📤 Upload kernel artifact"
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.kernel.name }}-kernel
-          path: ${{ env.KERNEL_DIR }}/${{ env.OUT_DIR }}/arch/arm64/boot/${{ env.OUTPUT_NAME }}
+          path: ${{ env.WORK_DIR }}/out/dist/${{ env.OUTPUT_NAME }}
           retention-days: 1
 
   package-kernels:
@@ -409,12 +361,13 @@ jobs:
           ║     • YASK-CLO Kernel (kernel.lnx.5.15.r16-rel)     ║
           ║                                                     ║
           ║     Features:                                       ║
-          ║     • -O2 Optimization                              ║
+          ║     • AOSP Build System & Toolchain                 ║
+          ║     • Thin LTO Optimization                         ║
           ║     • Extra TCP Congestion                          ║
-          ║     • TopNotchFreaks Clang 20                       ║
+          ║     • AOSP clang-r547379                            ║
           ║     • LineageOS disguise                            ║
-          ║     • SukiSU-Ultra v3.1.8 + KPM                     ║
-          ║     • SUSFS v1.5.9 (manual hook)                    ║
+          ║     • Latest SukiSU-Ultra Drivers + KPM             ║
+          ║     • Latest SUSFS version (manual hook)            ║
           ║                                                     ║
           ║     Please ensure:                                  ║
           ║     • Your device is compatible                     ║
