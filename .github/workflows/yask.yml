@@ -97,8 +97,8 @@ jobs:
 
       - name: "📐 Setup build environment"
         run: |
-          # Setup 20GB swap
-          sudo fallocate -l 20G /swapfile
+          # Setup 8GB swap
+          sudo fallocate -l 8G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
