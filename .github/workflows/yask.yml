@@ -116,6 +116,7 @@ jobs:
           # Set localversion
           if [ -n "${{ env.LOCAL_VERSION }}" ]; then
             echo "CONFIG_LOCALVERSION=\"${{ env.LOCAL_VERSION }}\"" >> "$CONFIG_FILE"
+            echo "CONFIG_LOCALVERSION_AUTO=n" >> "$CONFIG_FILE"
           fi
 
       - name: "🧩 Apply kernel patches"
