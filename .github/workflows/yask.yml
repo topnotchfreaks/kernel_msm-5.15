@@ -26,7 +26,7 @@ jobs:
             defconfig: "gki_defconfig"
             local_version: "-YASK/GKI"
             output_name: "Image.gki"
-            kmp_patch_url: "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kmp/patch_linux"
+            kpm_patch_url: "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux"
             extra_patches:
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Revert-bpf-fix-precision-backtracking-instruction-it.patch"
           - name: "CLO"
@@ -37,7 +37,7 @@ jobs:
             defconfig: "gki_defconfig"
             local_version: "-YASK/CLO"
             output_name: "Image.clo"
-            kmp_patch_url: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kmp/patch_linux"
+            kpm_patch_url: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux"
             extra_patches: []
 
     env:
