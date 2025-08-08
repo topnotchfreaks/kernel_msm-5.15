@@ -4,7 +4,6 @@ env:
   OUT_DIR: "out"
   KERNEL_VERSION: "5.15"
   ANDROID_VERSION: "13"
-  SUSFS_BRANCH: "gki-android13-5.15"
 
 on:
   workflow_dispatch:
@@ -54,6 +53,7 @@ jobs:
       kernelDir: common_${{ github.event.inputs.kernelDevice }}
       kernelName: common
       DEFCONFIG_NAME: ${{ github.event.inputs.kernelDevice }}_defconfig
+      WORK_DIR: ${{ github.workspace }}
 
     steps:
       - name: "✨ Setup workspace"
@@ -61,43 +61,13 @@ jobs:
           mkdir -p $kernelDir
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
           sudo apt-get update -qq
-          sudo apt-get install -y build-essential bc curl flex cpio git zip libelf-dev gcc-aarch64-linux-gnu libssl-dev clang lld llvm aria2 dwarves
+          sudo apt-get install -y repo rsync aria2
 
-      - name: "🌟 Clone kernel source"
-        working-directory: ./${{ env.kernelDir }}
-        run: |
-          git clone --recursive --branch ${{ github.event.inputs.kernelBranch }} \
-            ${{ github.event.inputs.kernelSourceURL }} ${{ env.kernelName }} --depth=1
-
-      - name: "💫 Get Clang Toolchain"
-        run: |
-          clang_url=$(curl -sL "https://api.github.com/repos/topnotchfreaks/clang/releases/latest" | \
-                     grep "browser_download_url.*tar.gz" | cut -d '"' -f 4 | head -n 1)
-          
-          if [ -z "$clang_url" ]; then
-            echo "Error: Could not find Clang download URL"
-            exit 1
-          fi
-          
-          mkdir -p clang
-          echo "🚀 Downloading Clang with aria2c..."
-          aria2c -x 16 -s 16 -k 1M --allow-overwrite=true --auto-file-renaming=false \
-            "$clang_url" -o clang.tar.gz
-          
-          tar -xz -C clang --strip-components=1 -f clang.tar.gz
-          rm -rf clang.tar.gz
-          
-          CLANG_PATH="${{ github.workspace }}/clang/bin"
-          echo "CLANG_PATH=$CLANG_PATH" >> $GITHUB_ENV
-          echo "$CLANG_PATH" >> $GITHUB_PATH
-
-      - name: "📐 Setup build environment"
-        run: |
           # Setup swap based on LTO mode
-          if [ "${{ github.event.inputs.ltoMode }}" = "Full" ]; then
-            SWAP_SIZE=20G
-          else
+          if [ "${{ github.event.inputs.ltoMode }}" = "full" ]; then
             SWAP_SIZE=8G
+          else
+            SWAP_SIZE=4G
           fi
           sudo fallocate -l $SWAP_SIZE /swapfile
           sudo chmod 600 /swapfile
@@ -106,24 +76,47 @@ jobs:
           echo "vm.swappiness=60" | sudo tee -a /etc/sysctl.conf
           sudo sysctl -p
 
+      - name: "🌟 Clone kernel source"
+        working-directory: ./${{ env.kernelDir }}
+        run: |
+          git clone --recursive --branch ${{ github.event.inputs.kernelBranch }} \
+            ${{ github.event.inputs.kernelSourceURL }} ${{ env.kernelName }} --depth=1
+
+      - name: "📥 Initialize repo"
+        working-directory: ${{ env.WORK_DIR}}
+        run: |
+          repo init -u https://android.googlesource.com/kernel/manifest -b common-android13-5.15-lts --depth=1
+          repo sync --optimized-fetch --prune --no-clone-bundle --no-tags -j$(nproc --all)
+          
+          rm -rf .repo
+          rm -rf common
+
+          aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r547379.tar.gz "https://github.com/topnotchfreaks/clang/releases/download/v1.0.0/clang-r547379.tar.gz"
+          mkdir -p prebuilts/clang/host/linux-x86/clang-r547379
+          tar -xzf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz -C prebuilts/clang/host/linux-x86/clang-r547379
+          rm -rf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz
+
+          rm -rf prebuilts/clang/host/linux-x86/clang-3289846
+          rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
+          rm -rf prebuilts/clang/host/linux-x86/clang-stable
+          
+          sed -i \
+           -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
+           -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' \
+           ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.constants
+          
+          sed -i '/^POST_DEFCONFIG_CMDS="check_defconfig"/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
+
       - name: "⚙️ Configure kernel"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
+          # Define the config file path
+          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+          
           # Set localversion
           if [ -n "${{ github.event.inputs.localVersion }}" ]; then
-            echo "CONFIG_LOCALVERSION=\"${{ github.event.inputs.localVersion }}\"" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+            echo "CONFIG_LOCALVERSION=\"${{ github.event.inputs.localVersion }}\"" >> "$CONFIG_FILE"
           fi
-          
-          # Set LTO mode
-          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          if [ "${{ github.event.inputs.ltoMode }}" = "Full" ]; then
-            sed -i 's/CONFIG_LTO_CLANG_THIN=y/CONFIG_LTO_CLANG_FULL=y/' "$CONFIG_FILE"
-            sed -i 's/CONFIG_LTO_NONE=y/CONFIG_LTO_CLANG_FULL=y/' "$CONFIG_FILE"
-          else
-            sed -i 's/CONFIG_LTO_CLANG_FULL=y/CONFIG_LTO_CLANG_THIN=y/' "$CONFIG_FILE"
-            sed -i 's/CONFIG_LTO_NONE=y/CONFIG_LTO_CLANG_THIN=y/' "$CONFIG_FILE"
-          fi
-          echo "✅ LTO configs updated"
           
           # Basic optimizations
           echo "CONFIG_KALLSYMS=y" >> "$CONFIG_FILE"
@@ -131,17 +124,8 @@ jobs:
       - name: "🛠 Apply kernel patches"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          # Apply LineageOS disguise patch
           curl -L -o lineage.patch "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-fs-lineageos-disguise.patch"
           patch -p1 < lineage.patch || echo "Warning: Some hunks failed"
-          
-          # Apply Clang 21+ compatibility if needed
-          CLANG_VERSION=$($CLANG_PATH/clang --version | head -n 1 | grep -oP '\d+' | head -n 1)
-          if [ "$CLANG_VERSION" -ge 21 ]; then
-            curl -L -o clang21.patch "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-treewide-clang-compilation-fixup.patch"
-            patch -p1 < clang21.patch || echo "Warning: Some hunks failed"
-            echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe -Wno-strict-prototypes' >> Makefile
-          fi
 
       - name: "🔧 Setup KernelSU (KSU variant only)"
         if: matrix.variant == 'ksu'
@@ -192,27 +176,15 @@ jobs:
           EOF
 
       - name: "🔨 Build kernel"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        working-directory: ${{ env.WORK_DIR }}
         run: |
-          mkdir -p ${{ env.OUT_DIR }}
-          
-          export KBUILD_BUILD_USER="belowzeroiq"
-          export KBUILD_BUILD_HOST="GitHub"
-          
-          # Make defconfig
-          make O=${{ env.OUT_DIR }} ARCH=arm64 LLVM=1 ${{ env.DEFCONFIG_NAME }}
-          
-          # Build kernel
-          make O=${{ env.OUT_DIR }} \
-            ARCH=arm64 \
-            LLVM=1 \
-            LTO=${{ github.event.inputs.ltoMode == 'Full' && 'full' || 'thin' }} \
-            CROSS_COMPILE=aarch64-linux-gnu- \
-            -j$(nproc)
+          LTO=${{ github.event.inputs.ltoMode }} \
+          BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 \
+          build/build.sh -j$(nproc --all)
 
       - name: "🩹 Apply KPM patch (KSU variant only)"
         if: matrix.variant == 'ksu'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}/${{ env.OUT_DIR }}/arch/arm64/boot
+        working-directory: ${{ env.WORK_DIR }}/out/dist
         run: |
           curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
           chmod +x patch
@@ -220,15 +192,15 @@ jobs:
           mv oImage Image
 
       - name: "📦 Prepare artifact"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        working-directory: ${{ env.WORK_DIR }}
         run: |
-          cp ${{ env.OUT_DIR }}/arch/arm64/boot/Image ../Image.${{ matrix.variant }}
+          cp out/dist/Image Image.${{ matrix.variant }}
 
       - name: "📤 Upload kernel"
         uses: actions/upload-artifact@v4
         with:
           name: kernel-${{ matrix.variant }}
-          path: ${{ env.kernelDir }}/Image.${{ matrix.variant }}
+          path: ${{ env.WORK_DIR }}/Image.${{ matrix.variant }}
           retention-days: 3
 
   Package-Kernels:
@@ -243,23 +215,24 @@ jobs:
 
       - name: "📦 Create flashable ZIP"
         run: |
+          BUILD_TIME=$(date +'%Y-%m-%d')
           git clone --depth=1 https://github.com/topnotchfreaks/AnyKernel3 -b master AnyKernel3
           
           # Copy kernels
           find kernels -name "Image.*" -exec cp {} AnyKernel3/ \;
           
           # Create ZIP
-          BUILD_TIME=$(date +'%Y-%m-%d')
           ZIP_NAME="Anykernel3_${{ github.event.inputs.kernelBranch }}_${BUILD_TIME}.zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
           echo "ZIP_PATH=$(pwd)/$ZIP_NAME" >> $GITHUB_ENV
+          echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
 
       - name: "📤 Upload final package"
         uses: actions/upload-artifact@v4
         with:
-          name: Anykernel3_${{ github.event.inputs.kernelBranch }}_${{ env.BUILD_TIME }}.zip
+          name: ${{ env.ZIP_NAME }}
           path: ${{ env.ZIP_PATH }}
           retention-days: 7
 
