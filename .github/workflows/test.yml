@@ -98,10 +98,10 @@ jobs:
       - name: "📐 Setup build environment"
         run: |
           # Setup swap based on LTO mode
-          if [ "${{ github.event.inputs.ltoMode }}" = "Full" ]; then
-            SWAP_SIZE=20G
+          if [ "${{ github.event.inputs.ltoMode }}" = "full" ]; then
+            SWAP_SIZE=10G
           else
-            SWAP_SIZE=8G
+            SWAP_SIZE=4G
           fi
           sudo fallocate -l $SWAP_SIZE /swapfile
           sudo chmod 600 /swapfile
