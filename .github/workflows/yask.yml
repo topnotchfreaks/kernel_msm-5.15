@@ -32,7 +32,7 @@ jobs:
           - name: "CLO"
             dir: "common_clo"
             repo_name: "clo"
-            repo_url: "https://git.codelinaro.org/clo/la/kernel/msm-5.15"
+            repo_url: "https://git.codelinaro.org/clo/la/kernel/msm-5.15.git"
             branch: "kernel.lnx.5.15.r16-rel"
             defconfig: "gki_defconfig"
             local_version: "-YASK-CLO"
