@@ -138,9 +138,6 @@ jobs:
           curl -L -o lineage.patch "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-fs-lineageos-disguise.patch"
           patch -p1 < lineage.patch || echo "Warning: Some hunks failed"
 
-          curl -L -o localversion.patch "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-skip-android-version-and-kmi-strings.patch"
-          patch -p1 < localversion.patch || echo "Warning: Some hunks failed"
-
       - name: "🔧 Setup KernelSU (KSU variant only)"
         if: matrix.variant == 'ksu'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
