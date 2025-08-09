@@ -29,6 +29,7 @@ jobs:
             kpm_patch_url: "https://raw.githubusercontent.com/ShirkNeko/SukiSU_patch/refs/heads/main/kpm/patch_linux"
             extra_patches:
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-Revert-bpf-fix-precision-backtracking-instruction-it.patch"
+              - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-sign-builds.patch"
           - name: "CLO"
             dir: "common_clo"
             repo_name: "clo"
@@ -38,7 +39,8 @@ jobs:
             local_version: "-YASK-CLO"
             output_name: "Image.clo"
             kpm_patch_url: "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux"
-            extra_patches: []
+            extra_patches:
+              - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-sign-builds.patch"
 
     env:
       KERNEL_LOC_DIR: ${{ matrix.kernel.dir }}
@@ -49,8 +51,6 @@ jobs:
       LOCAL_VERSION: ${{ matrix.kernel.local_version }}
       OUTPUT_NAME: ${{ matrix.kernel.output_name }}
       WORK_DIR: ${{ github.workspace }}
-      KBUILD_BUILD_USER: "Automated"
-      KBUILD_BUILD_HOST: "GitHub"
 
     steps:
       - name: "✨ Setup workspace"
@@ -204,8 +204,6 @@ jobs:
       - name: "🔨 Build kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          LINUX_COMPILE_BY="belowzeroiq" \
-          LINUX_COMPILE_HOST="GitHub" \
           LTO=full \
           BUILD_CONFIG=${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}/build.config.gki.aarch64 \
           build/build.sh -j$(nproc --all)
@@ -256,9 +254,20 @@ jobs:
           ║             ██║   ██║  ██║███████║██║  ██╗          ║
           ║             ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝          ║
           ║                                                     ║
-          ║                    by belowzeroiq                   ║
+          ║               Yet Another Stock Kernel              ║
+          ║                   by @belowzeroiq                   ║
+          ║                                                     ║
+          ║              Powered by Github Actions              ║
           ║                                                     ║
           ╠═════════════════════════════════════════════════════╣
+          ║                                                     ║
+          ║     Features:                                       ║
+          ║     • Full LTO Optimization                         ║
+          ║     • Extra TCP Congestion                          ║
+          ║     • AOSP 20 clang-r547379                         ║
+          ║     • LineageOS disguise                            ║
+          ║     • Latest SukiSU-Ultra Drivers + KPM             ║
+          ║     • Latest SUSFS version (manual hook)            ║
           ║                                                     ║
           ║     Please ensure:                                  ║
           ║     • Your device is compatible                     ║
