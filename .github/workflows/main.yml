@@ -127,6 +127,7 @@ jobs:
           # Set localversion
           if [ -n "${{ github.event.inputs.localVersion }}" ]; then
             echo "CONFIG_LOCALVERSION=\"${{ github.event.inputs.localVersion }}\"" >> "$CONFIG_FILE"
+            echo "CONFIG_LOCALVERSION_AUTO=n" >> "$CONFIG_FILE"
           fi
           
           # Basic optimizations
