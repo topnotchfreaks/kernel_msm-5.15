@@ -264,7 +264,7 @@ jobs:
           ║     Features:                                       ║
           ║     • Full LTO Optimization                         ║
           ║     • Extra TCP Congestion                          ║
-          ║     • AOSP 20 clang-r547379                         ║
+          ║     • AOSP clang-r547379                            ║
           ║     • LineageOS disguise                            ║
           ║     • Latest SukiSU-Ultra Drivers + KPM             ║
           ║     • Latest SUSFS version (manual hook)            ║
