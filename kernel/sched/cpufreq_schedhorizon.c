@@ -243,7 +243,7 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 	else
 		freq = map_util_freq(util, freq, max);
 
-	do_freq_limit(sg_policy, &freq, time);
+	//do_freq_limit(sg_policy, &freq, time);
 
 	if (freq == sg_policy->cached_raw_freq && !sg_policy->need_freq_update)
 		return sg_policy->next_freq;
@@ -831,8 +831,8 @@ static int sugov_init(struct cpufreq_policy *policy)
 		goto stop_kthread;
 	}
 
-	tunables->up_rate_limit_us = 500;
-	tunables->down_rate_limit_us = 1000;
+	tunables->up_rate_limit_us = 200;
+	tunables->down_rate_limit_us = 500;
 	tunables->efficient_freq = default_efficient_freq;
 	tunables->nefficient_freq = ARRAY_SIZE(default_efficient_freq);
 	tunables->up_delay = default_up_delay;
