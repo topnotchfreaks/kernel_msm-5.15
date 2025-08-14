@@ -212,6 +212,11 @@ static int __init shrink_async_init(void)
 
 static void __exit shrink_async_exit(void)
 {
+	if (shrink_slabd_tsk) {
+		kthread_stop(shrink_slabd_tsk);
+		shrink_slabd_tsk = NULL;
+	}
+
 	unregister_shrink_async_vendor_hooks();
 
 	pr_info("shrink_async exit succeed!\n");
