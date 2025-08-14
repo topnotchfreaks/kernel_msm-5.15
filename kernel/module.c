@@ -3590,6 +3590,9 @@ static char *custom_module_blacklist[] = {
     "zsmalloc",
 #endif
 #ifdef CONFIG_MACH_XIAOMI_TOPAZ
+	/* Unused scheduler */
+	"cpufreq_ondemand", "cpufreq_userspace",
+
 	/* Useless modules*/
 	"msm_performance",
 
