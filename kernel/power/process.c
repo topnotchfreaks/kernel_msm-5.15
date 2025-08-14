@@ -29,7 +29,7 @@
  * Timeout for stopping processes
  */
 unsigned int __read_mostly freeze_timeout_msecs =
-	IS_ENABLED(CONFIG_ANDROID) ? MSEC_PER_SEC : 20 * MSEC_PER_SEC;
+    IS_ENABLED(CONFIG_ANDROID) ? 500 : 2000; // 0.5s for Android, 2s otherwise
 
 #define MIN(X, Y) (((X) < (Y)) ? (X) : (Y))
 
@@ -42,7 +42,7 @@ static int try_to_freeze_tasks(bool user_only)
 	ktime_t start, end, elapsed;
 	unsigned int elapsed_msecs;
 	bool wakeup = false;
-	int sleep_usecs = USEC_PER_MSEC;
+	int sleep_usecs = USEC_PER_MSEC / 2; // Start with 0.5ms
 	bool todo_logging_on = false;
 
 	start = ktime_get_boottime();
@@ -83,7 +83,7 @@ static int try_to_freeze_tasks(bool user_only)
 		 * 1 ms sleep followed by exponential backoff until 8 ms.
 		 */
 		usleep_range(sleep_usecs / 2, sleep_usecs);
-		if (sleep_usecs < 8 * USEC_PER_MSEC)
+		if (sleep_usecs < 2 * USEC_PER_MSEC) // Cap at 2ms
 			sleep_usecs *= 2;
 	}
 
