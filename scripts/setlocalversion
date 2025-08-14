@@ -69,11 +69,11 @@ scm_version()
 	# Check for git and a git repo.
 	if head=$(git rev-parse --verify HEAD 2>/dev/null); then
 
-		if [ -n "$android_release" ] && [ -n "$kmi_generation" ]; then
-			printf '%s' "-$android_release-$kmi_generation"
-		elif [ -n "$android_release" ]; then
-			printf '%s' "-$android_release"
-		fi
+		# if [ -n "$android_release" ] && [ -n "$kmi_generation" ]; then
+		# 	printf '%s' "-$android_release-$kmi_generation"
+		# elif [ -n "$android_release" ]; then
+		#	printf '%s' "-$android_release"
+		# fi
 		# If we are at a tagged commit (like "v2.6.30-rc6"), by default
 		# we ignore it and manually define VERSION in the top level
 		# Makefile. Alternatively, set --save-tag to keep the tag.
