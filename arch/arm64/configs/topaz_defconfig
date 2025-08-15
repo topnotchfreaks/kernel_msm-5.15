@@ -1,3 +1,7 @@
+# Xiaomi Topaz Defconfig
+# Modules Blocklist
+CONFIG_MACH_XIAOMI_UNIFIED_BLOCKLIST=y
+# -------------------------
 CONFIG_UAPI_HEADER_TEST=y
 CONFIG_AUDIT=y
 CONFIG_NO_HZ=y
