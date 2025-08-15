@@ -105,6 +105,8 @@ jobs:
            -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' \
            ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.constants
           
+          sed -i '/^DEFCONFIG=gki_defconfig/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
+          sed -i '$a\DEFCONFIG=${{ env.DEFCONFIG_NAME }}' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
           sed -i '/^POST_DEFCONFIG_CMDS="check_defconfig"/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
 
           sed -i \
