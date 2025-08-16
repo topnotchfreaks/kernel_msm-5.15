@@ -3585,21 +3585,6 @@ void cpuset_cpus_allowed(struct task_struct *tsk, struct cpumask *pmask)
 	spin_unlock_irqrestore(&callback_lock, flags);
 }
 EXPORT_SYMBOL_GPL(cpuset_cpus_allowed);
-
-#ifdef CONFIG_BINDER_OPT
- /**
-  * Allows the child process of the RT or other threads whose affinity has been
-  * modified to inherit the affinity of its scheduling group.
-  **/
-
-void cpuset_cpus_allowed_mi(struct task_struct *tsk)
-{
- 	rcu_read_lock();
- 	sched_setaffinity(tsk->pid, task_cs(tsk)->cpus_allowed);
- 	rcu_read_unlock();
-}
-#endif
-
 /**
  * cpuset_cpus_allowed_fallback - final fallback before complete catastrophe.
  * @tsk: pointer to task_struct with which the scheduler is struggling

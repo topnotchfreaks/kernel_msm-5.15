@@ -100,9 +100,6 @@
 #include <linux/bpf.h>
 #include <linux/tick.h>
 #include <linux/cpufreq_times.h>
-#ifdef CONFIG_BINDER_OPT
-#include <linux/cpuset.h>
-#endif
 
 #include <asm/pgalloc.h>
 #include <linux/uaccess.h>
@@ -2767,20 +2764,6 @@ pid_t kernel_clone(struct kernel_clone_args *args)
 		lru_gen_add_mm(p->mm);
 		task_unlock(p);
 	}
-#ifdef CONFIG_BINDER_OPT
-	p->top_app = 0;
-	p->inherit_top_app = 0;
-	p->critical_task = 0;
-
-	if (current->critical_task)
-		cpuset_cpus_allowed_mi(p);
-#endif
-#ifdef CONFIG_PERF_CRITICAL_RT_TASK
-	p->critical_rt_task = 0;
-#endif
-#ifdef CONFIG_SF_BINDER
-	p->sf_binder_task = 0;
-#endif
 
 	wake_up_new_task(p);
 
