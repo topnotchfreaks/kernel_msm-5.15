@@ -6179,8 +6179,6 @@ static int binder_open(struct inode *nodp, struct file *filp)
 		proc->tsk->sf_binder_task = 1;
 #endif
 
-	set_binder_prio_uclamp(&proc->default_priority, NULL);
-
 	/* binderfs stashes devices in i_private */
 	if (is_binderfs_device(nodp)) {
 		binder_dev = nodp->i_private;
