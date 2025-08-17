@@ -1,0 +1,45 @@
+################################################################################
+## Inheriting configs from ACK
+. ${ROOT_DIR}/msm-kernel/build.config.common
+. ${ROOT_DIR}/msm-kernel/build.config.aarch64
+
+################################################################################
+## Variant setup
+MSM_ARCH=kalama
+VARIANTS=(consolidate gki)
+[ -z "${VARIANT}" ] && VARIANT=consolidate
+
+ABL_SRC=bootable/bootloader/edk2
+BOOT_IMAGE_HEADER_VERSION=4
+BASE_ADDRESS=0x80000000
+PAGE_SIZE=4096
+BUILD_VENDOR_DLKM=1
+PREPARE_SYSTEM_DLKM=1
+SYSTEM_DLKM_MODULES_LIST=${ROOT_DIR}/${KERNEL_DIR}/android/gki_system_dlkm_modules
+SUPER_IMAGE_SIZE=0x10000000
+TRIM_UNUSED_MODULES=1
+BUILD_INIT_BOOT_IMG=1
+AVB_SIGN_BOOT_IMG=1
+AVB_BOOT_PARTITION_SIZE=100663296
+AVB_BOOT_ALGORITHM=SHA256_RSA4096
+AVB_BOOT_KEY="tools/mkbootimg/gki/testdata/testkey_rsa4096.pem"
+AVB_SIGN_BOOT_IMG_PROP=("com.android.build.boot.os_version:13" "com.android.build.boot.security_patch:2023-05-05")
+
+MODULES_LIST_ORDER="1"
+[ -z "${DT_OVERLAY_SUPPORT}" ] && DT_OVERLAY_SUPPORT=1
+
+if [ "${KERNEL_CMDLINE_CONSOLE_AUTO}" != "0" ]; then
+	KERNEL_VENDOR_CMDLINE+=' console=ttyMSM0,115200n8 earlycon qcom_geni_serial.con_enabled=1 '
+fi
+
+if [ "${VARIANT}" == "gki" ]; then
+	KERNEL_VENDOR_CMDLINE+=' nosoftlockup '
+	VENDOR_EXTRA_CMDLINE=' nosoftlockup '
+fi
+
+KERNEL_VENDOR_CMDLINE+=' bootconfig '
+
+################################################################################
+## Inheriting MSM configs
+. ${KERNEL_DIR}/build.config.msm.common
+. ${KERNEL_DIR}/build.config.msm.gki

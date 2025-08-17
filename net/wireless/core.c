@@ -887,6 +887,7 @@ int wiphy_register(struct wiphy *wiphy)
 			has_ap = iftd->types_mask & ap_bits;
 			has_non_ap = iftd->types_mask & ~ap_bits;
 
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 			/*
 			 * For EHT 20 MHz STA, the capabilities format differs
 			 * but to simplify, don't check 20 MHz but rather check
@@ -896,6 +897,7 @@ int wiphy_register(struct wiphy *wiphy)
 			if (WARN_ON(iftd->eht_cap.has_eht &&
 				    has_ap && has_non_ap))
 				return -EINVAL;
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 		}
 
 		if (WARN_ON(!have_he && band == NL80211_BAND_6GHZ))
@@ -1285,7 +1287,7 @@ void __cfg80211_leave(struct cfg80211_registered_device *rdev,
 		break;
 	case NL80211_IFTYPE_AP:
 	case NL80211_IFTYPE_P2P_GO:
-		__cfg80211_stop_ap(rdev, dev, -1, true);
+		__cfg80211_stop_ap(rdev, dev, -1, true, NULL);
 		break;
 	case NL80211_IFTYPE_OCB:
 		__cfg80211_leave_ocb(rdev, dev);

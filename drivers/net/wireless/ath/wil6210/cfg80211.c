@@ -2184,9 +2184,15 @@ static int wil_cfg80211_start_ap(struct wiphy *wiphy,
 	return rc;
 }
 
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 static int wil_cfg80211_stop_ap(struct wiphy *wiphy,
 				struct net_device *ndev,
 				unsigned int link_id)
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+static int wil_cfg80211_stop_ap(struct wiphy *wiphy,
+				struct net_device *ndev,
+				struct cfg80211_ap_settings *settings)
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 {
 	struct wil6210_priv *wil = wiphy_to_wil(wiphy);
 	struct wil6210_vif *vif = ndev_to_vif(ndev);

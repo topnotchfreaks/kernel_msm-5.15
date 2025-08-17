@@ -1415,8 +1415,15 @@ static void brcmf_link_down(struct brcmf_cfg80211_vif *vif, u16 reason,
 
 		if ((vif->wdev.iftype == NL80211_IFTYPE_STATION) ||
 		    (vif->wdev.iftype == NL80211_IFTYPE_P2P_CLIENT))
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 			cfg80211_disconnected(vif->wdev.netdev, reason, NULL, 0,
 					      locally_generated, GFP_KERNEL);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+			cfg80211_disconnected(vif->wdev.netdev, reason, NULL, 0,
+					      locally_generated,
+					      NL80211_MLO_INVALID_LINK_ID,
+					      GFP_KERNEL);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 	}
 	clear_bit(BRCMF_VIF_STATUS_CONNECTING, &vif->sme_state);
 	clear_bit(BRCMF_SCAN_STATUS_SUPPRESS, &cfg->scan_status);
@@ -2271,7 +2278,12 @@ brcmf_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *ndev,
 
 	clear_bit(BRCMF_VIF_STATUS_CONNECTED, &ifp->vif->sme_state);
 	clear_bit(BRCMF_VIF_STATUS_CONNECTING, &ifp->vif->sme_state);
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 	cfg80211_disconnected(ndev, reason_code, NULL, 0, true, GFP_KERNEL);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+	cfg80211_disconnected(ndev, reason_code, NULL, 0, true,
+			      NL80211_MLO_INVALID_LINK_ID, GFP_KERNEL);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 
 	memcpy(&scbval.ea, &profile->bssid, ETH_ALEN);
 	scbval.val = cpu_to_le32(reason_code);
@@ -4950,8 +4962,13 @@ exit:
 	return err;
 }
 
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 static int brcmf_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *ndev,
 				  unsigned int link_id)
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+static int brcmf_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *ndev,
+				  struct cfg80211_ap_settings *settings)
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 {
 	struct brcmf_cfg80211_info *cfg = wiphy_to_cfg(wiphy);
 	struct brcmf_if *ifp = netdev_priv(ndev);

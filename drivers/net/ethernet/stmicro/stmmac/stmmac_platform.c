@@ -215,12 +215,13 @@ static int stmmac_mtl_setup(struct platform_device *pdev,
 
 		queue++;
 	}
+#if !IS_ENABLED(CONFIG_DWMAC_QCOM_ETHQOS)
 	if (queue != plat->rx_queues_to_use) {
 		ret = -EINVAL;
 		dev_err(&pdev->dev, "Not all RX queues were configured\n");
 		goto out;
 	}
-
+#endif
 	/* Processing TX queues common config */
 	if (of_property_read_u32(tx_node, "snps,tx-queues-to-use",
 				 &plat->tx_queues_to_use))
@@ -279,6 +280,7 @@ static int stmmac_mtl_setup(struct platform_device *pdev,
 
 		queue++;
 	}
+#if !IS_ENABLED(CONFIG_DWMAC_QCOM_ETHQOS)
 	if (queue != plat->tx_queues_to_use) {
 		ret = -EINVAL;
 		dev_err(&pdev->dev, "Not all TX queues were configured\n");
@@ -286,6 +288,7 @@ static int stmmac_mtl_setup(struct platform_device *pdev,
 	}
 
 out:
+#endif
 	of_node_put(rx_node);
 	of_node_put(tx_node);
 	of_node_put(q_node);
@@ -466,6 +469,9 @@ stmmac_probe_config_dt(struct platform_device *pdev, u8 *mac)
 	/* Default to phy auto-detection */
 	plat->phy_addr = -1;
 
+	/* Flag for mac2mac feature support*/
+	plat->mac2mac_en = of_property_read_bool(np, "mac2mac");
+
 	/* Default to get clk_csr from stmmac_clk_crs_set(),
 	 * or get clk_csr from device tree.
 	 */
@@ -478,10 +484,12 @@ stmmac_probe_config_dt(struct platform_device *pdev, u8 *mac)
 	if (of_property_read_u32(np, "snps,phy-addr", &plat->phy_addr) == 0)
 		dev_warn(&pdev->dev, "snps,phy-addr property is deprecated\n");
 
-	rc = stmmac_mdio_setup(plat, np, &pdev->dev);
-	if (rc) {
-		ret = ERR_PTR(rc);
-		goto error_put_phy;
+	if (!plat->mac2mac_en) {
+		rc = stmmac_mdio_setup(plat, np, &pdev->dev);
+		if (rc) {
+			ret = ERR_PTR(rc);
+			goto error_put_phy;
+		}
 	}
 
 	of_property_read_u32(np, "tx-fifo-depth", &plat->tx_fifo_size);
@@ -561,6 +569,8 @@ stmmac_probe_config_dt(struct platform_device *pdev, u8 *mac)
 
 	if (of_device_is_compatible(np, "snps,dwxgmac")) {
 		plat->has_xgmac = 1;
+		plat->has_gmac4 = 0;
+		plat->has_gmac = 0;
 		plat->pmt = 1;
 		plat->tso_en = of_property_read_bool(np, "snps,tso");
 	}
@@ -629,6 +639,12 @@ stmmac_probe_config_dt(struct platform_device *pdev, u8 *mac)
 		plat->clk_ptp_rate = clk_get_rate(plat->clk_ptp_ref);
 		dev_dbg(&pdev->dev, "PTP rate %d\n", plat->clk_ptp_rate);
 	}
+
+	of_property_read_u32(np,
+			     "snps,ptp-ref-clk-rate", &plat->clk_ptp_rate);
+
+	of_property_read_u32(np,
+			     "snps,ptp-req-clk-rate", &plat->clk_ptp_req_rate);
 
 	plat->stmmac_rst = devm_reset_control_get_optional(&pdev->dev,
 							   STMMAC_RESOURCE_NAME);

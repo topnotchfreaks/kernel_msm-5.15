@@ -642,8 +642,14 @@ void prism2_connect_result(struct wlandevice *wlandev, u8 failed)
 
 void prism2_disconnected(struct wlandevice *wlandev)
 {
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 	cfg80211_disconnected(wlandev->netdev, 0, NULL,
 			      0, false, GFP_KERNEL);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+	cfg80211_disconnected(wlandev->netdev, 0, NULL,
+			      0, false, NL80211_MLO_INVALID_LINK_ID,
+			      GFP_KERNEL);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 }
 
 void prism2_roamed(struct wlandevice *wlandev)

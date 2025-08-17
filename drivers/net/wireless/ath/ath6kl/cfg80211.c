@@ -895,8 +895,14 @@ void ath6kl_cfg80211_disconnect_event(struct ath6kl_vif *vif, u8 reason,
 					WLAN_STATUS_UNSPECIFIED_FAILURE,
 					GFP_KERNEL);
 	} else if (vif->sme_state == SME_CONNECTED) {
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 		cfg80211_disconnected(vif->ndev, proto_reason,
 				      NULL, 0, false, GFP_KERNEL);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+		cfg80211_disconnected(vif->ndev, proto_reason,
+				      NULL, 0, false,
+				      NL80211_MLO_INVALID_LINK_ID, GFP_KERNEL);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 	}
 
 	vif->sme_state = SME_DISCONNECTED;
@@ -2967,8 +2973,13 @@ static int ath6kl_change_beacon(struct wiphy *wiphy, struct net_device *dev,
 	return ath6kl_set_ies(vif, beacon);
 }
 
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 static int ath6kl_stop_ap(struct wiphy *wiphy, struct net_device *dev,
 			  unsigned int link_id)
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+static int ath6kl_stop_ap(struct wiphy *wiphy, struct net_device *dev,
+			  struct cfg80211_ap_settings *settings)
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 {
 	struct ath6kl *ar = ath6kl_priv(dev);
 	struct ath6kl_vif *vif = netdev_priv(dev);
@@ -3486,7 +3497,12 @@ void ath6kl_cfg80211_stop(struct ath6kl_vif *vif)
 					GFP_KERNEL);
 		break;
 	case SME_CONNECTED:
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 		cfg80211_disconnected(vif->ndev, 0, NULL, 0, true, GFP_KERNEL);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+		cfg80211_disconnected(vif->ndev, 0, NULL, 0, true,
+				      NL80211_MLO_INVALID_LINK_ID, GFP_KERNEL);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 		break;
 	}
 

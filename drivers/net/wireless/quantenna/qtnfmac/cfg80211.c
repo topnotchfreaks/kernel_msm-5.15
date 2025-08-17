@@ -352,8 +352,13 @@ static int qtnf_start_ap(struct wiphy *wiphy, struct net_device *dev,
 	return ret;
 }
 
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 static int qtnf_stop_ap(struct wiphy *wiphy, struct net_device *dev,
 			unsigned int link_id)
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+static int qtnf_stop_ap(struct wiphy *wiphy, struct net_device *dev,
+			struct cfg80211_ap_settings *settings)
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 {
 	struct qtnf_vif *vif = qtnf_netdev_get_priv(dev);
 	int ret;
@@ -734,8 +739,15 @@ qtnf_disconnect(struct wiphy *wiphy, struct net_device *dev,
 
 	if (vif->wdev.connected) {
 		netif_carrier_off(vif->netdev);
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 		cfg80211_disconnected(vif->netdev, reason_code,
 				      NULL, 0, true, GFP_KERNEL);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+		cfg80211_disconnected(vif->netdev, reason_code,
+				      NULL, 0, true,
+				      NL80211_MLO_INVALID_LINK_ID,
+				      GFP_KERNEL);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 	}
 
 	return ret;
@@ -1266,8 +1278,14 @@ void qtnf_virtual_intf_cleanup(struct net_device *ndev)
 void qtnf_cfg80211_vif_reset(struct qtnf_vif *vif)
 {
 	if (vif->wdev.iftype == NL80211_IFTYPE_STATION)
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 		cfg80211_disconnected(vif->netdev, WLAN_REASON_DEAUTH_LEAVING,
 				      NULL, 0, 1, GFP_KERNEL);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+		cfg80211_disconnected(vif->netdev, WLAN_REASON_DEAUTH_LEAVING,
+				      NULL, 0, 1, NL80211_MLO_INVALID_LINK_ID,
+				      GFP_KERNEL);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 
 	cfg80211_shutdown_all_interfaces(vif->wdev.wiphy);
 }

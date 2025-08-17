@@ -1817,6 +1817,81 @@ struct ieee80211_vht_operation {
 	__le16 basic_mcs_set;
 } __packed;
 
+#ifdef CFG80211_PROP_MULTI_LINK_SUPPORT
+/**
+ * enum ieee80211_eht_mcs_support - EHT MCS support definitions
+ * @IEEE80211_EHT_MCS_SUPPORT_0_9: MCSes 0-9 are supported for the
+ *	number of streams
+ * @IEEE80211_EHT_MCS_SUPPORT_0_11: MCSes 0-11 are supported
+ * @IEEE80211_EHT_MCS_SUPPORT_0_13: MCSes 0-13 are supported
+ * @IEEE80211_EHT_MCS_NOT_SUPPORTED: This number of streams isn't supported
+ *
+ * These definitions are used in each 2-bit subfield of the rx_mcs_*
+ * and tx_mcs_* fields of &struct ieee80211_eht_mcs_nss_supp, which are
+ * both split into 16 subfields by number of streams. These values indicate
+ * which MCSes are supported for the number of streams the value appears
+ * for.
+ */
+enum ieee80211_eht_mcs_support {
+	IEEE80211_EHT_MCS_SUPPORT_0_9	= 0,
+	IEEE80211_EHT_MCS_SUPPORT_0_11	= 1,
+	IEEE80211_EHT_MCS_SUPPORT_0_13	= 2,
+	IEEE80211_EHT_MCS_NOT_SUPPORTED	= 3,
+};
+
+/**
+ * struct ieee80211_eht_mcs_nss_supp - EHT Tx/Rx HE MCS NSS Support Field
+ *
+ * This structure holds the data required for the Tx/Rx HE MCS NSS Support Field
+ * described in Drat
+ *
+ * @rx_mcs_80: Rx MCS map 2 bits for each stream, total 16 streams, for channel
+ *     widths less than 80MHz.
+ * @tx_mcs_80: Tx MCS map 2 bits for each stream, total 16 streams, for channel
+ *     widths less than 80MHz.
+ * @rx_mcs_160: Rx MCS map 2 bits for each stream, total 16 streams, for channel
+ *     width 160MHz.
+ * @tx_mcs_160: Tx MCS map 2 bits for each stream, total 16 streams, for channel
+ *     width 160MHz.
+ * @rx_mcs_320: Rx MCS map 2 bits for each stream, total 16 streams, for channel
+ *	   width 320MHz.
+ * @tx_mcs_320: Tx MCS map 2 bits for each stream, total 16 streams, for channel
+ *     width 320MHz.
+ */
+struct ieee80211_eht_mcs_nss_supp {
+	__le32 rx_mcs_80;
+	__le32 tx_mcs_80;
+	__le32 rx_mcs_160;
+	__le32 tx_mcs_160;
+	__le32 rx_mcs_320;
+	__le32 tx_mcs_320;
+} __packed;
+
+/**
+ * struct ieee80211_eht_operation - EHT capabilities element
+ *
+ * This structure is the "EHT operation element" fields as
+ * described in 11be Draft
+ */
+struct ieee80211_eht_operation {
+	__le32 eht_oper_params;
+	__le16 eht_mcs_nss_set;
+	/* Optional 0,1,3,4,5,7 or 8 bytes: depends on @eht_oper_params */
+	u8 optional[];
+} __packed;
+
+/**
+ * struct ieee80211_eht_cap_elem - HE capabilities element
+ *
+ * This structure is the "EHT capabilities element" fixed fields as
+ * described in 11be Draft
+ */
+struct ieee80211_eht_cap_elem {
+	u8 mac_cap_info[2]; /* TBD */
+	u8 phy_cap_info[9]; /* TBD */
+} __packed;
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+
 /**
  * struct ieee80211_he_cap_elem - HE capabilities element
  *
@@ -1933,6 +2008,7 @@ struct ieee80211_mu_edca_param_set {
 #define IEEE80211_EHT_MCS_NSS_RX 0x0f
 #define IEEE80211_EHT_MCS_NSS_TX 0xf0
 
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 /**
  * struct ieee80211_eht_mcs_nss_supp_20mhz_only - EHT 20MHz only station max
  * supported NSS for per MCS.
@@ -2038,6 +2114,7 @@ struct ieee80211_eht_operation {
 	__le32 basic_mcs_nss;
 	u8 optional[];
 } __packed;
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 
 /**
  * struct ieee80211_eht_operation_info - eht operation information
@@ -2802,6 +2879,7 @@ ieee80211_he_spr_size(const u8 *he_spr_ie)
 #define IEEE80211_EHT_OPER_CHAN_WIDTH_160MHZ	3
 #define IEEE80211_EHT_OPER_CHAN_WIDTH_320MHZ	4
 
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 /* Calculate 802.11be EHT capabilities IE Tx/Rx EHT MCS NSS Support Field size */
 static inline u8
 ieee80211_eht_mcs_nss_size(const struct ieee80211_he_cap_elem *he_cap,
@@ -2915,6 +2993,15 @@ ieee80211_eht_oper_size_ok(const u8 *data, u8 len)
 
 	return len >= needed;
 }
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+/* 802.11be EHT MAC capabilities */
+
+/* TBD: 11BE MAC capabilities go here */
+
+/* 802.11be EHT PHY capabilities */
+
+/* TBD: 11BE PHY capabilities go here */
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 
 #define LISTEN_INT_USF	GENMASK(15, 14)
 #define LISTEN_INT_UI	GENMASK(13, 0)

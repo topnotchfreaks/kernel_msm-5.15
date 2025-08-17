@@ -234,8 +234,14 @@ void mwifiex_reset_connect_state(struct mwifiex_private *priv, u16 reason_code,
 		    priv->cfg_bssid, reason_code);
 	if (priv->bss_mode == NL80211_IFTYPE_STATION ||
 	    priv->bss_mode == NL80211_IFTYPE_P2P_CLIENT) {
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 		cfg80211_disconnected(priv->netdev, reason_code, NULL, 0,
 				      !from_ap, GFP_KERNEL);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+		cfg80211_disconnected(priv->netdev, reason_code, NULL, 0,
+				      !from_ap, NL80211_MLO_INVALID_LINK_ID,
+				      GFP_KERNEL);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 	}
 	eth_zero_addr(priv->cfg_bssid);
 

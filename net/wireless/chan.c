@@ -966,9 +966,16 @@ cfg80211_chandef_dfs_cac_time(struct wiphy *wiphy,
 	return max(t1, t2);
 }
 
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 static bool cfg80211_secondary_chans_ok(struct wiphy *wiphy,
 					u32 center_freq, u32 bandwidth,
 					u32 prohibited_flags)
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+static bool cfg80211_secondary_chans_ok(struct wiphy *wiphy,
+					u32 center_freq, u32 bandwidth,
+					u32 prohibited_flags,
+					u32 puncture_bitmap)
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 {
 	struct ieee80211_channel *c;
 	u32 freq, start_freq, end_freq;
@@ -977,6 +984,15 @@ static bool cfg80211_secondary_chans_ok(struct wiphy *wiphy,
 	end_freq = cfg80211_get_end_freq(center_freq, bandwidth);
 
 	for (freq = start_freq; freq <= end_freq; freq += MHZ_TO_KHZ(20)) {
+#ifdef CFG80211_PROP_MULTI_LINK_SUPPORT
+		u32 disabled_sub_chan = 0;
+
+		disabled_sub_chan =
+			(1 << (KHZ_TO_MHZ(freq) - KHZ_TO_MHZ(start_freq)) / 20) &
+			puncture_bitmap;
+		if (disabled_sub_chan)
+			continue;
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 		c = ieee80211_get_channel_khz(wiphy, freq);
 		if (!c || c->flags & prohibited_flags)
 			return false;
@@ -1050,6 +1066,10 @@ bool cfg80211_chandef_usable(struct wiphy *wiphy,
 	const struct ieee80211_sband_iftype_data *iftd;
 	struct ieee80211_supported_band *sband;
 	int i;
+#ifdef CFG80211_PROP_MULTI_LINK_SUPPORT
+	u32 puncture_bitmap_cfreq1 = 0;
+	u32 puncture_bitmap_cfreq2 = 0;
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 
 	if (WARN_ON(!cfg80211_chandef_valid(chandef)))
 		return false;
@@ -1200,7 +1220,7 @@ bool cfg80211_chandef_usable(struct wiphy *wiphy,
 	if (width < 20)
 		prohibited_flags |= IEEE80211_CHAN_NO_OFDM;
 
-
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 	if (!cfg80211_secondary_chans_ok(wiphy,
 					 ieee80211_chandef_to_khz(chandef),
 					 width, prohibited_flags))
@@ -1211,6 +1231,25 @@ bool cfg80211_chandef_usable(struct wiphy *wiphy,
 	return cfg80211_secondary_chans_ok(wiphy,
 					   MHZ_TO_KHZ(chandef->center_freq2),
 					   width, prohibited_flags);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+	if (chandef->center_freq2)
+		puncture_bitmap_cfreq2 = chandef->puncture_bitmap;
+	else
+		puncture_bitmap_cfreq1 = chandef->puncture_bitmap;
+
+	if (!cfg80211_secondary_chans_ok(wiphy,
+					 ieee80211_chandef_to_khz(chandef),
+					 width, prohibited_flags,
+					 puncture_bitmap_cfreq1))
+		return false;
+
+	if (!chandef->center_freq2)
+		return true;
+	return cfg80211_secondary_chans_ok(wiphy,
+					   MHZ_TO_KHZ(chandef->center_freq2),
+					   width, prohibited_flags,
+					   puncture_bitmap_cfreq2);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 }
 EXPORT_SYMBOL(cfg80211_chandef_usable);
 

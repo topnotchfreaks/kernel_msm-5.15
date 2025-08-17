@@ -215,7 +215,12 @@ static void cfg_connect_result(enum conn_event conn_disconn_evt, u8 mac_status,
 				reason = 1;
 		}
 
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 		cfg80211_disconnected(dev, reason, NULL, 0, false, GFP_KERNEL);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+		cfg80211_disconnected(dev, reason, NULL, 0, false,
+				      NL80211_MLO_INVALID_LINK_ID, GFP_KERNEL);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 	}
 }
 
@@ -466,7 +471,12 @@ static int disconnect(struct wiphy *wiphy, struct net_device *dev,
 
 	if (wilc->close) {
 		/* already disconnected done */
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 		cfg80211_disconnected(dev, 0, NULL, 0, true, GFP_KERNEL);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+		cfg80211_disconnected(dev, 0, NULL, 0, true,
+				      NL80211_MLO_INVALID_LINK_ID, GFP_KERNEL);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 		return 0;
 	}
 
@@ -1399,8 +1409,13 @@ static int change_beacon(struct wiphy *wiphy, struct net_device *dev,
 	return wilc_add_beacon(vif, 0, 0, beacon);
 }
 
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 static int stop_ap(struct wiphy *wiphy, struct net_device *dev,
 		   unsigned int link_id)
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+static int stop_ap(struct wiphy *wiphy, struct net_device *dev,
+		   struct cfg80211_ap_settings *settings)
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 {
 	int ret;
 	struct wilc_vif *vif = netdev_priv(dev);

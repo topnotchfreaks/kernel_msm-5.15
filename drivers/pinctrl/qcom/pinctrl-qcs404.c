@@ -358,7 +358,7 @@ static const unsigned int sdc2_data_pins[] = { 126 };
 
 enum qcs404_functions {
 	msm_mux_gpio,
-	msm_mux_hdmi_tx,
+	msm_mux_hdmi_cec,
 	msm_mux_hdmi_ddc,
 	msm_mux_blsp_uart_tx_a2,
 	msm_mux_blsp_spi2,
@@ -411,22 +411,46 @@ enum qcs404_functions {
 	msm_mux_blsp_i2c_sda_b2,
 	msm_mux_blsp_i2c_scl_b2,
 	msm_mux_pwm_led11,
+	msm_mux_i2s_1_sck,
+	msm_mux_i2s_1_ws,
+	msm_mux_i2s_1_data0_dsd0,
+	msm_mux_i2s_1_data0,
+	msm_mux_i2s_1_data1_dsd1,
+	msm_mux_i2s_1_data1,
+	msm_mux_i2s_1_data2_dsd2,
+	msm_mux_i2s_1_data2,
+	msm_mux_i2s_1_data3_dsd3,
+	msm_mux_i2s_1_data3,
+	msm_mux_i2s_1_data4_dsd4,
+	msm_mux_i2s_1_data5_dsd5,
 	msm_mux_i2s_3_data0_a,
 	msm_mux_ebi2_lcd,
+	msm_mux_hdmi_hot,
 	msm_mux_i2s_3_data1_a,
 	msm_mux_i2s_3_data2_a,
 	msm_mux_atest_char,
 	msm_mux_pwm_led3,
 	msm_mux_i2s_3_data3_a,
 	msm_mux_pwm_led4,
-	msm_mux_i2s_4,
+	msm_mux_i2s_4_sck,
 	msm_mux_ebi2_a,
 	msm_mux_dsd_clk_b,
 	msm_mux_pwm_led5,
+	msm_mux_i2s_4_ws,
+	msm_mux_i2s_4_data0_dsd0,
 	msm_mux_pwm_led6,
+	msm_mux_i2s_4_data0,
+	msm_mux_i2s_4_data1_dsd1,
 	msm_mux_pwm_led7,
+	msm_mux_i2s_4_data1,
+	msm_mux_i2s_4_data2_dsd2,
 	msm_mux_pwm_led8,
+	msm_mux_i2s_4_data2,
+	msm_mux_i2s_4_data3_dsd3,
 	msm_mux_pwm_led24,
+	msm_mux_i2s_4_data3,
+	msm_mux_i2s_4_data4_dsd4,
+	msm_mux_i2s_4_data5_dsd5,
 	msm_mux_spkr_dac0,
 	msm_mux_blsp_i2c4,
 	msm_mux_pwm_led9,
@@ -547,28 +571,24 @@ static const char * const gpio_groups[] = {
 	"gpio0", "gpio1", "gpio2", "gpio3", "gpio4", "gpio5", "gpio6", "gpio7",
 	"gpio8", "gpio9", "gpio10", "gpio11", "gpio12", "gpio13", "gpio14",
 	"gpio15", "gpio16", "gpio17", "gpio18", "gpio19", "gpio20", "gpio21",
-	"gpio21", "gpio21", "gpio22", "gpio22", "gpio23", "gpio23", "gpio24",
-	"gpio25", "gpio26", "gpio27", "gpio28", "gpio29", "gpio30", "gpio31",
-	"gpio32", "gpio33", "gpio34", "gpio35", "gpio36", "gpio36", "gpio36",
-	"gpio36", "gpio37", "gpio37", "gpio37", "gpio38", "gpio38", "gpio38",
-	"gpio39", "gpio39", "gpio40", "gpio40", "gpio41", "gpio41", "gpio41",
-	"gpio42", "gpio43", "gpio44", "gpio45", "gpio46", "gpio47", "gpio48",
-	"gpio49", "gpio50", "gpio51", "gpio52", "gpio53", "gpio54", "gpio55",
-	"gpio56", "gpio57", "gpio58", "gpio59", "gpio59", "gpio60", "gpio61",
-	"gpio62", "gpio63", "gpio64", "gpio65", "gpio66", "gpio67", "gpio68",
-	"gpio69", "gpio70", "gpio71", "gpio72", "gpio73", "gpio74", "gpio75",
-	"gpio76", "gpio77", "gpio77", "gpio78", "gpio78", "gpio78", "gpio79",
-	"gpio79", "gpio79", "gpio80", "gpio81", "gpio81", "gpio82", "gpio83",
-	"gpio84", "gpio85", "gpio86", "gpio87", "gpio88", "gpio89", "gpio90",
-	"gpio91", "gpio92", "gpio93", "gpio94", "gpio95", "gpio96", "gpio97",
-	"gpio98", "gpio99", "gpio100", "gpio101", "gpio102", "gpio103",
-	"gpio104", "gpio105", "gpio106", "gpio107", "gpio108", "gpio108",
-	"gpio108", "gpio109", "gpio109", "gpio110", "gpio111", "gpio112",
-	"gpio113", "gpio114", "gpio115", "gpio116", "gpio117", "gpio118",
-	"gpio119",
+	"gpio22", "gpio23", "gpio24", "gpio25", "gpio26", "gpio27", "gpio28",
+	"gpio29", "gpio30", "gpio31", "gpio32", "gpio33", "gpio34", "gpio35",
+	"gpio36", "gpio37", "gpio38", "gpio39", "gpio40", "gpio41", "gpio42",
+	"gpio43", "gpio44", "gpio45", "gpio46", "gpio47", "gpio48", "gpio49",
+	"gpio50", "gpio51", "gpio52", "gpio53", "gpio54", "gpio55", "gpio56",
+	"gpio57", "gpio58", "gpio59", "gpio60", "gpio61", "gpio62", "gpio63",
+	"gpio64", "gpio65", "gpio66", "gpio67", "gpio68", "gpio69", "gpio70",
+	"gpio71", "gpio72", "gpio73", "gpio74", "gpio75", "gpio76", "gpio77",
+	"gpio78", "gpio79", "gpio80", "gpio81", "gpio82", "gpio83", "gpio84",
+	"gpio85", "gpio86", "gpio87", "gpio88", "gpio89", "gpio90", "gpio91",
+	"gpio92", "gpio93", "gpio94", "gpio95", "gpio96", "gpio97", "gpio98",
+	"gpio99", "gpio100", "gpio101", "gpio102", "gpio103", "gpio104",
+	"gpio105", "gpio106", "gpio107", "gpio108", "gpio109", "gpio110",
+	"gpio111", "gpio112", "gpio113", "gpio114", "gpio115", "gpio116",
+	"gpio117", "gpio118", "gpio119",
 };
 
-static const char * const hdmi_tx_groups[] = {
+static const char * const hdmi_cec_groups[] = {
 	"gpio14",
 };
 
@@ -784,6 +804,10 @@ static const char * const pwm_led11_groups[] = {
 	"gpio43",
 };
 
+static const char * const hdmi_hot_groups[] = {
+	"gpio106",
+};
+
 static const char * const i2s_3_data0_a_groups[] = {
 	"gpio106",
 };
@@ -815,10 +839,44 @@ static const char * const i2s_3_data3_a_groups[] = {
 static const char * const pwm_led4_groups[] = {
 	"gpio109",
 };
-
-static const char * const i2s_4_groups[] = {
-	"gpio110", "gpio111", "gpio111", "gpio112", "gpio112", "gpio113",
-	"gpio113", "gpio114", "gpio114", "gpio115", "gpio115", "gpio116",
+static const char * const i2s_1_sck_groups[] = {
+	"gpio87",
+};
+static const char * const i2s_1_ws_groups[] = {
+	"gpio88",
+};
+static const char * const i2s_1_data0_dsd0_groups[] = {
+	"gpio88",
+};
+static const char * const i2s_1_data0_groups[] = {
+	"gpio89",
+};
+static const char * const i2s_1_data1_dsd1_groups[] = {
+	"gpio89",
+};
+static const char * const i2s_1_data1_groups[] = {
+	"gpio90",
+};
+static const char * const i2s_1_data2_dsd2_groups[] = {
+	"gpio90",
+};
+static const char * const i2s_1_data2_groups[] = {
+	"gpio91",
+};
+static const char * const i2s_1_data3_dsd3_groups[] = {
+	"gpio91",
+};
+static const char * const i2s_1_data3_groups[] = {
+	"gpio92",
+};
+static const char * const i2s_1_data4_dsd4_groups[] = {
+	"gpio92",
+};
+static const char * const i2s_1_data5_dsd5_groups[] = {
+	"gpio93",
+};
+static const char * const i2s_4_sck_groups[] = {
+	"gpio110",
 };
 
 static const char * const ebi2_a_groups[] = {
@@ -832,23 +890,51 @@ static const char * const dsd_clk_b_groups[] = {
 static const char * const pwm_led5_groups[] = {
 	"gpio110",
 };
-
+static const char * const i2s_4_ws_groups[] = {
+	"gpio111",
+};
+static const char * const i2s_4_data0_dsd0_groups[] = {
+	"gpio111",
+};
 static const char * const pwm_led6_groups[] = {
 	"gpio111",
 };
-
+static const char * const i2s_4_data0_groups[] = {
+	"gpio112",
+};
+static const char * const i2s_4_data1_dsd1_groups[] = {
+	"gpio112",
+};
 static const char * const pwm_led7_groups[] = {
 	"gpio112",
 };
-
+static const char * const i2s_4_data1_groups[] = {
+	"gpio113",
+};
+static const char * const i2s_4_data2_dsd2_groups[] = {
+	"gpio113",
+};
 static const char * const pwm_led8_groups[] = {
 	"gpio113",
 };
-
+static const char * const i2s_4_data2_groups[] = {
+	"gpio114",
+};
+static const char * const i2s_4_data3_dsd3_groups[] = {
+	"gpio114",
+};
 static const char * const pwm_led24_groups[] = {
 	"gpio114",
 };
-
+static const char * const i2s_4_data3_groups[] = {
+	"gpio115",
+};
+static const char * const i2s_4_data4_dsd4_groups[] = {
+	"gpio115",
+};
+static const char * const i2s_4_data5_dsd5_groups[] = {
+	"gpio116",
+};
 static const char * const spkr_dac0_groups[] = {
 	"gpio116",
 };
@@ -1305,7 +1391,7 @@ static const char * const i2s_3_ws_a_groups[] = {
 
 static const struct msm_function qcs404_functions[] = {
 	FUNCTION(gpio),
-	FUNCTION(hdmi_tx),
+	FUNCTION(hdmi_cec),
 	FUNCTION(hdmi_ddc),
 	FUNCTION(blsp_uart_tx_a2),
 	FUNCTION(blsp_spi2),
@@ -1358,6 +1444,7 @@ static const struct msm_function qcs404_functions[] = {
 	FUNCTION(blsp_i2c_sda_b2),
 	FUNCTION(blsp_i2c_scl_b2),
 	FUNCTION(pwm_led11),
+	FUNCTION(hdmi_hot),
 	FUNCTION(i2s_3_data0_a),
 	FUNCTION(ebi2_lcd),
 	FUNCTION(i2s_3_data1_a),
@@ -1366,14 +1453,37 @@ static const struct msm_function qcs404_functions[] = {
 	FUNCTION(pwm_led3),
 	FUNCTION(i2s_3_data3_a),
 	FUNCTION(pwm_led4),
-	FUNCTION(i2s_4),
+	FUNCTION(i2s_1_sck),
+	FUNCTION(i2s_4_sck),
 	FUNCTION(ebi2_a),
 	FUNCTION(dsd_clk_b),
 	FUNCTION(pwm_led5),
+	FUNCTION(i2s_1_ws),
+	FUNCTION(i2s_1_data0_dsd0),
+	FUNCTION(i2s_4_ws),
+	FUNCTION(i2s_4_data0_dsd0),
 	FUNCTION(pwm_led6),
+	FUNCTION(i2s_1_data0),
+	FUNCTION(i2s_1_data1_dsd1),
+	FUNCTION(i2s_4_data0),
+	FUNCTION(i2s_4_data1_dsd1),
 	FUNCTION(pwm_led7),
+	FUNCTION(i2s_1_data1),
+	FUNCTION(i2s_1_data2_dsd2),
+	FUNCTION(i2s_4_data1),
+	FUNCTION(i2s_4_data2_dsd2),
 	FUNCTION(pwm_led8),
+	FUNCTION(i2s_1_data2),
+	FUNCTION(i2s_1_data3_dsd3),
+	FUNCTION(i2s_4_data2),
+	FUNCTION(i2s_4_data3_dsd3),
 	FUNCTION(pwm_led24),
+	FUNCTION(i2s_1_data3),
+	FUNCTION(i2s_1_data4_dsd4),
+	FUNCTION(i2s_1_data5_dsd5),
+	FUNCTION(i2s_4_data3),
+	FUNCTION(i2s_4_data4_dsd4),
+	FUNCTION(i2s_4_data5_dsd5),
 	FUNCTION(spkr_dac0),
 	FUNCTION(blsp_i2c4),
 	FUNCTION(pwm_led9),
@@ -1509,7 +1619,7 @@ static const struct msm_pingroup qcs404_groups[] = {
 	[11] = PINGROUP(11, SOUTH, _, _, _, _, _, _, _, _, _),
 	[12] = PINGROUP(12, SOUTH, _, _, _, _, _, _, _, _, _),
 	[13] = PINGROUP(13, SOUTH, _, _, _, _, _, _, _, _, _),
-	[14] = PINGROUP(14, SOUTH, hdmi_tx, _, _, _, _, _, _, _, _),
+	[14] = PINGROUP(14, SOUTH, hdmi_cec, _, _, _, _, _, _, _, _),
 	[15] = PINGROUP(15, SOUTH, hdmi_ddc, _, _, _, _, _, _, _, _),
 	[16] = PINGROUP(16, SOUTH, hdmi_ddc, _, _, _, _, _, _, _, _),
 	[17] = PINGROUP(17, NORTH, blsp_uart_tx_a2, blsp_spi2, m_voc, _, _, _, _, _, _),
@@ -1582,13 +1692,16 @@ static const struct msm_pingroup qcs404_groups[] = {
 	[84] = PINGROUP(84, NORTH, blsp_uart3, blsp_i2c3, blsp_spi3, gcc_gp1_clk_a, qdss_cti_trig_in_b1, _, _, _, _),
 	[85] = PINGROUP(85, NORTH, blsp_uart3, blsp_i2c3, blsp_spi3, gcc_gp2_clk_a, qdss_tracedata_b, _, _, _, _),
 	[86] = PINGROUP(86, EAST, ext_mclk0, mclk_in1, _, _, _, _, _, _, _),
-	[87] = PINGROUP(87, EAST, i2s_1, dsd_clk_a, _, _, _, _, _, _, _),
-	[88] = PINGROUP(88, EAST, i2s_1, i2s_1, _, _, _, _, _, _, _),
-	[89] = PINGROUP(89, EAST, i2s_1, i2s_1, _, _, _, _, _, _, qdss_tracedata_b),
-	[90] = PINGROUP(90, EAST, i2s_1, i2s_1, _, _, _, _, _, _, _),
-	[91] = PINGROUP(91, EAST, i2s_1, i2s_1, _, _, _, _, _, _, _),
-	[92] = PINGROUP(92, EAST, i2s_1, i2s_1, _, _, _, _, _, qdss_cti_trig_in_a1, _),
-	[93] = PINGROUP(93, EAST, i2s_1, pwm_led22, i2s_1, _, _, _, _, _, qdss_tracedata_b),
+	[87] = PINGROUP(87, EAST, i2s_1_sck, dsd_clk_a, _, _, _, _, _, _, _),
+	[88] = PINGROUP(88, EAST, i2s_1_ws, i2s_1_data0_dsd0, _, _, _, _, _, _, _),
+	[89] = PINGROUP(89, EAST, i2s_1_data0, i2s_1_data1_dsd1, _, _, _, _, _, _,
+			qdss_tracedata_b),
+	[90] = PINGROUP(90, EAST, i2s_1_data1, i2s_1_data2_dsd2, _, _, _, _, _, _, _),
+	[91] = PINGROUP(91, EAST, i2s_1_data2, i2s_1_data3_dsd3, _, _, _, _, _, _, _),
+	[92] = PINGROUP(92, EAST, i2s_1_data3, i2s_1_data4_dsd4, _, _, _, _, _,
+			qdss_cti_trig_in_a1, _),
+	[93] = PINGROUP(93, EAST, i2s_1_data5_dsd5, pwm_led22, i2s_1, _, _, _, _, _,
+			qdss_tracedata_b),
 	[94] = PINGROUP(94, EAST, i2s_1, pwm_led23, i2s_1, _, qdss_cti_trig_out_a0, _, rgmi_dll2, _, _),
 	[95] = PINGROUP(95, EAST, i2s_1, pwm_led1, i2s_1, _, qdss_cti_trig_out_a1, _, _, _, _),
 	[96] = PINGROUP(96, EAST, i2s_1, pwm_led2, _, _, _, _, _, _, _),
@@ -1602,16 +1715,18 @@ static const struct msm_pingroup qcs404_groups[] = {
 	[104] = PINGROUP(104, EAST, i2s_3_sck_a, _, _, _, _, _, _, _, _),
 	[105] = PINGROUP(105, EAST, i2s_3_ws_a, _, _, _, _, _, _, _, _),
 	[106] = PINGROUP(106, EAST, i2s_3_data0_a, ebi2_lcd, _, _, ebi_cdc, _, _, _, _),
+	[106] = PINGROUP(106, EAST, i2s_3_data0_a, ebi2_lcd, hdmi_hot, _,
+			ebi_cdc, _, _, _, _),
 	[107] = PINGROUP(107, EAST, i2s_3_data1_a, ebi2_lcd, _, _, ebi_cdc, _, _, _, _),
 	[108] = PINGROUP(108, EAST, i2s_3_data2_a, ebi2_lcd, atest_char, pwm_led3, ebi_cdc, _, _, _, _),
 	[109] = PINGROUP(109, EAST, i2s_3_data3_a, ebi2_lcd, pwm_led4, bimc_dte1, _, _, _, _, _),
-	[110] = PINGROUP(110, EAST, i2s_4, ebi2_a, dsd_clk_b, pwm_led5, _, _, _, _, _),
-	[111] = PINGROUP(111, EAST, i2s_4, i2s_4, pwm_led6, ebi_cdc, _, _, _, _, _),
-	[112] = PINGROUP(112, EAST, i2s_4, i2s_4, pwm_led7, _, _, _, _, _, _),
-	[113] = PINGROUP(113, EAST, i2s_4, i2s_4, pwm_led8, _, _, _, _, _, _),
-	[114] = PINGROUP(114, EAST, i2s_4, i2s_4, pwm_led24, _, _, _, _, _, _),
-	[115] = PINGROUP(115, EAST, i2s_4, i2s_4, _, _, _, _, _, _, _),
-	[116] = PINGROUP(116, EAST, i2s_4, spkr_dac0, _, _, _, _, _, _, _),
+	[110] = PINGROUP(110, EAST, i2s_4_sck, ebi2_a, dsd_clk_b, pwm_led5, _, _, _, _, _),
+	[111] = PINGROUP(111, EAST, i2s_4_ws, i2s_4_data0_dsd0, pwm_led6, ebi_cdc, _, _, _, _, _),
+	[112] = PINGROUP(112, EAST, i2s_4_data0, i2s_4_data1_dsd1, pwm_led7, _, _, _, _, _, _),
+	[113] = PINGROUP(113, EAST, i2s_4_data1, i2s_4_data2_dsd2, pwm_led8, _, _, _, _, _, _),
+	[114] = PINGROUP(114, EAST, i2s_4_data2, i2s_4_data3_dsd3, pwm_led24, _, _, _, _, _, _),
+	[115] = PINGROUP(115, EAST, i2s_4_data3, i2s_4_data4_dsd4, _, _, _, _, _, _, _),
+	[116] = PINGROUP(116, EAST, i2s_4_data5_dsd5, spkr_dac0, _, _, _, _, _, _, _),
 	[117] = PINGROUP(117, NORTH, blsp_i2c4, blsp_spi4, pwm_led9, _, _, _, _, _, _),
 	[118] = PINGROUP(118, NORTH, blsp_i2c4, blsp_spi4, pwm_led10, _, _, _, _, _, _),
 	[119] = PINGROUP(119, EAST, spdifrx_opt, _, _, _, _, _, _, _, _),

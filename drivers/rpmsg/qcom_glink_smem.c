@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (c) 2016, Linaro Ltd
+ * Copyright (c) 2016, 2019 Linaro Ltd
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/io.h>
@@ -20,6 +21,7 @@
 #include <linux/regmap.h>
 #include <linux/workqueue.h>
 #include <linux/list.h>
+#include <linux/ipc_logging.h>
 
 #include <linux/rpmsg/qcom_glink.h>
 
@@ -33,6 +35,13 @@
 #define SMEM_GLINK_NATIVE_XPRT_FIFO_0		479
 #define SMEM_GLINK_NATIVE_XPRT_FIFO_1		480
 
+/* Define IPC Logging Macros */
+#define GLINK_SMEM_IPC_LOG_PAGE_CNT 8
+static void *glink_ilctxt;
+
+#define GLINK_SMEM_INFO(x, ...)						\
+ipc_log_string(glink_ilctxt, "[%s]: "x, __func__, ##__VA_ARGS__)
+
 struct glink_smem_pipe {
 	struct qcom_glink_pipe native;
 
@@ -45,6 +54,18 @@ struct glink_smem_pipe {
 };
 
 #define to_smem_pipe(p) container_of(p, struct glink_smem_pipe, native)
+
+static void glink_smem_rx_reset(struct qcom_glink_pipe *np)
+{
+	struct glink_smem_pipe *pipe = to_smem_pipe(np);
+	*pipe->tail = 0;
+}
+
+static void glink_smem_tx_reset(struct qcom_glink_pipe *np)
+{
+	struct glink_smem_pipe *pipe = to_smem_pipe(np);
+	*pipe->head = 0;
+}
 
 static size_t glink_smem_rx_avail(struct qcom_glink_pipe *np)
 {
@@ -71,9 +92,14 @@ static size_t glink_smem_rx_avail(struct qcom_glink_pipe *np)
 	tail = le32_to_cpu(*pipe->tail);
 
 	if (head < tail)
-		return pipe->native.length - tail + head;
+		len = pipe->native.length - tail + head;
 	else
-		return head - tail;
+		len = head - tail;
+
+	if (WARN_ON_ONCE(len > pipe->native.length))
+		len = 0;
+
+	return len;
 }
 
 static void glink_smem_rx_peak(struct qcom_glink_pipe *np,
@@ -84,6 +110,10 @@ static void glink_smem_rx_peak(struct qcom_glink_pipe *np,
 	u32 tail;
 
 	tail = le32_to_cpu(*pipe->tail);
+
+	if (WARN_ON_ONCE(tail > pipe->native.length))
+		return;
+
 	tail += offset;
 	if (tail >= pipe->native.length)
 		tail -= pipe->native.length;
@@ -94,6 +124,9 @@ static void glink_smem_rx_peak(struct qcom_glink_pipe *np,
 
 	if (len != count)
 		memcpy_fromio(data + len, pipe->fifo, (count - len));
+
+	GLINK_SMEM_INFO("RX: remote-pid=%d, head=0x%x, tail=0x%x\n",
+			pipe->remote_pid, le32_to_cpu(*pipe->head), tail);
 }
 
 static void glink_smem_rx_advance(struct qcom_glink_pipe *np,
@@ -106,7 +139,7 @@ static void glink_smem_rx_advance(struct qcom_glink_pipe *np,
 
 	tail += count;
 	if (tail >= pipe->native.length)
-		tail -= pipe->native.length;
+		tail %= pipe->native.length;
 
 	*pipe->tail = cpu_to_le32(tail);
 }
@@ -131,6 +164,9 @@ static size_t glink_smem_tx_avail(struct qcom_glink_pipe *np)
 	else
 		avail -= FIFO_FULL_RESERVE + TX_BLOCKED_CMD_RESERVE;
 
+	if (WARN_ON_ONCE(avail > pipe->native.length))
+		avail = 0;
+
 	return avail;
 }
 
@@ -139,6 +175,9 @@ static unsigned int glink_smem_tx_write_one(struct glink_smem_pipe *pipe,
 					    const void *data, size_t count)
 {
 	size_t len;
+
+	if (WARN_ON_ONCE(head > pipe->native.length))
+		return head;
 
 	len = min_t(size_t, count, pipe->native.length - head);
 	if (len)
@@ -174,6 +213,8 @@ static void glink_smem_tx_write(struct qcom_glink_pipe *glink_pipe,
 	/* Ensure ordering of fifo and head update */
 	wmb();
 
+	GLINK_SMEM_INFO("TX: remote-pid=%d, head=0x%x, tail=0x%x\n",
+			 pipe->remote_pid, head, le32_to_cpu(*pipe->tail));
 	*pipe->head = cpu_to_le32(head);
 }
 
@@ -264,11 +305,13 @@ struct qcom_glink *qcom_glink_smem_register(struct device *parent,
 		goto err_put_dev;
 	}
 
+	rx_pipe->native.reset = glink_smem_rx_reset;
 	rx_pipe->native.avail = glink_smem_rx_avail;
 	rx_pipe->native.peak = glink_smem_rx_peak;
 	rx_pipe->native.advance = glink_smem_rx_advance;
 	rx_pipe->remote_pid = remote_pid;
 
+	tx_pipe->native.reset = glink_smem_tx_reset;
 	tx_pipe->native.avail = glink_smem_tx_avail;
 	tx_pipe->native.write = glink_smem_tx_write;
 	tx_pipe->remote_pid = remote_pid;
@@ -277,7 +320,7 @@ struct qcom_glink *qcom_glink_smem_register(struct device *parent,
 	*tx_pipe->head = 0;
 
 	glink = qcom_glink_native_probe(dev,
-					GLINK_FEATURE_INTENT_REUSE,
+					GLINK_FEATURE_INTENT_REUSE | GLINK_FEATURE_ZERO_COPY,
 					&rx_pipe->native, &tx_pipe->native,
 					false);
 	if (IS_ERR(glink)) {
@@ -285,6 +328,9 @@ struct qcom_glink *qcom_glink_smem_register(struct device *parent,
 		goto err_put_dev;
 	}
 
+	if (!glink_ilctxt)
+		glink_ilctxt = ipc_log_context_create(GLINK_SMEM_IPC_LOG_PAGE_CNT,
+							   "glink_smem", 0);
 	return glink;
 
 err_put_dev:
@@ -294,8 +340,17 @@ err_put_dev:
 }
 EXPORT_SYMBOL_GPL(qcom_glink_smem_register);
 
+int qcom_glink_smem_start(struct qcom_glink *glink)
+{
+	return qcom_glink_native_start(glink);
+}
+EXPORT_SYMBOL(qcom_glink_smem_start);
+
 void qcom_glink_smem_unregister(struct qcom_glink *glink)
 {
+	if (!glink)
+		return;
+
 	qcom_glink_native_remove(glink);
 	qcom_glink_native_unregister(glink);
 }

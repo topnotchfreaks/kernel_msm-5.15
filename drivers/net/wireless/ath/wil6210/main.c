@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: ISC
 /*
  * Copyright (c) 2012-2017 Qualcomm Atheros, Inc.
- * Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/moduleparam.h>
@@ -296,6 +296,7 @@ __acquires(&sta->tid_rx_lock) __releases(&sta->tid_rx_lock)
 	/* statistics */
 	memset(&sta->stats, 0, sizeof(sta->stats));
 	sta->stats.tx_latency_min_us = U32_MAX;
+	wil_sta_info_amsdu_init(sta);
 }
 
 static void _wil6210_disconnect_complete(struct wil6210_vif *vif,
@@ -349,10 +350,18 @@ static void _wil6210_disconnect_complete(struct wil6210_vif *vif,
 
 		if (test_and_clear_bit(wil_vif_fwconnected, vif->status)) {
 			atomic_dec(&wil->connected_vifs);
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 			cfg80211_disconnected(ndev, reason_code,
 					      NULL, 0,
 					      vif->locally_generated_disc,
 					      GFP_KERNEL);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+			cfg80211_disconnected(ndev, reason_code,
+					      NULL, 0,
+					      vif->locally_generated_disc,
+					      NL80211_MLO_INVALID_LINK_ID,
+					      GFP_KERNEL);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 			vif->locally_generated_disc = false;
 		} else if (test_bit(wil_vif_fwconnecting, vif->status)) {
 			cfg80211_connect_result(ndev, bssid, NULL, 0, NULL, 0,
@@ -680,6 +689,13 @@ void wil_bcast_fini_all(struct wil6210_priv *wil)
 		if (vif)
 			wil_bcast_fini(vif);
 	}
+}
+
+void wil_sta_info_amsdu_init(struct wil_sta_info *sta)
+{
+	sta->amsdu_drop_sn = -1;
+	sta->amsdu_drop_tid = -1;
+	sta->amsdu_drop = 0;
 }
 
 int wil_priv_init(struct wil6210_priv *wil)

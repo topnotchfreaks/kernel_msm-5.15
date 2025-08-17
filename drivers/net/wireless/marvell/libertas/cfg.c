@@ -824,8 +824,13 @@ static int lbs_cfg_scan(struct wiphy *wiphy,
 void lbs_send_disconnect_notification(struct lbs_private *priv,
 				      bool locally_generated)
 {
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 	cfg80211_disconnected(priv->dev, 0, NULL, 0, locally_generated,
 			      GFP_KERNEL);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+	cfg80211_disconnected(priv->dev, 0, NULL, 0, locally_generated,
+			      NL80211_MLO_INVALID_LINK_ID, GFP_KERNEL);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT*/
 }
 
 void lbs_send_mic_failureevent(struct lbs_private *priv, u32 event)
@@ -1413,10 +1418,17 @@ int lbs_disconnect(struct lbs_private *priv, u16 reason)
 	if (ret)
 		return ret;
 
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 	cfg80211_disconnected(priv->dev,
-			reason,
-			NULL, 0, true,
-			GFP_KERNEL);
+			      reason,
+			      NULL, 0, true,
+			      GFP_KERNEL);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+	cfg80211_disconnected(priv->dev,
+			      reason,
+			      NULL, 0, true,
+			      NL80211_MLO_INVALID_LINK_ID, GFP_KERNEL);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 	priv->connect_status = LBS_DISCONNECTED;
 
 	return 0;

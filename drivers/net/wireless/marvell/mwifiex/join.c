@@ -1508,8 +1508,14 @@ int mwifiex_deauthenticate(struct mwifiex_private *priv, u8 *mac)
 	case NL80211_IFTYPE_P2P_CLIENT:
 		ret = mwifiex_deauthenticate_infra(priv, mac);
 		if (ret)
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 			cfg80211_disconnected(priv->netdev, 0, NULL, 0,
 					      true, GFP_KERNEL);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+			cfg80211_disconnected(priv->netdev, 0, NULL, 0,
+					      true, NL80211_MLO_INVALID_LINK_ID,
+					      GFP_KERNEL);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 		break;
 	case NL80211_IFTYPE_ADHOC:
 		return mwifiex_send_cmd(priv, HostCmd_CMD_802_11_AD_HOC_STOP,

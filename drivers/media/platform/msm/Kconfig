@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+source "drivers/media/platform/msm/synx/Kconfig"
+source "drivers/media/platform/msm/npu/Kconfig"
+source "drivers/media/platform/msm/npu_v2/Kconfig"

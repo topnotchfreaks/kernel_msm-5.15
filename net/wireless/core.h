@@ -252,6 +252,7 @@ enum cfg80211_event_type {
 	EVENT_PORT_AUTHORIZED,
 };
 
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 struct cfg80211_event {
 	struct list_head list;
 	enum cfg80211_event_type type;
@@ -276,6 +277,33 @@ struct cfg80211_event {
 		} pa;
 	};
 };
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+struct cfg80211_event {
+	struct list_head list;
+	enum cfg80211_event_type type;
+
+	union {
+		struct cfg80211_connect_resp_params cr;
+		struct cfg80211_roam_info rm;
+		struct {
+			const u8 *ie;
+			size_t ie_len;
+			u16 reason;
+			bool locally_generated;
+			int link_id;
+		} dc;
+		struct {
+			u8 bssid[ETH_ALEN];
+			struct ieee80211_channel *channel;
+		} ij;
+		struct {
+			u8 bssid[ETH_ALEN];
+			const u8 *td_bitmap;
+			u8 td_bitmap_len;
+		} pa;
+	};
+};
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 
 struct cfg80211_cached_keys {
 	struct key_params params[CFG80211_MAX_WEP_KEYS];
@@ -357,10 +385,10 @@ int cfg80211_leave_ocb(struct cfg80211_registered_device *rdev,
 /* AP */
 int __cfg80211_stop_ap(struct cfg80211_registered_device *rdev,
 		       struct net_device *dev, int link,
-		       bool notify);
+		       bool notify, struct genl_info *info);
 int cfg80211_stop_ap(struct cfg80211_registered_device *rdev,
 		     struct net_device *dev, int link,
-		     bool notify);
+		     bool notify, struct genl_info *info);
 
 /* MLME */
 int cfg80211_mlme_auth(struct cfg80211_registered_device *rdev,
@@ -404,8 +432,14 @@ int cfg80211_connect(struct cfg80211_registered_device *rdev,
 void __cfg80211_connect_result(struct net_device *dev,
 			       struct cfg80211_connect_resp_params *params,
 			       bool wextev);
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 void __cfg80211_disconnected(struct net_device *dev, const u8 *ie,
 			     size_t ie_len, u16 reason, bool from_ap);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+void __cfg80211_disconnected(struct net_device *dev, const u8 *ie,
+			     size_t ie_len, u16 reason, bool from_ap,
+			     int link_id);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 int cfg80211_disconnect(struct cfg80211_registered_device *rdev,
 			struct net_device *dev, u16 reason,
 			bool wextev);

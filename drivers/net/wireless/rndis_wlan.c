@@ -2845,7 +2845,12 @@ static void rndis_wlan_do_link_down_work(struct usbnet *usbdev)
 
 		deauthenticate(usbdev);
 
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 		cfg80211_disconnected(usbdev->net, 0, NULL, 0, true, GFP_KERNEL);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+		cfg80211_disconnected(usbdev->net, 0, NULL, 0, true,
+				      NL80211_MLO_INVALID_LINK_ID, GFP_KERNEL);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 	}
 
 	netif_carrier_off(usbdev->net);

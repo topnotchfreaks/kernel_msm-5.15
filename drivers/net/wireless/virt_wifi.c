@@ -321,7 +321,12 @@ static int virt_wifi_disconnect(struct wiphy *wiphy, struct net_device *netdev,
 	wiphy_debug(wiphy, "disconnect\n");
 	virt_wifi_cancel_connect(netdev);
 
+#ifndef CFG80211_PROP_MULTI_LINK_SUPPORT
 	cfg80211_disconnected(netdev, reason_code, NULL, 0, true, GFP_KERNEL);
+#else /* CFG80211_PROP_MULTI_LINK_SUPPORT */
+	cfg80211_disconnected(netdev, reason_code, NULL, 0, true,
+			      NL80211_MLO_INVALID_LINK_ID, GFP_KERNEL);
+#endif /* CFG80211_PROP_MULTI_LINK_SUPPORT */
 	priv->is_connected = false;
 	netif_carrier_off(netdev);
 
