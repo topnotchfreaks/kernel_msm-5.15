@@ -3603,6 +3603,9 @@ static char *custom_module_blacklist[] = {
 #if IS_BUILTIN(CONFIG_SPI_MSM_GENI)
     "spi_msm_geni",
 #endif
+#if IS_BUILTIN(CONFIG_MFD_SPMI_PMIC)
+    "qcom_spmi_pmic",
+#endif
 #ifdef CONFIG_MACH_XIAOMI_UNIFIED_BLOCKLIST
 	/* Useless modules */
 	"msm_performance",
