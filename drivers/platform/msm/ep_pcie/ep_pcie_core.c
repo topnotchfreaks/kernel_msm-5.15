@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 /*
@@ -2578,6 +2578,9 @@ int ep_pcie_core_disable_endpoint(void)
 		goto out;
 	}
 
+	/* Masking IRQs to stop Global IRQ from triggering during suspend sequence */
+	ep_pcie_write_reg(dev->parf, PCIE20_PARF_INT_ALL_MASK, 0x0);
+
 	dev->power_on = false;
 	/*
 	 * In some cases, the device is requesting for an inband pme
@@ -2971,6 +2974,9 @@ static irqreturn_t ep_pcie_handle_perst_irq(int irq, void *data)
 
 	perst = gpio_get_value(dev->gpio[EP_PCIE_GPIO_PERST].num);
 
+	EP_PCIE_DBG(dev, "PCIe V%d: PERST IRQ Handling\n",
+		dev->rev);
+
 	if (!dev->enumerated) {
 		EP_PCIE_DBG(dev,
 			"PCIe V%d: PCIe is not enumerated yet; PERST is %sasserted\n",
@@ -2989,6 +2995,7 @@ static irqreturn_t ep_pcie_handle_perst_irq(int irq, void *data)
 					"PCIe V%d: Acquired wakelock\n",
 					dev->rev);
 			}
+			dev->perst_deast_counter++;
 			/*
 			 * Perform link enumeration with the host side in the
 			 * bottom half
@@ -3056,6 +3063,16 @@ static irqreturn_t ep_pcie_handle_perst_deassert(int irq, void *data)
 			"PCIe V%d: Start enumeration due to PERST deassertion\n", dev->rev);
 		ep_pcie_enumeration(dev);
 	}
+
+	/*
+	 * perst_deast_thread_counter tracks the number of times the bottom half
+	 * (threaded handler) of the PERST deassertion interrupt is executed.
+	 * Helps compare with top half counter for debugging.
+	 */
+	dev->perst_deast_thread_counter++;
+	EP_PCIE_DBG(dev, "PCIe V%d: No. %ld PERST deassertion handled\n",
+		dev->rev, dev->perst_deast_thread_counter);
+
 	return IRQ_HANDLED;
 }
 
@@ -3131,6 +3148,15 @@ static irqreturn_t ep_pcie_handle_global_irq(int irq, void *data)
 	unsigned long irqsave_flags;
 
 	spin_lock_irqsave(&dev->isr_lock, irqsave_flags);
+	if (dev->power_on) {
+		status = readl_relaxed(dev->parf + PCIE20_PARF_INT_ALL_STATUS);
+		ep_pcie_write_reg(dev->parf, PCIE20_PARF_INT_ALL_CLEAR, status);
+		dev->global_irq_counter++;
+		EP_PCIE_DUMP(dev,
+			"PCIe V%d: No. %ld Global IRQ %d received; status:0x%x\n",
+			dev->rev, dev->global_irq_counter, irq, status);
+	}
+
 	if (!atomic_read(&dev->perst_deast)) {
 		EP_PCIE_ERR(dev,
 			"PCIe V%d: Global irq not processed as PERST# is asserted\n",
@@ -3138,14 +3164,6 @@ static irqreturn_t ep_pcie_handle_global_irq(int irq, void *data)
 		spin_unlock_irqrestore(&dev->isr_lock, irqsave_flags);
 		return IRQ_HANDLED;
 	}
-
-	status = readl_relaxed(dev->parf + PCIE20_PARF_INT_ALL_STATUS);
-	ep_pcie_write_reg(dev->parf, PCIE20_PARF_INT_ALL_CLEAR, status);
-
-	dev->global_irq_counter++;
-	EP_PCIE_DUMP(dev,
-		"PCIe V%d: No. %ld Global IRQ %d received; status:0x%x\n",
-		dev->rev, dev->global_irq_counter, irq, status);
 
 	if (!status)
 		goto sriov_irq;

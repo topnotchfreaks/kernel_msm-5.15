@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -316,6 +316,14 @@ int fsa4480_reg_notifier(struct notifier_block *nb,
 	if (atomic_read(&(fsa_priv->usbc_mode)) == TYPEC_ACCESSORY_AUDIO) {
 		dev_dbg(fsa_priv->dev, "%s: analog adapter already inserted\n",
 			__func__);
+
+		/*
+		 * reset the cached usbc mode when power supply is used,
+		 * to bypass the event filtering logic.
+		 */
+		if (fsa_priv->use_powersupply)
+			atomic_set(&(fsa_priv->usbc_mode), TYPEC_ACCESSORY_NONE);
+
 		rc = fsa4480_usbc_analog_setup_switches(fsa_priv);
 	}
 
