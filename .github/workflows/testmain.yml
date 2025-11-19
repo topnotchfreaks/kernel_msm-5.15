@@ -37,7 +37,21 @@ on:
           - "noksu"
           - "ksu"
           - "both"
-
+      kpm:
+        description: "Add KPM?"
+        required: true
+        type: boolean
+        default: true
+      bbg:
+        description: "Add BBG?"
+        required: true
+        type: boolean
+        default: true
+      manager:
+        description: "Get newest manager?"
+        required: true
+        type: boolean
+        default: true
 jobs:
   Build-Kernel:
     name: "🚀 Build Kernel"
@@ -61,7 +75,7 @@ jobs:
           mkdir -p $kernelDir
           echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
           sudo apt-get update -qq
-          sudo apt-get install -y repo rsync aria2 curl jq
+          sudo apt-get install -y repo rsync aria2 curl jq 
 
       - name: "🌟 Clone kernel source"
         working-directory: ./${{ env.kernelDir }}
@@ -122,7 +136,7 @@ jobs:
           echo "CONFIG_KALLSYMS=y" >> "$CONFIG_FILE"
 
       - name: "🔧 Add BBG Support (KSU variant only)"
-        if: matrix.variant == 'ksu'
+        if: matrix.variant == 'ksu' && inputs.bbg == true
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           echo "Adding BBG..."
@@ -243,7 +257,7 @@ jobs:
           build/build.sh -j$(nproc --all)
 
       - name: "🩹 Apply KPM patch (KSU variant only)"
-        if: matrix.variant == 'ksu'
+        if: matrix.variant == 'ksu' && inputs.kpm == true
         working-directory: ${{ env.WORK_DIR }}/out/dist
         run: |
           curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
@@ -272,7 +286,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: ./kernels/
-
+        
+      - name: "⬇️ Download Manager"
+        if: inputs.manager == true
+        run: |
+          wget -O Manager.zip "https://nightly.link/SukiSU-Ultra/SukiSU-Ultra/workflows/build-manager/main/Manager.zip"
+          unzip -o Manager.zip -d manager
+          cd manager
+          echo "MANAGER_PATH=$(pwd)" >> $GITHUB_ENV
       - name: "📦 Create flashable ZIP"
         run: |
           BUILD_TIME=$(date +'%Y-%m-%d')
@@ -292,8 +313,9 @@ jobs:
       - name: "📤 Upload final package"
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.ZIP_NAME }}
-          path: ${{ env.ZIP_PATH }}
+          path: | 
+            ${{ env.ZIP_PATH }}
+            ${{ env.MANAGER_PATH }}
           retention-days: 7
 
       - name: "📱 Send to Telegram"
