@@ -52,6 +52,14 @@ on:
         required: true
         type: boolean
         default: true
+      managerBranch: 
+        description: "Choose manager branch"
+        required: true
+        type: choice
+        default: main
+        options:
+          -  "main"
+          -  "miuix"
 jobs:
   Build-Kernel:
     name: "🚀 Build Kernel"
@@ -290,7 +298,7 @@ jobs:
       - name: "⬇️ Download Manager"
         if: inputs.manager == true
         run: |
-          wget -O Manager.zip "https://nightly.link/SukiSU-Ultra/SukiSU-Ultra/workflows/build-manager/main/Manager.zip"
+          wget -O Manager.zip "https://nightly.link/SukiSU-Ultra/SukiSU-Ultra/workflows/build-manager/${{inputs.managerBranch}}/Manager.zip"
           unzip -o Manager.zip -d manager
           cd manager
           echo "MANAGER_PATH=$(pwd)" >> $GITHUB_ENV
