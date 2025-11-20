@@ -209,31 +209,31 @@ jobs:
             patch -p1 < susfs.patch
           fi
           
-          # echo "=== Applying scope min manual hooks v1.6 patch ==="
-          # curl -L -o hooks.patch "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/scope_min_manual_hooks_v1.6.patch"
+          echo "=== Applying Syscall hooks ==="
+          curl -L -o hooks.patch "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-SUSFS-syscall-hooks.patch"
           
-          # if [ ! -f "hooks.patch" ] || [ ! -s "hooks.patch" ]; then
-          #  echo "ERROR: Scope min manual hooks patch file is empty or not downloaded"
-          #  exit 1
-          # fi
+          if [ ! -f "hooks.patch" ] || [ ! -s "hooks.patch" ]; then
+           echo "ERROR: Syscall hooks patch file is empty or not downloaded"
+           exit 1
+          fi
           
-          # # Try to apply hooks
-          # if ! patch -p1 --dry-run < hooks.patch > /dev/null 2>&1; then
-          #  echo "Trying syscall hooks patch with -p0..."
-          #  if ! patch -p0 --dry-run < hooks.patch > /dev/null 2>&1; then
-          #    echo "WARNING: Syscall hooks patch cannot be applied (may already be included)"
-          #  else
-          #    patch -p0 < hooks.patch
-          #  fi
-          #  else
-          #  patch -p1 < hooks.patch
-          # fi
+          # Try to apply hooks
+          if ! patch -p1 --dry-run < hooks.patch > /dev/null 2>&1; then
+            echo "Trying syscall hooks patch with -p0..."
+            if ! patch -p0 --dry-run < hooks.patch > /dev/null 2>&1; then
+              echo "WARNING: Syscall hooks patch cannot be applied (may already be included)"
+            else
+              patch -p0 < hooks.patch
+            fi
+            else
+            patch -p1 < hooks.patch
+          fi
           
           echo "=== Adding KSU configs ==="
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_KSU=y
-          # CONFIG_KSU_MANUAL_HOOK is not set
+          CONFIG_KSU_MANUAL_HOOK=y
           CONFIG_KPM=y
           CONFIG_KSU_SUSFS=y
           CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
@@ -250,7 +250,7 @@ jobs:
           CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
           CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_KSU_SUSFS_SUS_SU=y
+          CONFIG_KSU_SUSFS_SUS_SU=n
           CONFIG_TMPFS_XATTR=y
           CONFIG_TMPFS_POSIX_ACL=y
           EOF
