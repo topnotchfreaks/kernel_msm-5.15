@@ -218,12 +218,8 @@ jobs:
           # Set localversion
           if [ -n "${{ github.event.inputs.localVersion }}" ]; then
             echo "CONFIG_LOCALVERSION=\"${{ github.event.inputs.localVersion }}\"" >> "$CONFIG_FILE"
-            patch 
+            echo "CONFIG_LOCALVERSION_AUTO=n\"" >> "$CONFIG_FILE"
           fi
-
-          # String patch
-          curl -L -o string.patch "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-skip-android-version-and-kmi-strings.patch" 
-          patch -p1 < string.patch || echo "Warning: Strings patch failed"
           
           # Basic optimizations
           echo "CONFIG_KALLSYMS=y" >> "$CONFIG_FILE"
