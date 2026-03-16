@@ -40,21 +40,6 @@ on:
 
 jobs:
   Build-Kernel:
-      name: "🚀 Overclock CPU & GPU"
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-          echo "Applying Overclock to Snapdragon 685..."
-          
-          # Разгон больших ядер (Gold) с 2.803 ГГц до 3.0 ГГц
-          find arch/arm64/boot/dts/vendor/qcom/ -name "*6225*.dtsi" | xargs sed -i 's/2803200/3000000/g'
-          
-          # Разгон малых ядер (Silver) с 1.9 ГГц до 2.1 ГГц
-          find arch/arm64/boot/dts/vendor/qcom/ -name "*6225*.dtsi" | xargs sed -i 's/1900800/2100000/g'
-          
-          # Разгон GPU с 1260 МГц до 1350 МГц (будьте осторожны, это очень высокая частота)
-          find arch/arm64/boot/dts/vendor/qcom/ -name "*6225*.dtsi" | xargs sed -i 's/1260000000/1350000000/g'
-          
-          echo "✅ Frequencies updated in Device Tree"
           name: "🚀 Build Kernel"
     runs-on: ubuntu-latest
     strategy:
