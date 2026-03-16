@@ -40,7 +40,7 @@ on:
 
 jobs:
   Build-Kernel:
-          name: "🚀 Build Kernel"
+    name: "🚀 Build Kernel"
     runs-on: ubuntu-latest
     strategy:
       matrix:
