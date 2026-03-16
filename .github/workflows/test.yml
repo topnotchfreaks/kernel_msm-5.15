@@ -1,0 +1,135 @@
+  - name: "✨ Setup workspace"
+    run: |
+      mkdir -p $kernelDir
+      echo "BUILD_TIME=$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+      sudo apt-get update -qq
+      sudo apt-get install -y repo rsync aria2
+
+  - name: 📐 Setup SWAP 10GB
+    uses: pierotofy/set-swap-space@master
+    with:
+        swap-size-gb: 10
+        
+  - name: 📐 Tune Swap
+    run: |
+        echo "vm.swappiness=80" | sudo tee -a /etc/sysctl.conf
+        sudo sysctl -p
+
+  - name: "🌟 Clone kernel source"
+    working-directory: ./${{ env.kernelDir }}
+    run: |
+      git clone --recursive --branch ${{ github.event.inputs.kernelBranch }} \
+        ${{ github.event.inputs.kernelSourceURL }} ${{ env.kernelName }} --depth=1
+
+  - name: "📥 Initialize repo"
+    working-directory: ${{ env.WORK_DIR}}
+    run: |
+      repo init -u https://android.googlesource.com/kernel/manifest -b common-android13-5.15-lts --depth=1
+      repo sync --optimized-fetch --prune --no-clone-bundle --no-tags -j$(nproc --all)
+      
+      rm -rf .repo
+      rm -rf common
+
+      aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r547379.tar.gz "https://github.com/topnotchfreaks/clang/releases/download/v1.0.0/clang-r547379.tar.gz"
+      mkdir -p prebuilts/clang/host/linux-x86/clang-r547379
+      tar -xzf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz -C prebuilts/clang/host/linux-x86/clang-r547379
+      rm -rf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz
+
+      sed -i \
+       -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
+       -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' \
+       ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.constants
+      
+      sed -i '/^DEFCONFIG=gki_defconfig/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
+      sed -i '$a\DEFCONFIG=${{ env.DEFCONFIG_NAME }}' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
+
+  - name: "🚀 Apply Overclock Patches"
+    working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+    run: |
+      echo "🔍 Searching for frequency tables..."
+      # Ищем файлы dtsi в любой папке внутри репозитория
+      FILES=$(find . -name "*6225*.dtsi")
+      
+      if [ -z "$FILES" ]; then
+        echo "❌ Файлы дерева устройств для 6225 не найдены!"
+      else
+        for FILE in $FILES; do
+          echo "🛠 Патчим: $FILE"
+          # CPU Gold: 2.8GHz -> 3.0GHz
+          sed -i 's/2803200/3000000/g' "$FILE"
+          # CPU Silver: 1.9GHz -> 2.1GHz
+          sed -i 's/1900800/2100000/g' "$FILE"
+          # GPU: 1260MHz -> 1350MHz
+          sed -i 's/1260000000/1350000000/g' "$FILE"
+        done
+        echo "✅ Разгон успешно применен."
+      fi
+
+  - name: "⚙️ Configure kernel"
+    working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+    run: |
+      CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+      if [ -n "${{ github.event.inputs.localVersion }}" ]; then
+        echo "CONFIG_LOCALVERSION=\"${{ github.event.inputs.localVersion }}\"" >> "$CONFIG_FILE"
+      fi
+      cat >> "$CONFIG_FILE" << 'EOF'
+      CONFIG_KALLSYMS=y
+      CONFIG_TMPFS_XATTR=y
+      CONFIG_TMPFS_POSIX_ACL=y
+      EOF
+
+  - name: "🔧 Setup Wild KSU with SUSFS"
+    if: matrix.variant == 'ksu'
+    working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+    run: |
+      rm -rf ./KernelSU ./drivers/kernelsu
+      curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s stable
+      git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
+      cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
+      cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
+      [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ] && cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
+      rm -rf susfs4ksu
+      [ ! -L "drivers/kernelsu" ] && ln -sf ../KernelSU drivers/kernelsu
+      
+      CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
+      cat >> "$CONFIG_FILE" << 'EOF'
+      CONFIG_KSU=y
+      CONFIG_KPROBES=y
+      CONFIG_HAVE_KPROBES=y
+      CONFIG_KPROBE_EVENTS=y
+      CONFIG_OVERLAY_FS=y
+      CONFIG_KSU_SUSFS=y
+      CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
+      CONFIG_KSU_SUSFS_SUS_PATH=y
+      CONFIG_KSU_SUSFS_SUS_MOUNT=y
+      CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
+      CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
+      CONFIG_KSU_SUSFS_SUS_KSTAT=y
+      CONFIG_KSU_SUSFS_TRY_UMOUNT=y
+      CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
+      CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+      CONFIG_KSU_SUSFS_ENABLE_LOG=y
+      CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+      CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+      CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+      CONFIG_KSU_SUSFS_SUS_SU=y
+      EOF
+
+  - name: "🔨 Build kernel"
+    working-directory: ${{ env.WORK_DIR }}
+    run: |
+      LTO=thin \
+      BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 \
+      build/build.sh -j$(nproc --all)
+
+  - name: "📦 Prepare artifact"
+    working-directory: ${{ env.WORK_DIR }}
+    run: |
+      cp out/dist/Image Image.${{ matrix.variant }}
+
+  - name: "📤 Upload kernel"
+    uses: actions/upload-artifact@v4
+    with:
+      name: kernel-${{ matrix.variant }}
+      path: ${{ env.WORK_DIR }}/Image.${{ matrix.variant }}
+      retention-days: 3
