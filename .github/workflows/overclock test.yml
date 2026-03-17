@@ -252,7 +252,7 @@ jobs:
         run: |
           CONFIG_FILE="${{ env.kernelDir }}/${{ env.kernelName }}/arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
 
-          >> "$CONFIG_FILE" << 'EOF'
+          cat >> "$CONFIG_FILE" << 'EOF'
           ...
           CONFIG_KALLSYMS=y 
           CONFIG_TMPFS_XATTR=y 
