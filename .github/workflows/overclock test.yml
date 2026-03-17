@@ -254,6 +254,12 @@ jobs:
 
           >> "$CONFIG_FILE" << 'EOF'
           ...
+          CONFIG_KALLSYMS=y 
+          CONFIG_TMPFS_XATTR=y 
+          CONFIG_TMPFS_POSIX_ACL=y 
+          CONFIG_MODULES=y 
+          CONFIG_MODULE_UNLOAD=y 
+          CONFIG_MODVERSIONS=y
           EOF
 
           LTO=thin \
