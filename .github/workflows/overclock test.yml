@@ -53,10 +53,7 @@ jobs:
       kernelName: common
       DEFCONFIG_NAME: ${{ github.event.inputs.kernelDevice }}_defconfig
       WORK_DIR: ${{ github.workspace }}
-      CONFIG_MODULES=y
-      CONFIG_MODULE_UNLOAD=y
-      CONFIG_MODVERSIONS=y
-  
+      
     steps:
       - name: "✨ Setup workspace"
         run: |
@@ -255,6 +252,14 @@ jobs:
         run: |
           LTO=thin \
           BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 \
+          cat >> "$CONFIG_FILE" << 'EOF'
+          CONFIG_KALLSYMS=y
+          CONFIG_TMPFS_XATTR=y
+          CONFIG_TMPFS_POSIX_ACL=y
+          CONFIG_MODULES=y
+          CONFIG_MODULE_UNLOAD=y
+          CONFIG_MODVERSIONS=y
+          EOF
           build/build.sh -j$(nproc --all)
 
       - name: "📦 Prepare artifact"
