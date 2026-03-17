@@ -250,6 +250,8 @@ jobs:
       - name: "🔨 Build kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
+          cd ${{ env.kernelDir }}/${{ env.kernelName }}
+
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
 
           cat >> "$CONFIG_FILE" << 'EOF'
@@ -262,7 +264,7 @@ jobs:
           EOF
 
           LTO=thin \
-          BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 \
+          BUILD_CONFIG=build.config.gki.aarch64 \
           build/build.sh -j$(nproc --all)
       - name: "📦 Prepare artifact"
         working-directory: ${{ env.WORK_DIR }}
