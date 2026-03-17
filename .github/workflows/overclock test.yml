@@ -250,22 +250,15 @@ jobs:
       - name: "🔨 Build kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          cd common_gki/common
+          CONFIG_FILE="${{ env.kernelDir }}/${{ env.kernelName }}/arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
 
-          CONFIG_FILE="arch/arm64/configs/gki_defconfig"
-
-          cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_KALLSYMS=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
-          CONFIG_MODULES=y
-          CONFIG_MODULE_UNLOAD=y
-          CONFIG_MODVERSIONS=y
+          >> "$CONFIG_FILE" << 'EOF'
+          ...
           EOF
 
           LTO=thin \
-          BUILD_CONFIG=build.config.gki.aarch64 \
-          ../../build/build.sh -j$(nproc --all)
+          BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 \
+          build/build.sh -j$(nproc --all)
       - name: "📦 Prepare artifact"
         working-directory: ${{ env.WORK_DIR }}
         run: |
