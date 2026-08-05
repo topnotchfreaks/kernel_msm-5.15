@@ -52,6 +52,24 @@ git commit -am "advanced_build: add ApkeSU variant"
   `ksu_su_compat_enabled` → `ksu_su_compat_toggle`, двухаргументный
   `ksu_handle_setresuid` → `ksu_handle_setresuid_transition`.
 
+## Как выбирается рут в workflow (v2, на стоковой базе)
+
+Имена вариантов матрицы намеренно оставлены стоковыми — `noksu` и `ksu`. Это важно:
+AnyKernel3 у topnotchfreaks **хардкодит** имена файлов `Image.ksu` и `Image.noksu`
+в `anykernel.sh` и по ним предлагает выбор при прошивке. Если переименовать варианты
+(например в `apkesu`), ZIP соберётся, но AnyKernel3 не найдёт образ и прошивка не пройдёт.
+
+Поэтому выбор реализации рута — отдельный вход:
+
+| Вход | Значения | Что делает |
+| --- | --- | --- |
+| `buildKSU` | `noksu` / `ksu` / `both` | как в стоке: собирать без рута, с рутом, или оба образа в один ZIP |
+| `ksuFlavor` | `wildksu` / `apkesu` | какой именно KSU ставить в вариант `ksu` |
+| `apkeSuRef` | branch/tag/commit | ревизия ApkeSU, по умолчанию `ApkeSU` |
+
+Относительно стокового файла изменены всего две строки (условие шага Wild KSU и подпись
+варианта в Telegram), остальное — добавленные шаги. Шаг BBG оставлен ровно как в стоке.
+
 ## Важные ограничения
 
 * **`CONFIG_KSU=y` обязателен.** Kernel-side патч SUSFS ссылается на символы KernelSU
