@@ -560,8 +560,15 @@ jobs:
           # ApkeSU is kprobe-based: susfs4ksu's own 10_enable_susfs_for_ksu.patch does NOT
           # apply to it (it would strip ApkeSU's hook layer), so we ship our own patch.
           echo "🔧 Applying ApkeSU <-> SUSFS integration patch..."
+          PATCH_FILE="${{ env.WORK_DIR }}/builder/patches/susfs-apkesu.patch"
+          # Copy-pasting the patch through a web editor can strip its trailing newline,
+          # which makes GNU patch abort with "unexpectedly ends in middle of line".
+          if [ -n "$(tail -c 1 "$PATCH_FILE")" ]; then
+            echo "⚠️ patch file has no trailing newline, adding one"
+            printf '\n' >> "$PATCH_FILE"
+          fi
           cd KernelSU
-          patch -p1 --no-backup-if-mismatch < "${{ env.WORK_DIR }}/builder/patches/susfs-apkesu.patch"
+          patch -p1 --no-backup-if-mismatch < "$PATCH_FILE"
           if find . -name '*.rej' | grep -q .; then
             echo "::error::ApkeSU SUSFS patch left rejected hunks - ApkeSU upstream moved, patch needs a refresh:"
             find . -name '*.rej' -exec cat {} +
