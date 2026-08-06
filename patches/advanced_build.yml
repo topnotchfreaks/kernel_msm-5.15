@@ -124,6 +124,29 @@ jobs:
           git clone --recursive --branch ${{ github.event.inputs.kernelBranch }} \
             ${{ github.event.inputs.kernelSourceURL }} ${{ env.kernelName }} --depth=1
 
+      - name: "🩹 Fix broken FUSE in kernel source"
+        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
+        run: |
+          set -euo pipefail
+          # The CodeLinaro source carries a partial FUSE backport: fs/fuse/dev.c uses
+          # FR_INTR_QUEUED and dprintk(), neither of which exists in this tree.
+          # Unrelated to KSU/SUSFS - it breaks plain noksu builds too.
+          if grep -q "FR_INTR_QUEUED" fs/fuse/dev.c && ! grep -q "FR_INTR_QUEUED" fs/fuse/fuse_i.h; then
+            echo "🔧 Adding missing FR_INTR_QUEUED to enum fuse_req_flag..."
+            sed -i '/^enum fuse_req_flag {/,/^};/ s/^\tFR_PENDING,$/\tFR_PENDING,\n\tFR_INTR_QUEUED,/' fs/fuse/fuse_i.h
+            grep -q "FR_INTR_QUEUED" fs/fuse/fuse_i.h || { echo "::error::failed to add FR_INTR_QUEUED"; exit 1; }
+            sed -n '/^enum fuse_req_flag {/,/^};/p' fs/fuse/fuse_i.h
+          else
+            echo "✔ FUSE enum looks fine, nothing to do"
+          fi
+
+          if grep -q "dprintk(" fs/fuse/*.c && ! grep -rq "define dprintk" fs/fuse/; then
+            echo "🔧 Replacing undefined dprintk() with pr_debug() in FUSE..."
+            sed -i 's/\bdprintk(/pr_debug(/g' fs/fuse/*.c
+          else
+            echo "✔ No stray dprintk() in FUSE"
+          fi
+
       - name: "📥 Initialize repo"
         if: github.event.inputs.buildToolchains == 'android-tools'
         working-directory: ${{ env.WORK_DIR}}
