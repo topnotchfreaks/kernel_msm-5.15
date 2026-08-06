@@ -1,46 +1,59 @@
-Integrate susfs4ksu into ApkeSU (kprobe-based tree)
+Integrate susfs4ksu into ApkeSU (kprobe-based tree) + fix in-tree include paths
 
 Generated against:
   ApkeSU     : https://github.com/fixz232/ApkeSU @ f2d024608d99 (branch ApkeSU)
   susfs4ksu  : https://gitlab.com/simonpunk/susfs4ksu @ ccb1918684b2 (branch gki-android13-5.15)
 
-Why this patch exists
----------------------
-susfs4ksu ships two patches: a kernel-side one (50_add_susfs_in_gki-*.patch,
-applied to the kernel tree) and a KernelSU-side one
-(KernelSU/10_enable_susfs_for_ksu.patch). The latter does NOT apply to ApkeSU:
-it is written against a KernelSU revision that uses manual kernel hooks, and it
-would strip ApkeSU's own hook layer (hook/lsm_hook.o, hook/syscall_hook_manager.o,
-infra/symbol_resolver.o, arm64 syscall hooks), rewrite sucompat/setuid_hook to
-different signatures and delete ApkeSU's KSU_X86_PATCH_SYSCALL_DISPATCHER option.
+Part 1 - SUSFS integration
+--------------------------
+susfs4ksu ships two patches: a kernel-side one (50_add_susfs_in_gki-*.patch, applied
+to the kernel tree) and a KernelSU-side one (KernelSU/10_enable_susfs_for_ksu.patch).
+The latter does NOT apply to ApkeSU: it targets a KernelSU revision that uses manual
+kernel hooks, and it would strip ApkeSU's own hook layer (hook/lsm_hook.o,
+hook/syscall_hook_manager.o, infra/symbol_resolver.o, arm64 syscall hooks), rewrite
+sucompat/setuid_hook to different signatures and delete ApkeSU's
+KSU_X86_PATCH_SYSCALL_DISPATCHER option.
 
-This patch replaces 10_enable_susfs_for_ksu.patch for ApkeSU. It only adds
-susfs support, and keeps every ApkeSU feature intact:
+This patch replaces 10_enable_susfs_for_ksu.patch for ApkeSU. It only adds susfs
+support and keeps every ApkeSU feature intact:
 
   * kernel/Kconfig       - susfs options (CONFIG_KSU_SUSFS*, default n = opt-in)
   * kernel/Makefile      - susfs version banner
   * kernel/core/init.c   - susfs_init()
   * kernel/selinux/*     - sid helpers susfs needs + susfs_set_batch_sid()
-  * kernel/supercall/*   - ksu_handle_sys_reboot(): the susfs command entry that
-                           susfs' kernel-side patch calls from SYSCALL_DEFINE4(reboot)
+  * kernel/supercall/*   - ksu_handle_sys_reboot(): the susfs command entry that susfs'
+                           kernel-side patch calls from SYSCALL_DEFINE4(reboot)
   * kernel/feature/kernel_umount.c
-                         - mark the process as umounted for susfs and kick
-                           susfs' deferred work after umounting
+                         - mark the process as umounted for susfs and kick susfs'
+                           deferred work after umounting
   * kernel/feature/susfs_compat.c (new)
-                         - gate keys + inert stubs for susfs' *manual* hooks
-                           (su compat, safe-mode input, init.rc). ApkeSU wires all
-                           of those through its own kprobe/syscall hooks, so the
-                           manual hooks stay disabled to avoid double handling.
+                         - gate keys + inert stubs for susfs' *manual* hooks (su compat,
+                           safe-mode input, init.rc). ApkeSU wires all of those through
+                           its own kprobe/syscall hooks, so the manual hooks stay
+                           disabled to avoid double handling.
   * de-static selinux_hide internals referenced by the kernel-side patch
   * renames to free names the kernel-side patch owns:
       bool  ksu_su_compat_enabled  -> ksu_su_compat_toggle
       2-arg ksu_handle_setresuid   -> ksu_handle_setresuid_transition
 
-Requires CONFIG_KSU=y (built-in): the kernel-side patch references KSU symbols
-from built-in kernel code, so LKM mode (CONFIG_KSU=m) will not link.
+Part 2 - in-tree (built-in) build fix
+-------------------------------------
+kernel/Kbuild derives the repo root with $(abspath $(KSU_KERNEL_DIR)/..). For a built-in
+build the driver is reached through the drivers/kernelsu symlink created by setup.sh,
+and $(abspath) collapses ".." lexically without following symlinks, so the root resolves
+to <srctree>/drivers. The result is:
+
+  fatal error: 'uapi/app_profile.h' file not found
+
+and version.properties / dist/manager_identity.mk are silently missed as well. The patch
+resolves the symlink physically ("cd -P") and prefers that result when available.
+Out-of-tree LKM builds pass an absolute real path, where this is a no-op.
+
+Requires CONFIG_KSU=y (built-in): the kernel-side patch references KSU symbols from
+built-in kernel code, so LKM mode will not link.
 
 diff --git a/kernel/Kbuild b/kernel/Kbuild
-index 8eebadb..bc0362e 100644
+index 8eebadb..f0b6cb8 100644
 --- a/kernel/Kbuild
 +++ b/kernel/Kbuild
 @@ -3,6 +3,7 @@ kernelsu-objs := core/init.o
@@ -51,6 +64,45 @@ index 8eebadb..bc0362e 100644
  kernelsu-objs += feature/hook_status.o
  
  kernelsu-objs += hook/lsm_hook.o
+@@ -78,12 +79,26 @@ KSU_KERNEL_DIR := $(src)
+ endif
+ KSU_ROOT_DIR := $(abspath $(KSU_KERNEL_DIR)/..)
+ 
++# In an in-tree build the driver is reached through the drivers/kernelsu symlink that
++# setup.sh creates. $(abspath) collapses ".." purely lexically and never follows that
++# symlink, so the repo root above resolves to <srctree>/drivers instead of the ApkeSU
++# checkout - and -I misses uapi/, version.properties and dist/manager_identity.mk.
++# Resolve the symlink physically ("cd -P") and prefer that result when we get one.
++# Out-of-tree (LKM) builds already pass an absolute real path, where this is a no-op.
++KSU_REPO_ROOT := $(shell cd -P $(KSU_KERNEL_DIR)/.. 2>/dev/null && pwd -P)
++ifneq ($(KSU_REPO_ROOT),)
++KSU_ROOT_DIR := $(KSU_REPO_ROOT)
++endif
++
+ ccflags-y += -I$(KSU_KERNEL_DIR) -I$(KSU_KERNEL_DIR)/include -I$(KSU_ROOT_DIR)
+ 
+ obj-$(CONFIG_KSU) += kernelsu.o
+ 
+ MDIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+ KSU_VERSION_FILE := $(abspath $(MDIR)/../version.properties)
++ifneq ($(KSU_REPO_ROOT),)
++KSU_VERSION_FILE := $(KSU_REPO_ROOT)/version.properties
++endif
+ KSU_FALLBACK_VERSION := $(shell sed -n 's/^versionCode=//p' $(KSU_VERSION_FILE) 2>/dev/null | head -n 1)
+ KSU_VERSION_OVERRIDE := $(strip $(KSU_VERSION_OVERRIDE))
+ 
+@@ -133,7 +148,11 @@ endif
+ KSU_NEW_DCACHE_FLUSH := $(shell grep -q __flush_dcache_area $(srctree)/arch/arm64/include/asm/cacheflush.h ; echo $$?)
+ $(info -- KSU_NEW_DCACHE_FLUSH: $(KSU_NEW_DCACHE_FLUSH))
+ 
++ifneq ($(KSU_REPO_ROOT),)
++KSU_MANAGER_IDENTITY ?= $(KSU_REPO_ROOT)/dist/manager_identity.mk
++else
+ KSU_MANAGER_IDENTITY ?= $(abspath $(MDIR)/../dist/manager_identity.mk)
++endif
+ ifneq ($(wildcard $(KSU_MANAGER_IDENTITY)),)
+ include $(KSU_MANAGER_IDENTITY)
+ $(info -- KernelSU Manager identity: $(KSU_MANAGER_IDENTITY))
 diff --git a/kernel/Kconfig b/kernel/Kconfig
 index 88e2281..55a635c 100644
 --- a/kernel/Kconfig
