@@ -37,14 +37,6 @@ on:
           - "noksu"
           - "ksu"
           - "both"
-      ksuVariant:
-        description: "KSU implementation"
-        required: true
-        type: choice
-        default: "sukisu-ultra"
-        options:
-          - "sukisu-ultra"
-          - "wildksu"
       tickRate:
         description: "Kernel tick rate (Hz)"
         required: false
@@ -62,6 +54,7 @@ on:
         type: choice
         default: "O2"
         options:
+          - "default"
           - "O2"
           - "O3"
           - "Os"
@@ -73,7 +66,7 @@ on:
         options:
           - "android-tools"
           - "custom-tools"
-      LTOOptimizations:
+      LtoOptimizations:
         description: "Choose LTO"
         required: true
         type: choice
@@ -123,20 +116,21 @@ jobs:
          rm -rf common
 
          # Download updated Clang r584948 from Android Git repository
-         aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r547379.tar.gz "https://github.com/topnotchfreaks/clang/releases/download/v1.0.0/clang-r547379.tar.gz"
+         aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r584948b.tar.gz "https://github.com/topnotchfreaks/clang/releases/download/v1.0.0/clang-r584948b.tar.gz"
     
-         mkdir -p prebuilts/clang/host/linux-x86/clang-r547379
-         tar -xzf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz -C prebuilts/clang/host/linux-x86/clang-r547379
-         rm -rf prebuilts/clang/host/linux-x86/clang-r547379.tar.gz
+         mkdir -p prebuilts/clang/host/linux-x86/clang-r584948b
+         tar -xzf prebuilts/clang/host/linux-x86/clang-r584948b.tar.gz -C prebuilts/clang/host/linux-x86/clang-r584948b
+         rm -rf prebuilts/clang/host/linux-x86/clang-r584948b.tar.gz
 
          # Clean up old Clang versions
          rm -rf prebuilts/clang/host/linux-x86/clang-3289846
          rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
+         rm -rf prebuilts/clang/host/linux-x86/clang-r547379
          rm -rf prebuilts/clang/host/linux-x86/clang-stable
          
          sed -i \
           -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
-          -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r547379/' \
+          -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r584948b/' \
          ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.constants
     
          sed -i '/^DEFCONFIG=gki_defconfig/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
@@ -251,17 +245,8 @@ jobs:
             args="$args AR=llvm-ar"
             args="$args CC=clang"
             echo "args=$args" >> $GITHUB_OUTPUT
-            
-      - name: "📝 Append custom Makefile line AOSP"
-        if: github.event.inputs.buildToolchains == 'android-tools'
-        working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
-        run: |
-         echo 'KBUILD_CFLAGS += -Wno-implicit-function-declaration' >> Makefile
-         echo 'KBUILD_CFLAGS += -Wno-sometimes-uninitialized' >> Makefile
-         echo "Custom Makefile line added successfully"
 
-      - name: "📝 Append custom Makefile line CUSTOM"
-        if: github.event.inputs.buildToolchains == 'custom-tools'
+      - name: "📝 Append custom Makefile line"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
          echo 'KBUILD_CFLAGS += -Wno-default-const-init-unsafe' >> Makefile
@@ -285,7 +270,7 @@ jobs:
          fi
     
          # LTO Configuration - Enable Thin LTO only
-         if [ "${{ github.event.inputs.LTOOptimizations }}" = "thin" ]; then
+         if [ "${{ github.event.inputs.LtoOptimizations }}" = "thin" ]; then
            sed -i '/CONFIG_LTO_CLANG_FULL/d' "$CONFIG_FILE"
            echo "CONFIG_LTO_CLANG=y" >> "$CONFIG_FILE"
            echo "# CONFIG_LTO_CLANG_FULL is not set" >> "$CONFIG_FILE"
@@ -312,6 +297,9 @@ jobs:
           
           # Apply selected optimization level
           case "${{ github.event.inputs.optimizationLevel }}" in
+            default)
+              # nothing to add here (keep it default)
+              ;;
             O2)
               echo "CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y" >> "$CONFIG_FILE"
               echo "# CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE_O3 is not set" >> "$CONFIG_FILE"
@@ -331,8 +319,8 @@ jobs:
                    
           # Apply selected tick rate
           case "${{ github.event.inputs.tickRate }}" in
-          default)
-              echo Nothing to change. Keep Default.
+            default)
+              # nothing to add here (keep it default)
               ;;
             100Hz)
               sed -i '/^CONFIG_HZ_100=/d' "$CONFIG_FILE"
@@ -380,54 +368,16 @@ jobs:
           # curl -L -o localversion.patch "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-do-not-ship-full-auto_localversion.patch" 
           # patch -p1 < localversion.patch || echo "Warning: Strings patch failed"
 
-      - name: "🔧 Setup SukiSU-Ultra (Stable)"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'sukisu-ultra'
+      - name: "🔧 Add BBG Support (KSU variant only)"
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
-          rm -rf ./KernelSU ./drivers/kernelsu
-          
-          # Install SukiSU-Ultra with SUSFS
-          curl -LSs "https://raw.githubusercontent.com/ShirkNeko/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
-          
-          # Apply SUSFS patch
-          PATCH_URL="https://api.github.com/repos/topnotchfreaks/kernel_patches/releases/latest"
-          SUSFS_PATCH=$(curl -s "$PATCH_URL" | grep "browser_download_url.*0001-Implement-SUSFS.*Android-13.*Kernel-5.15.*patch" | cut -d '"' -f 4 | head -n 1)
-          
-          if [ -n "$SUSFS_PATCH" ]; then
-            curl -L -o susfs.patch "$SUSFS_PATCH"
-            patch -p1 < susfs.patch || echo "Warning: SUSFS patch failed"
-          fi
-          
-          # Add KSU configs
-          CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_KSU=y
-          # CONFIG_KSU_MANUAL_HOOK is not set
-          CONFIG_KPM=y
-          CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_PATH=y
-          CONFIG_KSU_SUSFS_SUS_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n
-          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
-          CONFIG_KSU_SUSFS_SPOOF_UNAME=y
-          CONFIG_KSU_SUSFS_ENABLE_LOG=y
-          CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
-          CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
-          CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_KSU_SUSFS_SUS_SU=y
-          CONFIG_TMPFS_XATTR=y
-          CONFIG_TMPFS_POSIX_ACL=y
-          EOF
-          
-          echo "✅ Installed SukiSU-Ultra with SUSFS"
+          echo "Adding BBG...";
+          wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
+          echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
           
       - name: "🔧 Setup Wild KSU with SUSFS"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'wildksu'
+        if: matrix.variant == 'ksu'
         working-directory: ./${{ env.kernelDir }}/${{ env.kernelName }}
         run: |
           rm -rf ./KernelSU ./drivers/kernelsu
@@ -435,7 +385,7 @@ jobs:
           echo "📦 Installing Wild KSU..."
 
           # Install WildKSU with SUSFS
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s stable
+          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s canary
       
           echo "✔ Wild KSU installed successfully"
           
@@ -512,6 +462,10 @@ jobs:
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
           CONFIG_KSU_SUSFS_SUS_SU=y
           EOF
+
+          # hooks patch
+          # curl -L -o hooks.patch "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-69-pure-manual-hooks-only.patch" 
+          # patch -p1 < hooks.patch || echo "Warning: Strings patch failed"
           
           echo "🎉 Wild KSU with SUSFS kernel patches fully integrated!"
 
@@ -519,7 +473,7 @@ jobs:
         if: github.event.inputs.buildToolchains == 'android-tools'
         working-directory: ${{ env.WORK_DIR }}
         run: |
-          if [ "${{ github.event.inputs.LTOoptimizations }}" = "thin" ]; then
+          if [ "${{ github.event.inputs.LtoOptimizations }}" = "thin" ]; then
            LTO=thin BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
           else
            LTO=full BUILD_CONFIG=${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki.aarch64 build/build.sh -j$(nproc --all)
@@ -541,22 +495,12 @@ jobs:
         run: |
           make ${args} \
             LLVM=1 \
-            LTO=thin \
             CC=clang \
             AR=llvm-ar \
             NM=llvm-nm \
             OBJCOPY=llvm-objcopy \
             STRIP=llvm-strip \
             -j$(nproc --all)
-
-      - name: "🩹 Apply KPM patch (SukiSU-Ultra only)"
-        if: matrix.variant == 'ksu' && github.event.inputs.ksuVariant == 'sukisu-ultra'
-        working-directory: ${{ env.WORK_DIR }}/out/dist
-        run: |
-          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU_patch/refs/heads/main/kpm/patch_linux" -o patch
-          chmod +x patch
-          ./patch
-          mv oImage Image
           
       - name: 📦 Prepare artifact
         working-directory: ${{ env.WORK_DIR }}
@@ -619,7 +563,7 @@ jobs:
          if [ "${{ github.event.inputs.buildKSU }}" != "noksu" ]; then
           KSU_TEXT="
           
-         🔐 *KSU Variant:* \`${{ github.event.inputs.ksuVariant }}\`"
+         🔐 *KSU Variant:* \`Wild KSU\`"
          fi
       
          CAPTION="✅ *Kernel Build Successful*
@@ -631,13 +575,14 @@ jobs:
          • Device: \`${{ github.event.inputs.kernelDevice }}\`
     
          ⚙️ *Configuration:*
-         • LTO: \`${{ github.event.inputs.LTOOptimizations }}\`
+         • LTO: \`${{ github.event.inputs.LtoOptimizations }}\`
          • Optimization: \`-${{ github.event.inputs.optimizationLevel }}\`
          • Tick Rate: \`${{ github.event.inputs.tickRate }}\`
          • Build Type: \`${{ github.event.inputs.buildKSU }}\`${KSU_TEXT}
          • SUSFS: \`Enabled (GKI A13-5.15)\`
          • Local Version: \`${{ github.event.inputs.localVersion }}\`
          • Build Tools: \`${{ github.event.inputs.buildToolchains }}\`
+         • Manager: \`KSU,Wild-KSU,KSUN,rKSU and KowSU\`
     
          🕐 *Build Date:* $(date '+%Y-%m-%d %H:%M:%S UTC')
          📦 *Package:* \`${{ env.ZIP_NAME }}\`"
@@ -657,13 +602,14 @@ jobs:
          • Device: \`Redmi Note 12/13 4G. Pad SE\`
     
          ⚙️ *Configuration:*
-         • LTO: \`${{ github.event.inputs.LTOOptimizations }}\`
+         • LTO: \`${{ github.event.inputs.LtoOptimizations }}\`
          • Optimization: \`-${{ github.event.inputs.optimizationLevel }}\`
          • Tick Rate: \`${{ github.event.inputs.tickRate }}\`
          • Build Type: \`${{ github.event.inputs.buildKSU }}\`${KSU_TEXT}
          • SUSFS: \`Enabled (GKI A13-5.15)\`
          • Local Version: \`${{ github.event.inputs.localVersion }}\`
          • Build Tools: \`${{ github.event.inputs.buildToolchains }}\`
+         • Manager: \`KSU,Wild-KSU,KSUN,rKSU and KowSU\`
       
          🕐 *Failed at:* $(date '+%Y-%m-%d %H:%M:%S UTC')
     

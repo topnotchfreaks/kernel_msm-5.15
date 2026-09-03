@@ -1,4 +1,4 @@
-name: "Build YASK Wild"
+name: "Build YASK"
 
 env:
   OUT_DIR: "out"
@@ -9,7 +9,7 @@ on:
   schedule:
     - cron: '0 0 * * 0'
   workflow_dispatch:
-
+        
 jobs:
   build-kernels:
     name: "🐎 Build YASK ${{ matrix.kernel.name }} kernel"
@@ -28,6 +28,7 @@ jobs:
             output_name: "Image.gki.ksu"
             enable_ksu: true
             extra_patches:
+              - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-gki-fixup.patch"
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-sign-builds.patch"
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-Don-t-append-and-dirty-to-localversion.patch"
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-do-not-ship-full-auto_localversion.patch"
@@ -41,6 +42,7 @@ jobs:
             output_name: "Image.clo.ksu"
             enable_ksu: true
             extra_patches:
+              - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-gki-fixup.patch"
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-sign-builds.patch"
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-Don-t-append-and-dirty-to-localversion.patch"
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-do-not-ship-full-auto_localversion.patch"
@@ -54,6 +56,7 @@ jobs:
             output_name: "Image.gki.noksu"
             enable_ksu: false
             extra_patches:
+              - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-gki-fixup.patch"
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-sign-builds.patch"
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-Don-t-append-and-dirty-to-localversion.patch"
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-do-not-ship-full-auto_localversion.patch"
@@ -67,6 +70,7 @@ jobs:
             output_name: "Image.clo.noksu"
             enable_ksu: false
             extra_patches:
+              - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-gki-fixup.patch"
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-sign-builds.patch"
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-Don-t-append-and-dirty-to-localversion.patch"
               - "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-scripts-do-not-ship-full-auto_localversion.patch"
@@ -140,8 +144,8 @@ jobs:
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
-          echo "CONFIG_LOCALVERSION=\"${{ env.LOCAL_VERSION }}\"" >> "$CONFIG_FILE"
-          echo "CONFIG_LOCALVERSION_AUTO=y" >> "$CONFIG_FILE"
+          echo "CONFIG_LOCALVERSION=\"${{ env.LOCAL_VERSION }}-${{ env.BUILD_TIME }}\"" >> "$CONFIG_FILE"
+          echo "CONFIG_LOCALVERSION_AUTO=n" >> "$CONFIG_FILE"
 
           # Helper
           apply_patch() {
@@ -152,216 +156,149 @@ jobs:
             rm -f "$file"
           }
 
-          # Common patches
-          apply_patch "https://raw.githubusercontent.com/topnotchfreaks/kernel_patches/main/0001-gki-fixup.patch"
-
-          # Kernel-specific patches
+          # Apply patches
           echo '${{ toJSON(matrix.kernel.extra_patches) }}' | jq -r '.[]' | while read p; do
             [ -n "$p" ] && apply_patch "$p"
           done
 
-      - name: "🔧 Setup Wild-KSU with SUSFS"
+      - name: "🔧 Add BBG Support (KSU variant only)"
         if: matrix.kernel.enable_ksu == true
         working-directory: ./${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
-          set -e
+          echo "Adding BBG...";
+          wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
+          echo "CONFIG_BBG=y" >> arch/arm64/configs/${{ env.DEFCONFIG_NAME }}
+          sed -i '/^config LSM$/,/^help$/{ /^[[:space:]]*default/ { /baseband_guard/! s/selinux/selinux,baseband_guard/ } }' security/Kconfig
+
+      - name: "🔧 Setup ReSukiSU with SUSFS"
+        if: matrix.kernel.enable_ksu == true
+        working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
+        run: |
+          rm -rf ./KernelSU ./drivers/kernelsu
+
+          echo "📦 Installing KSU..."
+          curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
           
-          # Clean existing installations
-          rm -rf ./KernelSU ./drivers/kernelsu ./Wild_KSU
+          echo "✔ KSU installed successfully"
           
-          echo "📦 Installing Wild-KSU..."
-          curl -LSs "https://raw.githubusercontent.com/WildKernels/Wild_KSU/wild/kernel/setup.sh" | bash -s stable
-          
-          if [ ! -d "Wild_KSU" ]; then
-            echo "❌ ERROR: Wild_KSU directory not found after installation!"
-            exit 1
-          fi
-          echo "✔ Wild-KSU installed successfully"
-          
-          echo "📦 Cloning SUSFS4KSU..."
+          # Clone SUSFS4KSU for kernel patches only (not KSU integration)
+          echo "📦 Cloning SUSFS4KSU for kernel patches..."
           git clone --depth=1 https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android13-5.15
-          
-          if [ ! -d "susfs4ksu" ]; then
-            echo "❌ ERROR: SUSFS4KSU clone failed!"
-            exit 1
+
+          echo "☣️ Applying namespace.c Fake Patch (if applicable)"
+          if grep -q '^#include <trace/hooks/blk.h>$' fs/namespace.c; then
+            sed -i '/^#include <trace\/hooks\/blk.h>$/d' fs/namespace.c
+            NS_FAKE_PATCHED=1
+          else
+            echo "ℹ️ blk.h include not present in fs/namespace.c — skipping fake patch"
+            NS_FAKE_PATCHED=0
+          fi
+
+          echo "☣️ Applying task_mmu.c Fake Patch (if applicable)"
+          if grep -q '^#include <trace/hooks/mm.h>$' fs/proc/task_mmu.c; then
+            sed -i '/^#include <trace\/hooks\/mm.h>$/d' fs/proc/task_mmu.c
+            MM_FAKE_PATCHED=1
+          else
+            echo "ℹ️ mm.h include not present in fs/proc/task_mmu.c — skipping fake patch"
+            MM_FAKE_PATCHED=0
           fi
           
-          # Apply SUSFS kernel patch
+          SUSFS_KERNEL_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
+          
           echo "🔧 Applying SUSFS kernel patch..."
-          SUSFS_PATCH="susfs4ksu/kernel_patches/50_add_susfs_in_gki-android13-5.15.patch"
-          
-          if [ -f "$SUSFS_PATCH" ]; then
-            if patch -p1 --forward < "$SUSFS_PATCH"; then
-              echo "✅ SUSFS kernel patch applied successfully"
-            else
-              echo "⚠️ Patch had some issues, but continuing..."
-            fi
+          if patch -p1 < "$SUSFS_KERNEL_PATCH"; then
+            echo "✅ SUSFS patch successfully applied"
           else
-            echo "⚠️ SUSFS patch file not found: $SUSFS_PATCH"
+            echo "⚠️ SUSFS patch failed — copying files manually"
           fi
+
+          echo "🔧 Applying SUSFS -> KernelSU patch..."
+          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
           
-          # Force copy SUSFS source files
-          echo "📄 Installing SUSFS source files..."
-          mkdir -p fs include/linux
+          echo "📄 Forcing SUSFS source injection..."
           
-          if [ -f "susfs4ksu/kernel_patches/fs/susfs.c" ]; then
-            cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
-            echo "✔ Copied fs/susfs.c"
-          else
-            echo "❌ ERROR: fs/susfs.c not found in SUSFS repo!"
-            exit 1
-          fi
+          # Always replace fs/susfs.c
+          mkdir -p fs
+          cp -f susfs4ksu/kernel_patches/fs/susfs.c fs/susfs.c
+          echo "✔ Copied fs/susfs.c"
           
-          if [ -f "susfs4ksu/kernel_patches/include/linux/susfs.h" ]; then
-            cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
-            echo "✔ Copied include/linux/susfs.h"
-          else
-            echo "❌ ERROR: include/linux/susfs.h not found!"
-            exit 1
-          fi
+          # Always replace include/linux/susfs.h
+          mkdir -p include/linux
+          cp -f susfs4ksu/kernel_patches/include/linux/susfs.h include/linux/susfs.h
+          echo "✔ Copied include/linux/susfs.h"
           
-          if [ -f "susfs4ksu/kernel_patches/include/linux/susfs_def.h" ]; then
+          # Also install missing susfs_def.h
+          if [ -f susfs4ksu/kernel_patches/include/linux/susfs_def.h ]; then
             cp -f susfs4ksu/kernel_patches/include/linux/susfs_def.h include/linux/susfs_def.h
             echo "✔ Copied include/linux/susfs_def.h"
           else
-            echo "⚠️ susfs_def.h not found, might not be needed"
+            echo "⚠️ susfs_def.h not found in repo"
           fi
           
-          # Inject SUSFS integration into KernelSU
-          echo "📦 Integrating SUSFS with Wild-KSU..."
-          
-          if [ -d "susfs4ksu/kernel_patches/KernelSU/kernel" ]; then
-            cp -rf susfs4ksu/kernel_patches/KernelSU/kernel/* Wild_KSU/kernel/ || true
-            echo "✔ Copied SUSFS integration files to Wild_KSU/kernel/"
-          fi
-          
-          # Apply KSU SUSFS patch with better error handling
-          KSU_PATCH="susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
-          KSU_C_FILE="Wild_KSU/kernel/ksu.c"
-          
-          if [ ! -f "$KSU_C_FILE" ]; then
-            echo "❌ ERROR: $KSU_C_FILE not found!"
-            exit 1
-          fi
-          
-          echo "🔧 Integrating SUSFS into KSU initialization..."
-          
-          # Check if already patched
-          if grep -q "susfs_init" "$KSU_C_FILE" 2>/dev/null; then
-            echo "⚠️ SUSFS already integrated in ksu.c, skipping"
-          else
-            # Try applying patch first
-            PATCH_SUCCESS=0
-            if [ -f "$KSU_PATCH" ]; then
-              cd Wild_KSU
-              if patch -p1 --forward --dry-run < "../$KSU_PATCH" >/dev/null 2>&1; then
-                patch -p1 < "../$KSU_PATCH" && PATCH_SUCCESS=1
-                echo "✔ Applied KSU SUSFS patch successfully"
-              fi
-              cd ..
-            fi
-            
-            # Manual integration if patch failed
-            if [ $PATCH_SUCCESS -eq 0 ]; then
-              echo "⚠️ Patch failed or unavailable, applying manual integration..."
-              
-              # Add susfs.h include after other linux includes
-              if ! grep -q "#include <linux/susfs.h>" "$KSU_C_FILE"; then
-                sed -i '/#include <linux\/fs\.h>/a #include <linux/susfs.h>' "$KSU_C_FILE"
-                echo "✔ Added #include <linux/susfs.h>"
-              fi
-              
-              # Add susfs_init() call in ksu_core_init()
-              if ! grep -q "susfs_init()" "$KSU_C_FILE"; then
-                # Find the ksu_core_init function and add susfs_init after ksu_core_init call
-                sed -i '/ksu_core_init();/a \\tsusfs_init();' "$KSU_C_FILE" || \
-                sed -i '/int __init ksu_init(/,/^}/{ /return 0;/i \\tsusfs_init(); }' "$KSU_C_FILE"
-                echo "✔ Added susfs_init() call"
-              fi
-            fi
-          fi
-          
-          # Verify the integration
-          echo "🔍 Verifying SUSFS integration..."
-          VERIFICATION_FAILED=0
-          
-          for file in fs/susfs.c include/linux/susfs.h; do
-            if [ -f "$file" ]; then
-              echo "✔ Found: $file"
-            else
-              echo "❌ MISSING: $file"
-              VERIFICATION_FAILED=1
-            fi
+          echo "🔍 Verifying SUSFS files..."
+          for f in fs/susfs.c include/linux/susfs.h include/linux/susfs_def.h; do
+            if [ -f "$f" ]; then echo "✔ Found: $f"; else echo "❌ Missing: $f"; fi
           done
           
-          if grep -q "susfs_init" "$KSU_C_FILE"; then
-            echo "✔ susfs_init() call verified in ksu.c"
-          else
-            echo "❌ MISSING: susfs_init() call in ksu.c"
-            VERIFICATION_FAILED=1
-          fi
+          # Clean up SUSFS repo (we only needed kernel patches, not KSU integration)
+          rm -rf susfs4ksu
           
-          if grep -q "#include <linux/susfs.h>" "$KSU_C_FILE"; then
-            echo "✔ susfs.h include verified in ksu.c"
-          else
-            echo "❌ MISSING: susfs.h include in ksu.c"
-            VERIFICATION_FAILED=1
-          fi
-          
-          if [ $VERIFICATION_FAILED -eq 1 ]; then
-            echo "❌ SUSFS integration verification FAILED!"
-            echo "Dumping ksu.c header for debugging:"
-            head -30 "$KSU_C_FILE"
-            exit 1
-          fi
-          
-          # Ensure drivers/kernelsu symlink exists
-          if [ ! -L "drivers/kernelsu" ] && [ ! -d "drivers/kernelsu" ]; then
-            ln -sf ../Wild_KSU drivers/kernelsu
+          # Create symbolic link for drivers/kernelsu (if needed by build system)
+          if [ ! -L "drivers/kernelsu" ]; then
+            ln -sf ../KernelSU drivers/kernelsu
             echo "✔ Created drivers/kernelsu symlink"
           fi
-          
-          # Add Wild-KSU and SUSFS configs
+
+          echo "✅ SUSFS build wiring verified"
+
           CONFIG_FILE="arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           cat >> "$CONFIG_FILE" << 'EOF'
-          CONFIG_KSU=y
-          CONFIG_KPROBES=y
-          CONFIG_HAVE_KPROBES=y
-          CONFIG_KPROBE_EVENTS=y
-          CONFIG_OVERLAY_FS=y
           CONFIG_KSU_SUSFS=y
-          CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_PATH=y
           CONFIG_KSU_SUSFS_SUS_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y
           CONFIG_KSU_SUSFS_SUS_KSTAT=y
-          CONFIG_KSU_SUSFS_TRY_UMOUNT=y
-          CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y
           CONFIG_KSU_SUSFS_SPOOF_UNAME=y
           CONFIG_KSU_SUSFS_ENABLE_LOG=y
           CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
           CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
           CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
-          CONFIG_KSU_SUSFS_SUS_SU=y
+          CONFIG_KSU_SUSFS_SUS_MAP=y
           EOF
+
+          echo "↩️ Reverting namespace.c Fake Patch (if applicable)"
+          if [ "$NS_FAKE_PATCHED" = "1" ] && ! grep -q 'trace/hooks/blk.h' fs/namespace.c; then
+            if grep -q '^#include "internal.h"$' fs/namespace.c; then
+              sed -i '/^#include "internal.h"$/a #include <trace/hooks/blk.h>' fs/namespace.c
+              echo "✔ Restored blk.h include"
+            else
+              echo "⚠️ Anchor #include \"internal.h\" not found — could not restore blk.h include, check fs/namespace.c manually"
+            fi
+          else
+            echo "ℹ️ Skipping blk.h restore (not fake-patched or already present)"
+          fi
+
+          echo "↩️ Reverting task_mmu.c Fake Patch (if applicable)"
+          if [ "$MM_FAKE_PATCHED" = "1" ] && ! grep -q 'trace/hooks/mm.h' fs/proc/task_mmu.c; then
+            if grep -q '^#include <linux/pkeys.h>$' fs/proc/task_mmu.c; then
+              sed -i '/^#include <linux\/pkeys.h>$/a #include <trace/hooks/mm.h>' fs/proc/task_mmu.c
+              echo "✔ Restored mm.h include"
+            else
+              echo "⚠️ Anchor #include <linux/pkeys.h> not found — could not restore mm.h include, check fs/proc/task_mmu.c manually"
+            fi
+          else
+            echo "ℹ️ Skipping mm.h restore (not fake-patched or already present)"
+          fi
           
-          echo "✔ Wild-KSU configs with SUSFS added"
-          
-          # Clean up
-          rm -rf susfs4ksu
-          
-          echo "🎉 Wild-KSU with SUSFS fully integrated and verified!"
+          echo "✅ KSU configs added"
+
+          echo "🎉 ReSukiSU installed and SUSFS for GKI android13-5.15 fully integrated!"
 
       - name: "⚙️ Setup basic configs"
         working-directory: ${{ env.KERNEL_LOC_DIR }}/${{ env.KERNEL_NAME }}
         run: |
           CONFIG_FILE="./arch/arm64/configs/${{ env.DEFCONFIG_NAME }}"
           
-          # Basic optimizations
-          echo "CONFIG_KALLSYMS=y" >> "$CONFIG_FILE"
-
-          # Performance configs
+          # addon configs
           cat >> "$CONFIG_FILE" << 'EOF'
           CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
           CONFIG_TCP_CONG_ADVANCED=y
@@ -373,6 +310,7 @@ jobs:
           CONFIG_OVERLAY_FS=y
           CONFIG_TMPFS_XATTR=y
           CONFIG_TMPFS_POSIX_ACL=y
+          CONFIG_KALLSYMS=y
           EOF
           
           echo "✅ Basic configs added"
@@ -385,7 +323,6 @@ jobs:
          echo 'KBUILD_CFLAGS += -Wno-implicit-function-declaration' >> Makefile
          echo "Custom Makefile line added successfully"
     
-
       - name: "🔨 Build kernel"
         working-directory: ${{ env.WORK_DIR }}
         run: |
@@ -444,15 +381,15 @@ jobs:
           ╠═════════════════════════════════════════════════════╣
           ║                                                     ║
           ║     Features:                                       ║
-          ║     • Thin LTO + -O2 Optimization                   ║
+          ║     • Full LTO + -O2 Optimization                   ║
           ║     • Extra TCP Congestion (BBR, Westwood)          ║
           ║     • AOSP clang-r547379                            ║
-          ║     • Non-KSU & Wild-KSU support                    ║
-          ║     • SUSFS integration (for KSU builds)            ║
+          ║     • Non-KSU & ReSukiSU + SUSFS support            ║
+          ║     • Baseband-Guard Support                        ║
           ║     • Metamodule Support                            ║
           ║                                                     ║
           ║     Info:                                           ║
-          ║     • Supported Android: 13-16                      ║
+          ║     • Supported Android: 13-17                      ║
           ║     • Supported Device:                             ║
           ║       Redmi Note 12 4G/NFC                          ║
           ║       Redmi Note 13 4G/NFC                          ║
@@ -467,7 +404,7 @@ jobs:
           EOF
 
           # Create ZIP
-          ZIP_NAME="Anykernel3_YASK-WildKSU-AIO-FULL_$(date +'%Y-%m-%d').zip"
+          ZIP_NAME="Anykernel3_YASK-ReSukiSU-AIO-FULL_$(date +'%Y-%m-%d').zip"
           cd AnyKernel3
           zip -r9 "../$ZIP_NAME" * -x .git/*
           cd ..
@@ -483,36 +420,71 @@ jobs:
           files: ${{ env.ZIP_NAME }}
           tag_name: "YASK-NEXT"
 
-      - name: "🎉 Send success notification with download link"
-        if: success()
+      - name: "📱 Send Telegram Notification"
         run: |
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/YASK-NEXT"
-          MESSAGE="🎉 <b>YASK Kernel Package Released!</b>%0A%0A"
-          MESSAGE="${MESSAGE}✅ All kernels built successfully%0A%0A"
-          MESSAGE="${MESSAGE}📦 <b>Package:</b> <code>${{ env.ZIP_NAME }}</code>%0A"
-          MESSAGE="${MESSAGE}📊 <b>Size:</b> ${{ env.ZIP_SIZE }}%0A"
-          MESSAGE="${MESSAGE}📅 <b>Build Date:</b> ${{ env.BUILD_TIME }}%0A%0A"
-          MESSAGE="${MESSAGE}📥 <b>Included Variants:</b>%0A"
-          MESSAGE="${MESSAGE}• GKI + Wild-KSU + SUSFS%0A"
-          MESSAGE="${MESSAGE}• CLO + Wild-KSU + SUSFS%0A"
-          MESSAGE="${MESSAGE}• GKI (No KSU)%0A"
-          MESSAGE="${MESSAGE}• CLO (No KSU)%0A%0A"
-          MESSAGE="${MESSAGE}🔗 <a href='${RELEASE_URL}'>Download Now</a>"
-          
-          curl -s -X POST "https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ env.TELEGRAM_CHAT_ID }}" \
-            -d text="${MESSAGE}" \
-            -d parse_mode="HTML" \
-            -d disable_web_page_preview=true
+          BANNER_URL="https://raw.githubusercontent.com/topnotchfreaks/kernel_msm-5.15/builder/assets/yask.png"
 
-      - name: "💔 Send failure notification"
-        if: failure()
-        run: |
-          MESSAGE="❌ <b>YASK Kernel Package Failed!</b>%0A%0A"
-          MESSAGE="${MESSAGE}⚠️ Package creation or upload failed%0A"
-          MESSAGE="${MESSAGE}📅 <b>Time:</b> $(date +'%Y-%m-%d %H:%M:%S')%0A"
-          MESSAGE="${MESSAGE}🔗 <a href='https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'>View Logs</a>"
+          if [[ "${{ job.status }}" == "success" ]]; then
+            MESSAGE="✅ *YASK Kernel Released*
+
+          📦 *Build Information:*
+          • Kernel: \`Linux 5.15\`
+          • Android: \`13-17\`
+          • Base: \`GKI & CLO\`
+          • KSU: \`ReSukiSU\`
+          • SUSFS: \`Enabled (GKI A13-5.15)\`
+          • LTO: \`Full\`
+          • Optimization: \`-O2\`
+          • BBG: \`Enabled\`
+
+          📱 *Supported Devices:*
+          • Redmi Note 12 4G/NFC
+          • Redmi Note 13 4G/NFC
+          • Redmi Pad SE
+
+          📱 *Supported Manager:*
+          • KSU by tiann
+          • MKSU
+          • Rissu-KSU
+          • KowSU
+          • ReSukiSU (Main Root Manager)
+          • SukiSU-Ultra
+
+          🕐 *Build Date:* $(date '+%Y-%m-%d %H:%M:%S UTC')
+          📦 *Package:* \`${{ env.ZIP_NAME }}\`
+
+          ⬇️ [Download Here]($RELEASE_URL)"
+
+            curl -s -X POST \
+              -d chat_id=${{ secrets.TELEGRAM_CHANNEL_ID }} \
+              -d photo="${BANNER_URL}" \
+              --data-urlencode "caption=${MESSAGE}" \
+              -d parse_mode="Markdown" \
+              -d disable_web_page_preview="false" \
+              "https://api.telegram.org/bot${{ secrets.TELEGRAM_YASK_BOT_TOKEN }}/sendPhoto"
+
+          else
+            FAILURE_MSG="❌ *YASK Kernel Build Failed*
+            
+          📦 *Build Information:*
+          • Kernel: \`Linux 5.15\`
+          • Android: \`13-17\`
+          • Base: \`GKI & CLO\`
+          • KSU: \`ReSukiSU\`
+          • SUSFS: \`Enabled (GKI A13-5.15)\`
+          • LTO: \`Full\`
+          • Optimization: \`-O2\`
+          • BBG: \`Enabled\`
           
-          curl -s -X POST "https://api.telegram.org/bot${{ env.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ env.TELEGRAM_CHAT_ID }}" \
-            -d text="${MESSAGE}" \
+          🕐 *Failed at:* $(date '+%Y-%m-%d %H:%M:%S UTC')
+
+          🔍 Check the [workflow logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details."
+           
+            curl -s -X POST \
+              -d chat_id=${{ secrets.TELEGRAM_CHANNEL_ID }} \
+              -d photo="${BANNER_URL}" \
+              --data-urlencode "caption=${FAILURE_MSG}" \
+              -d parse_mode="Markdown" \
+              "https://api.telegram.org/bot${{ secrets.TELEGRAM_YASK_BOT_TOKEN }}/sendPhoto"
+          fi
