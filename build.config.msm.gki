@@ -1,6 +1,6 @@
 ################################################################################
 # Common MSM configuration for building GKI-based kernels
-DEFCONFIG="gki_defconfig"
+DEFCONFIG="khaje-perf_defconfig"
 
 # Configuration options to build images for MSM targets
 # Must be included AFTER build.config.msm.<target>
