@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+#include "sa410m-audio.dtsi"
+#include "sa410m-audio-overlay.dtsi"
+
+/ {
+    model = "Qualcomm Technologies, Inc. SA410M";
+    compatible = "qcom,sa410m";
+    qcom,board-id = <0 0>;
+};

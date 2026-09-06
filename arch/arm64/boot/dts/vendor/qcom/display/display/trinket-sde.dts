@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+#include "trinket-sde.dtsi"
+
+/{
+	model = "Qualcomm Technologies, Inc. TRINKET IOT IDP SoC";
+	compatible = "qcom,trinket-iot";
+	qcom,msm-id = <467 0x10000>, <468 0x10000>;
+	qcom,board-id = <0 0>;
+};

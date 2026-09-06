@@ -1,0 +1,10 @@
+/dts-v1/;
+/plugin/;
+
+#include "monaco-slate-amic-audio.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. Monaco IDP V2.0";
+	qcom,board-id = <0x020022 0x0>;
+};
+

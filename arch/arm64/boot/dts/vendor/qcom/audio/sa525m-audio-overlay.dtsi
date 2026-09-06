@@ -1,0 +1,61 @@
+#include "bindings/qcom,audio-ext-clk.h"
+#include <dt-bindings/gpio/gpio.h>
+
+&soc {
+
+	clock_audio_up: audio_ext_clk_up {
+		compatible = "qcom,audio-ref-clk";
+		qcom,codec-ext-clk-src = <AUDIO_LPASS_MCLK_3>;
+		qcom,codec-lpass-clk-id = <0x302>;
+		qcom,codec-lpass-ext-clk-freq = <9600000>;
+		qcom,use-pinctrl = <1>;
+		pinctrl-names = "sleep", "active";
+		pinctrl-0 = <&i2s_mclk_sleep>;
+		pinctrl-1 = <&i2s_mclk_active>;
+		#clock-cells = <1>;
+	};
+
+};
+
+&soc {
+
+		codec_vreg: regulator-codec-tlv320aic3x {
+		compatible = "regulator-fixed";
+		regulator-name = "codec_vreg";
+		startup-delay-us = <5000>;
+		gpio = <&pmx75_gpios 05 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
+		regulator-always-on;
+	};
+
+		snd_tlv3x: sound-auto {
+		compatible = "qcom,sdx-asoc-snd-auto";
+		qcom,model = "sdx-auto-i2s-snd-card";
+		qcom,prim_mi2s_aux_master = <&prim_master_slave>;
+		qcom,prim_mi2s_aux_slave = <&prim_slave>;
+		qcom,sec_mi2s_aux_master = <&sec_master_slave>;
+		qcom,sec_mi2s_aux_slave = <&sec_slave>;
+		qcom,tert_mi2s_aux_master = <&tert_master_slave>;
+		qcom,tert_mi2s_aux_slave = <&tert_slave>;
+
+		pinctrl-names = "default";
+		pinctrl-0 =  <&i2s_mclk_active &tlv_reset_active &tlv_cdc_power>;
+		asoc-codec = <&tlv320aic3x_codec>, <&stub_codec>;
+		asoc-codec-names = "tlv320aic3x", "msm-stub-codec.1";
+
+		qcom,msm_audio_ssr_devs = <&audio_gpr>;
+	};
+};
+
+
+&qupv3_se2_i2c {
+	status = "okay";
+	tlv320aic3x_codec: tlv320aic3x@18 {
+		compatible = "ti,tlv320aic3x";
+		reg = <0x18>;
+		gpio-reset = <&pmx75_gpios 01 0>;
+		AVDD-supply = <&codec_vreg>;
+		IOVDD-supply = <&codec_vreg>;
+		ai3x-ocmv = <1>;
+	};
+};

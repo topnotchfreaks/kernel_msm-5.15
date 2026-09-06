@@ -1,0 +1,15 @@
+/dts-v1/;
+/plugin/;
+#include <dt-bindings/clock/qcom,gcc-khaje.h>
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/regulator/qcom,rpmh-regulator-levels.h>
+
+#include "khaje-camera-sensor-idp.dtsi"
+
+/ {
+        model = "Qualcomm Technologies, Inc. KHAJE IDP nopmi tapas";
+        compatible = "qcom,khaje-idp", "qcom,khaje", "qcom,idp";
+        qcom,msm-id = <518 0x10000>;
+        qcom,board-id = <0x20022 0>;
+        qcom,pmic-id = <0x2D 0x0 0x0 0x0>;
+};

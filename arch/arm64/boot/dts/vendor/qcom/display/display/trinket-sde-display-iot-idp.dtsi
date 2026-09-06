@@ -1,0 +1,38 @@
+#include "trinket-sde-display.dtsi"
+
+&dsi_td4330_truly_video {
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_pwm";
+	pwms = <&pm6125_pwm 0 0>;
+	qcom,bl-pmic-pwm-period-usecs = <100>;
+	qcom,mdss-dsi-bl-min-level = <1>;
+	qcom,mdss-dsi-bl-max-level = <4095>;
+	qcom,platform-reset-gpio = <&tlmm 90 0>;
+	qcom,platform-bklight-en-gpio = <&pmi632_gpios 6 0>;
+};
+
+&dsi_td4330_truly_cmd {
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_pwm";
+	pwms = <&pm6125_pwm 0 0>;
+	qcom,bl-pmic-pwm-period-usecs = <100>;
+	qcom,mdss-dsi-bl-min-level = <1>;
+	qcom,mdss-dsi-bl-max-level = <4095>;
+	qcom,platform-te-gpio = <&tlmm 89 0>;
+	qcom,platform-reset-gpio = <&tlmm 90 0>;
+	qcom,platform-bklight-en-gpio = <&pmi632_gpios 6 0>;
+};
+
+&sde_dsi {
+	qcom,dsi-default-panel = <&dsi_td4330_truly_video>;
+};
+
+&mdss_mdp {
+	connectors = <&sde_dsi &sde_wb>;
+};
+
+&qupv3_se2_i2c {
+	synaptics_tcm@20 {
+		panel = <&dsi_td4330_truly_video>;
+	};
+};

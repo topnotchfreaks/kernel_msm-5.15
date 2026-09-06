@@ -1,0 +1,15 @@
+/dts-v1/;
+/plugin/;
+
+#include "bengal-audio-qrd.dtsi"
+/ {
+	model = "Qualcomm Technologies, Inc. Khajeg QRD";
+	compatible = "qcom,khajeg-qrd", "qcom,khajeg", "qcom,qrd";
+	qcom,msm-id = <585 0x10000>;
+	qcom,board-id = <0x1000B 0>;
+	qcom,pmic-id = <0x2D 0x2E 0x0 0x0>;
+};
+
+&bengal_snd {
+	qcom,wcd-datalane-mismatch = <1>;
+};

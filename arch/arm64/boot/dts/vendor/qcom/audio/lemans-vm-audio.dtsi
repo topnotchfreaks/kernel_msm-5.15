@@ -1,0 +1,12 @@
+&soc {
+	snd_8255_ar: sound-adp-star {
+		compatible = "qcom,gvm-auto-spf-asoc-snd-adp-star";
+		qcom,model = "gvmauto8255-adp-star-snd-card";
+		asoc-codec = <&stub_codec>;
+		asoc-codec-names = "msm-stub-codec.1";
+	};
+
+	stub_codec: qcom,msm-stub-codec {
+		compatible = "qcom,msm-stub-codec";
+	};
+};

@@ -1,0 +1,10 @@
+/dts-v1/;
+/plugin/;
+
+#include "crow-nfc-common.dtsi"
+/ {
+	model = "Qualcomm Technologies, Inc. Crow ATP";
+	compatible = "qcom,crow-atp", "qcom,crow", "qcom,atp";
+	qcom,msm-id = <608 0x10000>;
+	qcom,board-id = <33 0>;
+};

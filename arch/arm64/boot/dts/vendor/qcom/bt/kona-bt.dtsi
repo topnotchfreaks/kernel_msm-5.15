@@ -1,0 +1,68 @@
+#include <dt-bindings/interconnect/qcom,kona.h>
+#include <dt-bindings/gpio/gpio.h>
+
+&tlmm {
+        bt_en_sleep: bt_en_sleep {
+                mux {
+                        pins = "gpio21";
+                        function = "gpio";
+                };
+
+                config {
+                        pins = "gpio21";
+                        drive-strength = <2>;
+                        output-low;
+                        bias-pull-down;
+                };
+        };
+};
+
+
+&soc {
+    bluetooth: bt_qca6390 {
+          compatible = "qcom,qca6390";
+          pinctrl-names = "default";
+          pinctrl-0 = <&bt_en_sleep>;
+          qcom,bt-reset-gpio = <&tlmm 21 0>; /* BT_EN */
+          qcom,bt-sw-ctrl-gpio = <&tlmm 124 0>; /* SW_CTRL */
+          mboxes = <&qmp_aop 0>;
+
+          /* qcom,bt-vdd-io-supply  = <&pm8150_s6>; BT VDD1.8 AON */
+          qcom,bt-vdd-aon-supply = <&pm8150_s6>;
+          qcom,bt-vdd-dig-supply = <&pm8009_s2>;
+          /* qcom,bt-vdd-rfaOp8-supply = <&pm8150_s6>; BT RFAOp8 CMN LDO*/
+          qcom,bt-vdd-rfa1-supply = <&pm8150_s5>;
+          qcom,bt-vdd-rfa2-supply = <&pm8150a_s8>;
+          qcom,bt-vdd-asd-supply = <&pm8150_l16>;
+
+          /* qcom,bt-vdd-io-config  = <1800000 1800000 0 1>;*/
+          qcom,bt-vdd-aon-config = <950000 950000 0 0>;
+          qcom,bt-vdd-dig-config = <950000 952000 0 0>;
+          /*qcom,bt-vdd-rfaOp8-config = <966000 966000 0 1>;*/
+          qcom,bt-vdd-rfa1-config = <1900000 1900000 0 0>;
+          qcom,bt-vdd-rfa2-config = <1350000 1350000 0 0>;
+          qcom,bt-vdd-asd-config = <3024000 3304000 10000 0>;
+    };
+
+    slim_msm: slim@3ac0000 {
+      status = "ok";
+      ngd@1 {
+        reg = <1>;
+        #address-cells = <1>;
+        #size-cells = <1>;
+        slimbus: btfmslim-driver {
+          compatible = "slim217,220";
+          reg = <1 0>;
+        };
+      };
+     };
+};
+
+//uart instance
+&qupv3_se6_4uart{
+       status = "ok";
+};
+
+&qupv3_se12_2uart {
+    status = "okay";
+};

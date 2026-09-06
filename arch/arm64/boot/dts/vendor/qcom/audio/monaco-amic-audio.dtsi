@@ -1,0 +1,55 @@
+#include "monaco-audio-overlay.dtsi"
+
+&rx_macro {
+	swr1: rx_swr_master {
+		 qcom,swr-port-mapping = <1 HPH_L 0x1>,
+				<1 HPH_R 0x2>, <2 CLSH 0x1>,
+				<3 COMP_L 0x1>, <3 COMP_R 0x2>,
+				<4 LO 0x1>, <5 DSD_L 0x1>,
+				<5 DSD_R 0x2>,
+				<7 SWRM_TX1_CH1 0x1>, <7 SWRM_TX1_CH2 0x2>;
+	};
+};
+
+&besbev_codec {
+		qcom,swr_ch_map = <0 SPKR_L 0x1 0 LO>,
+				<2 ADC1 0x1 0 SWRM_TX1_CH1>, <2 ADC2 0x2 0 SWRM_TX1_CH2>;
+};
+
+&monaco_snd {
+	qcom,model = "monaco-idp-amic-snd-card";
+	qcom,msm-mi2s-master = <1>, <1>, <1>, <1>;
+	qcom,mi2s-audio-intf = <1>;
+	qcom,tdm-audio-intf = <0>;
+	qcom,wcn-btfm = <0>;
+	qcom,bt-slim-clk-src-ctrl = <1>;
+	qcom,va-bolero-codec = <1>;
+	qcom,visense-enable = <0>;
+	qcom,audio-routing =
+		"AMIC1", "Analog Mic1",
+		"Analog Mic1","MIC BIAS1",
+		"AMIC2", "Analog Mic2",
+		"Analog Mic2", "MIC BIAS2",
+		"SPKR_IN", "AUX_OUT",
+		"TX SWR_INPUT", "VA_TX_SWR_CLK",
+		"RX_SWR_TX_PCM_IN0", "RX_MCLK",
+		"RX_SWR_TX_PCM_IN1", "RX_MCLK",
+		"RX_SWR_TX_PCM_IN0", "ADC1_OUTPUT",
+		"RX_SWR_TX_PCM_IN1", "ADC2_OUTPUT",
+		"RX_TX DEC0_INP", "TX DEC0 MUX",
+		"RX_TX DEC1_INP", "TX DEC1 MUX",
+		"RX_TX DEC2_INP", "TX DEC2 MUX",
+		"RX_TX DEC3_INP", "TX DEC3 MUX",
+		"TX_AIF1 CAP", "VA_TX_SWR_CLK",
+		"TX_AIF2 CAP", "VA_TX_SWR_CLK",
+		"TX_AIF3 CAP", "VA_TX_SWR_CLK",
+		"VA SWR_INPUT", "VA_SWR_CLK",
+		"VA_AIF1 CAP", "VA_SWR_CLK",
+		"VA_AIF2 CAP", "VA_SWR_CLK",
+		"VA_AIF3 CAP", "VA_SWR_CLK";
+
+	nvmem-cells = <&adsp_variant>;
+	nvmem-cell-names = "adsp_variant";
+	asoc-codec  = <&stub_codec>, <&bolero>, <&besbev_codec>;
+	asoc-codec-names = "msm-stub-codec.1", "bolero_codec", "besbev_codec";
+};

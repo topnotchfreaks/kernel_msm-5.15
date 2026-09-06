@@ -1,0 +1,43 @@
+#include "khaje-sde.dtsi"
+#include "khaje-sde-display-common.dtsi"
+
+&soc{
+	disp_rdump_memory: disp_rdump_region@5c000000 {
+	reg = <0x0 0x5c000000 0x0 0x00f00000>;
+	label = "disp_rdump_region";
+	};
+};
+
+&sde_dsi {
+        clocks = <&mdss_dsi_phy0 0>,
+                        <&mdss_dsi_phy0 1>,
+                         /*
+                          * Currently the dsi clock handles are under the dsi
+                          * controller DT node. As soon as the controller probe
+                          * finishes, the dispcc sync state can get called before
+                          * the dsi_display probe potentially disturbing the clock
+                          * votes for cont_splash use case. Hence we are no longer
+                          * protected by the component model in this case against the
+                          * disp cc sync state getting triggered after the dsi_ctrl
+                          * probe. To protect against this incorrect sync state trigger
+                          * add this dummy MDP clk vote handle to the dsi_display
+                          * DT node. Since the dsi_display driver does not parse
+                          * MDP clock nodes, no actual vote shall be added and this
+                          * change is done just to satisfy sync state requirements.
+                          */
+                         <&dispcc DISP_CC_MDSS_MDP_CLK>;
+        clock-names = "pll_byte_clk0", "pll_dsi_clk0",
+                        "mdp_core_clk";
+
+        vddio-supply = <&L9A>;
+};
+
+
+&reserved_memory {
+	splash_memory: splash_region@5c000000 {
+		reg = <0x0 0x5c000000 0x0 0x00f00000>;
+		label = "cont_splash_region";
+	};
+};
+
+

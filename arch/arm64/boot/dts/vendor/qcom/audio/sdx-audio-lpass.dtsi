@@ -1,0 +1,91 @@
+&soc {
+	spf_core_platform: spf_core_platform {
+		compatible = "qcom,spf-core-platform";
+	};
+
+	audio_pkt_core_platform: audio-pkt-platform {
+		compatible = "qcom,audio-pkt-core-platform";
+	};
+
+	adsp_loader: qcom,msm-adsp-loader {
+		status = "ok";
+		compatible = "qcom,adsp-loader";
+		qcom,rproc-handle = <&modem_pas>;
+		qcom,adsp-state = <0>;
+		qcom,proc-img-to-load = "modem";
+	};
+
+	adsp_notify: qcom,msm-adsp-notify {
+		status = "ok";
+		compatible = "qcom,adsp-notify";
+		qcom,rproc-handle = <&modem_pas>;
+	};
+
+	qcom,msm-audio-ion {
+		compatible = "qcom,msm-audio-ion-cma";
+		qcom,scm-mp-enabled;
+		memory-region = <&audio_heap_mem>;
+	};
+
+	stub_codec: qcom,msm-stub-codec {
+		compatible = "qcom,msm-stub-codec";
+	};
+
+	prim_master: prim_master_pinctrl {
+		compatible = "qcom,msm-cdc-pinctrl";
+		pinctrl-names = "aud_active", "aud_sleep";
+		pinctrl-0 = <&pri_ws_active_master
+				&pri_sck_active_master
+				&pri_dout_active
+				&pri_din_active>;
+		pinctrl-1 = <&pri_ws_sleep
+				&pri_sck_sleep
+				&pri_dout_sleep
+				&pri_din_sleep>;
+		qcom,mi2s-auxpcm-cdc-gpios;
+	};
+
+	prim_slave: prim_slave_pinctrl {
+		status = "disabled";
+		compatible = "qcom,msm-cdc-pinctrl";
+		pinctrl-names = "aud_active", "aud_sleep";
+		pinctrl-0 = <&pri_ws_active_slave
+				&pri_sck_active_slave
+				&pri_dout_active
+				&pri_din_active>;
+		pinctrl-1 = <&pri_ws_sleep
+				&pri_sck_sleep
+				&pri_dout_sleep
+				&pri_din_sleep>;
+		qcom,mi2s-auxpcm-cdc-gpios;
+	};
+
+	sec_master: sec_master_pinctrl {
+		compatible = "qcom,msm-cdc-pinctrl";
+		pinctrl-names = "aud_active", "aud_sleep";
+		pinctrl-0 = <&sec_ws_active_master
+				&sec_sck_active_master
+				&sec_dout_active
+				&sec_din_active>;
+		pinctrl-1 = <&sec_ws_sleep
+				&sec_sck_sleep
+				&sec_dout_sleep
+				&sec_din_sleep>;
+		qcom,mi2s-auxpcm-cdc-gpios;
+	};
+
+	sec_slave: sec_slave_pinctrl {
+		status = "disabled";
+		compatible = "qcom,msm-cdc-pinctrl";
+		pinctrl-names = "aud_active", "aud_sleep";
+		pinctrl-0 = <&sec_ws_active_slave
+				&sec_sck_active_slave
+				&sec_dout_active
+				&sec_din_active>;
+		pinctrl-1 = <&sec_ws_sleep
+				&sec_sck_sleep
+				&sec_dout_sleep
+				&sec_din_sleep>;
+		qcom,mi2s-auxpcm-cdc-gpios;
+	};
+};

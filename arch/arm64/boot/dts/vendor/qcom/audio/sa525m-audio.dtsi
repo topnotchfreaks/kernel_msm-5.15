@@ -1,0 +1,29 @@
+#include "sa525m-audio-lpass.dtsi"
+#include "bindings/qcom,audio-ext-clk.h"
+#include "bindings/qcom,gpr.h"
+
+&glink_edge {
+	audio_gpr: qcom,gpr {
+		compatible = "qcom,gpr";
+		qcom,glink-channels = "modem_apps";
+		qcom,intents = <0x200 20>;
+		reg = <GPR_DOMAIN_MODEM>;
+
+		spf_core {
+			compatible = "qcom,spf_core";
+			reg = <GPR_SVC_ADSP_CORE>;
+		};
+
+		audio-pkt {
+			compatible = "qcom,audio-pkt";
+			qcom,audiopkt-ch-name = "apr_audio_svc";
+			reg = <GPR_SVC_MAX>;
+		};
+
+		audio_prm {
+			compatible = "qcom,audio_prm";
+			reg = <GPR_SVC_ASM>;
+		};
+	};
+};
+

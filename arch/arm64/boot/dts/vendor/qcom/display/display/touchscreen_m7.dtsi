@@ -1,0 +1,55 @@
+/*
+ * TouchScreen Device Tree For Xiaomi m7
+ */
+
+&soc {
+        xiaomi_touch {
+                status = "okay";
+                compatible = "xiaomi-touch";
+                touch,name = "xiaomi-touch";
+        };
+};
+
+&qupv3_se2_i2c {
+	qcom,i2c-touch-active = "focaltech,fts";
+	qcom,touch-active = "goodix,gt9896";
+	status = "ok";
+    
+	focaltech@38 {
+	        compatible = "focaltech,fts";
+		focaltech,avdd-gpio = <&tlmm 36 0>;
+		focaltech,display-coords = <0 0 10799 23999>;
+		focaltech,irq-gpio = <&tlmm 80 2>;
+		focaltech,max-touch-number = <10>;
+		focaltech,reset-gpio = <&tlmm 86 1>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <80 2>;
+		panel = <&dsi_panel_m7_38_0c_0a_fhdp_video>;
+		pinctrl-0 = <&ts_int_active &ts_reset_active &ts_avdd>;
+		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
+		pinctrl-2 = <&ts_release>;
+		pinctrl-names = "pmx_ts_active", "pmx_ts_suspend", "pmx_ts_release";
+		reg = <0x38>;
+		status = "okay";
+	};
+
+        goodix-sunrise@5d {
+	        compatible = "goodix,gt9896";
+		goodix,avdd-gpio = <&tlmm 36 0>;
+	        goodix,irq-flags = <2>;
+		goodix,irq-gpio = <&tlmm 80 2>;
+	        goodix,panel-max-w = <255>;
+		goodix,panel-max-x = <10800>;
+	        goodix,panel-max-y = <24000>;
+	        goodix,reset-gpio = <&tlmm 86 1>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <80 2>;
+		panel = <&dsi_panel_m7_38_0c_0b_fhdp_video>;
+		pinctrl-0 = <&ts_int_active &ts_reset_active &ts_avdd>;
+		pinctrl-1 = <&ts_int_suspend &ts_reset_suspend>;
+		pinctrl-2 = <&ts_release>;
+		pinctrl-names = "pmx_ts_active", "pmx_ts_suspend", "pmx_ts_release";
+		reg = <0x5D>;
+		status = "okay";
+	};
+};

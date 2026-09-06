@@ -1,0 +1,17 @@
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/clock/qcom,gcc-sdxpinn.h>
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/interconnect/qcom,sdxpinn.h>
+#include <dt-bindings/regulator/qcom,rpmh-regulator-levels.h>
+
+#include "sdxpinn-audio.dtsi"
+
+/ {
+
+	model = "Qualcomm Technologies, Inc. SDXPINN";
+	compatible = "qcom,sdxpinn";
+	qcom,msm-id = <556 0x10000>, <580 0x10000>;
+	qcom,board-id = <0x4010022 772>, <0x3020022 1027>, <0x4020022 772>, <0x20015 768>, <0x2020022 770>, <15 1024>, <0x10015 768>, <0x2010022 770>, <0x3010022 1027>, <0x4030022 772>, <0x2010022 0x402>;
+};

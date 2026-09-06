@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+#include "sa525m-audio-overlay.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. SA525 IDP Overlay";
+	compatible = "qcom,sdxpinn-idp",
+		"qcom,sdxpinn", "qcom,idp";
+	qcom,board-id = <0x0010022 0x00>;
+};

@@ -1,0 +1,12 @@
+/dts-v1/;
+
+#include "cinder.dtsi"
+#include "cinder-ru.dtsi"
+#include "cinder-ru-hireg-2gb.dtsi"
+#include "cinder-idp.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. Cinder RU IDP 2GB";
+	compatible = "qcom,cinder-idp", "qcom,cinder", "qcom,idp";
+	qcom,board-id = <0x22 0x400>;
+};

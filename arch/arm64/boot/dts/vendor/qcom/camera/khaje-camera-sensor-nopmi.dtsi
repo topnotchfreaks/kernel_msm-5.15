@@ -1,0 +1,13 @@
+&cam_cci0 {
+	qcom,camera-flash@0 {
+		status = "disabled";
+	};
+
+	qcom,camera-flash@1 {
+		status = "disabled";
+	};
+
+	qcom,camera-flash@2 {
+		status = "disabled";
+	};
+};

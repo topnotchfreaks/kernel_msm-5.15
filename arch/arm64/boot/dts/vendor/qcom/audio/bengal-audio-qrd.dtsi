@@ -1,0 +1,42 @@
+#include "bengal-audio-overlay.dtsi"
+
+&bengal_snd {
+	qcom,model = "bengal-qrd-snd-card";
+	qcom,msm-mi2s-master = <1>, <1>, <1>, <1>;
+	qcom,wcn-btfm = <1>;
+	qcom,ext-disp-audio-rx = <0>;
+	qcom,audio-routing =
+		"AMIC1", "Analog Mic1",
+		"AMIC1", "MIC BIAS1",
+		"AMIC2", "Analog Mic2",
+		"AMIC2", "MIC BIAS2",
+		"AMIC3", "MIC BIAS3",
+		"AMIC3", "Analog Mic3",
+		"AMIC3", "MIC BIAS3",
+		"AMIC4", "Analog Mic4",
+		"AMIC4", "MIC BIAS3",
+		"IN1_HPHL", "HPHL_OUT",
+		"IN2_HPHR", "HPHR_OUT",
+		"IN3_AUX", "AUX_OUT",
+		"SpkrMono WSA_IN", "AUX",
+		"TX SWR_INPUT", "WCD_TX_OUTPUT",
+		"VA SWR_INPUT", "VA_SWR_CLK",
+		"VA SWR_INPUT", "WCD_TX_OUTPUT",
+		"RX_TX DEC0_INP", "TX DEC0 MUX",
+		"RX_TX DEC1_INP", "TX DEC1 MUX",
+		"RX_TX DEC2_INP", "TX DEC2 MUX",
+		"RX_TX DEC3_INP", "TX DEC3 MUX",
+		"TX_AIF1 CAP", "VA_SWR_CLK",
+		"TX_AIF2 CAP", "VA_SWR_CLK",
+		"TX_AIF3 CAP", "VA_SWR_CLK";
+		qcom,msm-mbhc-hphl-swh = <1>;
+		qcom,msm-mbhc-gnd-swh = <1>;
+		asoc-codec  = <&stub_codec>, <&bolero_cdc>,
+			<&wcd937x_codec> , <&wsa881x_i2c_e>;
+		asoc-codec-names = "msm-stub-codec.1", "bolero-codec",
+				"wcd937x_codec", "wsa-codec0";
+		qcom,wsa-max-devs = <1>;
+		qcom,wsa-aux-dev-prefix = "SpkrMono";
+		qcom,msm_audio_ssr_devs = <&audio_gpr>, <&lpi_tlmm>,
+					<&bolero_cdc>;
+};

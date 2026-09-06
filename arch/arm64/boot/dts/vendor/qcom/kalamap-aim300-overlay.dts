@@ -1,0 +1,11 @@
+/dts-v1/;
+/plugin/;
+
+#include "kalamap-aim300.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. Kalamap AIM300";
+	compatible = "qcom,kalamap-hdk", "qcom,kalamap", "qcom,hdk";
+	qcom,msm-id = <603 0x20000>;
+	qcom,board-id = <0x1001f 0x3>;
+};

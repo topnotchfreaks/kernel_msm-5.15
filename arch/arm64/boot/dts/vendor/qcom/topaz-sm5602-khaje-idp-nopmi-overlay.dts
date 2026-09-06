@@ -1,0 +1,13 @@
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include "topaz-sm5602.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. KHAJE IDP nopmi topaz";
+	compatible = "qcom,khaje-idp", "qcom,khaje", "qcom,idp";
+        qcom,board-id = <0x30022 0>;
+        qcom,msm-id = <518 0x10000>;
+	qcom,pmic-id = <0x2D 0x0 0x0 0x0>;
+};

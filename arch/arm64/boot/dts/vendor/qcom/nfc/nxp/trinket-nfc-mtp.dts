@@ -1,0 +1,10 @@
+/dts-v1/;
+/plugin/;
+
+#include "trinket-nfc-common.dtsi"
+/ {
+    model = "Qualcomm Technologies, Inc. trinket MTP";
+    compatible = "qcom,trinket-mtp", "qcom,trinket", "qcom,mtp";
+    qcom,msm-id = <467 0x10000>, <468 0x10000> ;
+    qcom,board-id = <34 0>;
+};

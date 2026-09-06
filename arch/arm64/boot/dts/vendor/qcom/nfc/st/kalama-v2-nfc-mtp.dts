@@ -1,0 +1,10 @@
+/dts-v1/;
+/plugin/;
+
+#include "kalama-v2-nfc-common.dtsi"
+/ {
+	model = "Qualcomm Technologies, Inc. Kalama MTP";
+	compatible = "qcom,kalama-mtp", "qcom,kalama", "qcom,mtp";
+	qcom,msm-id = <519 0x20000>, <536 0x20000>;
+	qcom,board-id = <0x1010008 0>;
+};

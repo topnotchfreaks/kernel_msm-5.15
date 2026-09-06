@@ -1,0 +1,17 @@
+/dts-v1/;
+/plugin/;
+
+#include <dt-bindings/clock/qcom,gpucc-lemans.h>
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/interconnect/qcom,lemans.h>
+#include <dt-bindings/regulator/qcom,rpmh-regulator-levels.h>
+
+#include "lemans-audio.dtsi"
+
+/ {
+
+	model = "Qualcomm Technologies, Inc. Lemans SoC";
+	compatible = "qcom,lemans", "qcom,lemans-ivi-adas";
+	qcom,msm-id = <532 0x10000>, <534 0x10000>;
+	qcom,board-id = <0 0>;
+};
