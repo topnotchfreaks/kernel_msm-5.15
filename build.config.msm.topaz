@@ -4,6 +4,22 @@
 . ${ROOT_DIR}/msm-kernel/build.config.aarch64
 
 ################################################################################
+## External Modules
+EXT_MODULES="
+. ${ROOT_DIR}/vendor/qcom/opensource/audio-kernel
+. ${ROOT_DIR}/vendor/qcom/opensource/camera-kernel
+. ${ROOT_DIR}/vendor/qcom/opensource/dataipa
+. ${ROOT_DIR}/vendor/qcom/opensource/datarmnet
+. ${ROOT_DIR}/vendor/qcom/opensource/datarmnet-ext
+. ${ROOT_DIR}/vendor/qcom/opensource/display-drivers
+. ${ROOT_DIR}/vendor/qcom/opensource/graphics-kernel
+. ${ROOT_DIR}/vendor/qcom/opensource/mmrm-driver
+. ${ROOT_DIR}/vendor/qcom/opensource/securemsm-kernel
+. ${ROOT_DIR}/vendor/qcom/opensource/touch-drivers
+. ${ROOT_DIR}/vendor/qcom/opensource/video-driver
+. ${ROOT_DIR}/vendor/qcom/opensource/wlan/qcacld-3.0
+"
+
 ## Variant setup
 MSM_ARCH=topaz
 VARIANTS=(consolidate gki)
