@@ -133,6 +133,7 @@ static void *z_erofs_lz4_handle_inplace_io(struct z_erofs_decompress_req *rq,
 
 	if (rq->inplace_io) {
 		if (rq->partial_decoding || !support_0padding ||
+		    nrpages_out < nrpages_in ||
 		    ofull - oend < LZ4_DECOMPRESS_INPLACE_MARGIN(inputsize))
 			goto docopy;
 

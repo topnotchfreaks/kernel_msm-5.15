@@ -37,6 +37,9 @@
 #include <trace/events/android_fs.h>
 #include <uapi/linux/f2fs.h>
 
+#undef CREATE_TRACE_POINTS
+#include <trace/hooks/fs.h>
+
 static vm_fault_t f2fs_filemap_fault(struct vm_fault *vmf)
 {
 	struct inode *inode = file_inode(vmf->vma->vm_file);
@@ -604,6 +607,8 @@ static int f2fs_file_open(struct inode *inode, struct file *filp)
 		return err;
 
 	filp->f_mode |= FMODE_NOWAIT;
+
+	trace_android_vh_f2fs_file_open(inode, filp);
 
 	err = dquot_file_open(inode, filp);
 	if (err)
@@ -1753,9 +1758,16 @@ static int expand_inode_data(struct inode *inode, loff_t offset,
 		return 0;
 
 	if (f2fs_is_pinned_file(inode)) {
-		block_t sec_blks = BLKS_PER_SEC(sbi);
-		block_t sec_len = roundup(map.m_len, sec_blks);
+		block_t sec_blks = CAP_BLKS_PER_SEC(sbi);
+		block_t sec_len;
 
+		if (map.m_lblk % sec_blks) {
+			map.m_lblk = rounddown(map.m_lblk, sec_blks);
+			map.m_len = pg_end - map.m_lblk;
+			if (off_end)
+				map.m_len++;
+		}
+		sec_len = roundup(map.m_len, sec_blks);
 		map.m_len = sec_blks;
 next_alloc:
 		if (has_not_enough_free_secs(sbi, 0,
@@ -2552,7 +2564,7 @@ do_more:
 			ret = -EAGAIN;
 		goto out;
 	}
-	range->start += BLKS_PER_SEC(sbi);
+	range->start += CAP_BLKS_PER_SEC(sbi);
 	if (range->start <= end)
 		goto do_more;
 out:
@@ -2677,7 +2689,7 @@ static int f2fs_defragment_range(struct f2fs_sb_info *sbi,
 		goto out;
 	}
 
-	sec_num = DIV_ROUND_UP(total, BLKS_PER_SEC(sbi));
+	sec_num = DIV_ROUND_UP(total, CAP_BLKS_PER_SEC(sbi));
 
 	/*
 	 * make sure there are enough free section for LFS allocation, this can

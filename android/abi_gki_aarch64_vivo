@@ -1361,6 +1361,8 @@
   mempool_destroy
   mempool_free
   mempool_free_slab
+  mempool_kfree
+  mempool_kmalloc
   memremap
   mem_section
   memset64
@@ -1728,6 +1730,7 @@
   proc_create
   proc_create_data
   proc_create_single_data
+  proc_mkdir_mode
   proc_dointvec
   proc_dointvec_minmax
   proc_dostring
@@ -2027,6 +2030,11 @@
   set_page_dirty_lock
   __SetPageMovable
   __set_task_comm
+  seq_file_path
+  seq_put_decimal_ll
+  seq_put_decimal_ull
+  seq_read_iter
+  set_task_ioprio
   set_task_cpu
   set_user_nice
   sg_alloc_table
@@ -2377,18 +2385,26 @@
   __traceiter_android_vh_cpuidle_psci_enter
   __traceiter_android_vh_cpuidle_psci_exit
   __traceiter_android_vh_do_anonymous_page
+  __traceiter_android_vh_do_async_mmap_readahead
+  __traceiter_android_vh_do_new_mount_fc
   __traceiter_android_vh_do_swap_page
   __traceiter_android_vh_do_swap_page_lock_check
   __traceiter_android_vh_do_wp_page
   __traceiter_android_vh_dup_task_struct
+  __traceiter_android_vh_f2fs_file_open
   __traceiter_android_vh_ftrace_dump_buffer
   __traceiter_android_vh_ftrace_format_check
   __traceiter_android_vh_ftrace_oops_enter
   __traceiter_android_vh_ftrace_oops_exit
   __traceiter_android_vh_ftrace_size_check
   __traceiter_android_vh_fuse_request_end
+  __traceiter_android_vh_filemap_update_page
+  __traceiter_android_vh_lock_folio_drop_mmap_end
+  __traceiter_android_vh_lock_folio_drop_mmap_start
   __traceiter_android_vh_gic_resume
   __traceiter_android_vh_init_adjust_zone_wmark
+  __traceiter_android_vh_inode_lru_isolate
+  __traceiter_android_vh_invalidate_mapping_pagevec
   __traceiter_android_vh_ipi_stop
   __traceiter_android_vh_irqtime_account_process_tick
   __traceiter_android_vh_jiffies_update
@@ -2396,6 +2412,7 @@
   __traceiter_android_vh_logbuf_pr_cont
   __traceiter_android_vh_lruvec_add_folio
   __traceiter_android_vh_lruvec_del_folio
+  __traceiter_android_vh_mm_free_page
   __traceiter_android_vh_mmap_region
   __traceiter_android_vh_mmc_attach_sd
   __traceiter_android_vh_mmc_blk_mq_rw_recovery
@@ -2439,7 +2456,10 @@
   __traceiter_android_vh_uprobes_replace_page
   __traceiter_android_vh_vmpressure
   __traceiter_binder_transaction_received
+  __traceiter_block_rq_complete
   __traceiter_block_rq_insert
+  __traceiter_block_rq_issue
+  __traceiter_block_rq_requeue
   __traceiter_cpu_frequency_limits
   __traceiter_dwc3_complete_trb
   __traceiter_dwc3_ctrl_req
@@ -2531,18 +2551,26 @@
   __tracepoint_android_vh_cpuidle_psci_enter
   __tracepoint_android_vh_cpuidle_psci_exit
   __tracepoint_android_vh_do_anonymous_page
+  __tracepoint_android_vh_do_async_mmap_readahead
+  __tracepoint_android_vh_do_new_mount_fc
   __tracepoint_android_vh_do_swap_page
   __tracepoint_android_vh_do_swap_page_lock_check
   __tracepoint_android_vh_do_wp_page
   __tracepoint_android_vh_dup_task_struct
+  __tracepoint_android_vh_f2fs_file_open
   __tracepoint_android_vh_ftrace_dump_buffer
   __tracepoint_android_vh_ftrace_format_check
   __tracepoint_android_vh_ftrace_oops_enter
   __tracepoint_android_vh_ftrace_oops_exit
   __tracepoint_android_vh_ftrace_size_check
   __tracepoint_android_vh_fuse_request_end
+  __tracepoint_android_vh_filemap_update_page
+  __tracepoint_android_vh_lock_folio_drop_mmap_end
+  __tracepoint_android_vh_lock_folio_drop_mmap_start
   __tracepoint_android_vh_gic_resume
   __tracepoint_android_vh_init_adjust_zone_wmark
+  __tracepoint_android_vh_inode_lru_isolate
+  __tracepoint_android_vh_invalidate_mapping_pagevec
   __tracepoint_android_vh_ipi_stop
   __tracepoint_android_vh_irqtime_account_process_tick
   __tracepoint_android_vh_jiffies_update
@@ -2550,6 +2578,7 @@
   __tracepoint_android_vh_logbuf_pr_cont
   __tracepoint_android_vh_lruvec_add_folio
   __tracepoint_android_vh_lruvec_del_folio
+  __tracepoint_android_vh_mm_free_page
   __tracepoint_android_vh_mmap_region
   __tracepoint_android_vh_mmc_attach_sd
   __tracepoint_android_vh_mmc_blk_mq_rw_recovery
@@ -2593,7 +2622,10 @@
   __tracepoint_android_vh_uprobes_replace_page
   __tracepoint_android_vh_vmpressure
   __tracepoint_binder_transaction_received
+  __tracepoint_block_rq_complete
   __tracepoint_block_rq_insert
+  __tracepoint_block_rq_issue
+  __tracepoint_block_rq_requeue
   __tracepoint_cpu_frequency_limits
   __tracepoint_dwc3_complete_trb
   __tracepoint_dwc3_ctrl_req

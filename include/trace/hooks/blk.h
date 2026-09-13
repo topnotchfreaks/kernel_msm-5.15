@@ -21,6 +21,13 @@ DECLARE_HOOK(android_vh_blk_mq_kick_requeue_list,
 	TP_PROTO(struct request_queue *q, unsigned long delay, bool *skip),
 	TP_ARGS(q, delay, skip));
 
+struct path;
+struct vfsmount;
+
+DECLARE_HOOK(android_vh_do_new_mount_fc,
+	TP_PROTO(struct path *mountpoint, struct vfsmount *mnt),
+	TP_ARGS(mountpoint, mnt));
+
 #endif /* _TRACE_HOOK_BLK_H */
 /* This part must be outside protection */
 #include <trace/define_trace.h>

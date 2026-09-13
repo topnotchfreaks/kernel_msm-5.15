@@ -35,6 +35,7 @@
 
 #include "pnode.h"
 #include "internal.h"
+#include <trace/hooks/blk.h>
 
 /* Maximum number of mounts in a mount namespace */
 unsigned int sysctl_mount_max __read_mostly = 100000;
@@ -2977,6 +2978,8 @@ static int do_new_mount_fc(struct fs_context *fc, struct path *mountpoint,
 	unlock_mount(mp);
 	if (error < 0)
 		mntput(mnt);
+	else
+		trace_android_vh_do_new_mount_fc(mountpoint, mnt);
 	return error;
 }
 
@@ -3698,6 +3701,11 @@ SYSCALL_DEFINE3(fsmount, int, fs_fd, unsigned int, flags,
 	newmount.mnt = vfs_create_mount(fc);
 	if (IS_ERR(newmount.mnt)) {
 		ret = PTR_ERR(newmount.mnt);
+		goto err_unlock;
+	}
+	if (newmount.mnt->mnt_sb->s_flags & SB_NOUSER) {
+		mntput(newmount.mnt);
+		ret = -EINVAL;
 		goto err_unlock;
 	}
 	newmount.dentry = dget(fc->root);

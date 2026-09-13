@@ -556,7 +556,6 @@ static void io_worker_handle_work(struct io_worker *worker)
 	struct io_wq *wq = wqe->wq;
 
 	do {
-		bool do_kill = test_bit(IO_WQ_BIT_EXIT, &wq->state);
 		struct io_wq_work *work;
 get_next:
 		/*
@@ -578,6 +577,7 @@ get_next:
 
 		/* handle a whole dependent link */
 		do {
+			bool do_kill = test_bit(IO_WQ_BIT_EXIT, &wq->state);
 			struct io_wq_work *next_hashed, *linked;
 			unsigned int hash = io_get_work_hash(work);
 
@@ -1014,7 +1014,8 @@ static inline void io_wqe_remove_pending(struct io_wqe *wqe,
 	if (io_wq_is_hashed(work) && work == wqe->hash_tail[hash]) {
 		if (prev)
 			prev_work = container_of(prev, struct io_wq_work, list);
-		if (prev_work && io_get_work_hash(prev_work) == hash)
+		if (prev_work && io_wq_is_hashed(prev_work) &&
+		    io_get_work_hash(prev_work) == hash)
 			wqe->hash_tail[hash] = prev_work;
 		else
 			wqe->hash_tail[hash] = NULL;
