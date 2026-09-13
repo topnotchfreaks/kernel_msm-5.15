@@ -132,40 +132,11 @@ struct qcom_adsp {
 	const struct firmware *dtb_firmware;
 };
 
-static ssize_t txn_id_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	struct platform_device *pdev = container_of(dev, struct platform_device, dev);
-	struct qcom_adsp *adsp = (struct qcom_adsp *)platform_get_drvdata(pdev);
-
-	return sysfs_emit(buf, "%zu\n", qcom_sysmon_get_txn_id(adsp->sysmon));
-}
-static DEVICE_ATTR_RO(txn_id);
-
-static inline bool is_mss_ssr_hyp_assign_en(const struct adsp_data *desc)
-{
-	return (desc->needs_dsm_mem_setup && !strcmp(desc->firmware_name, "modem.mdt"));
-}
-
 void adsp_segment_dump(struct rproc *rproc, struct rproc_dump_segment *segment,
-		     void *dest, size_t offset, size_t size)
+		       void *dest, size_t offset, size_t size)
 {
 	struct qcom_adsp *adsp = rproc->priv;
 	int total_offset;
-	void __iomem *base;
-	int len = strlen("md_dbg_buf");
-
-	if (strnlen(segment->priv, len + 1) == len &&
-		    !strcmp(segment->priv, "md_dbg_buf")) {
-		base = ioremap((unsigned long)le64_to_cpu(segment->da), size);
-		if (!base) {
-			pr_err("failed to map md_dbg_buf region\n");
-			return;
-		}
-
-		memcpy_fromio(dest, base, size);
-		iounmap(base);
-		return;
-	}
 
 	total_offset = segment->da + segment->offset + offset - adsp->mem_phys;
 	if (total_offset < 0 || total_offset + size > adsp->mem_size) {
@@ -185,13 +156,7 @@ static void adsp_minidump(struct rproc *rproc)
 
 	trace_rproc_qcom_event(dev_name(adsp->dev), "adsp_minidump", "enter");
 
-	if (rproc->dump_conf == RPROC_COREDUMP_DISABLED)
-		goto exit;
-
-	qcom_minidump(rproc, adsp->minidump_dev, adsp->minidump_id, adsp_segment_dump);
-
-exit:
-	trace_rproc_qcom_event(dev_name(adsp->dev), "adsp_minidump", "exit");
+	qcom_minidump(rproc, adsp->minidump_id, adsp_segment_dump);
 }
 
 static int adsp_pds_enable(struct qcom_adsp *adsp, struct device **pds,

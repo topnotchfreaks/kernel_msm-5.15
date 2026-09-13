@@ -2933,7 +2933,7 @@ static int xfrm_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh,
 
 	/* Use the 64-bit / untranslated format on Android, even for compat */
 	if (!IS_ENABLED(CONFIG_ANDROID) || IS_ENABLED(CONFIG_XFRM_USER_COMPAT)) {
-		if (in_compat_syscall()) {
+		if (IS_ENABLED(CONFIG_COMPAT_FOR_U64_ALIGNMENT) && in_compat_syscall()) {
 			struct xfrm_translator *xtr = xfrm_get_translator();
 
 			if (!xtr)

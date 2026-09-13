@@ -1955,31 +1955,12 @@ static int of_qcom_slim_ngd_register(struct device *parent,
 	return -ENODEV;
 }
 
-static ssize_t debug_mask_show(struct device *device,
-				struct device_attribute *attr,
-				char *buf)
+static void qcom_slim_ngd_unregister(struct qcom_slim_ngd_ctrl *ctrl)
 {
-	struct platform_device *pdev = to_platform_device(device);
-	struct qcom_slim_ngd_ctrl *dev = platform_get_drvdata(pdev);
+	struct qcom_slim_ngd *ngd = ctrl->ngd;
 
-	return scnprintf(buf, sizeof(int), "%u\n", dev->ipc_log_mask);
+	platform_device_del(ngd->pdev);
 }
-
-static ssize_t debug_mask_store(struct device *device,
-			struct device_attribute *attr,
-			const char *buf, size_t count)
-{
-	struct platform_device *pdev = to_platform_device(device);
-	struct qcom_slim_ngd_ctrl *dev = platform_get_drvdata(pdev);
-
-	dev->ipc_log_mask = buf[0] - '0';
-	if (dev->ipc_log_mask > DBG_LEV)
-		dev->ipc_log_mask = DBG_LEV;
-
-	return count;
-}
-
-static DEVICE_ATTR_RW(debug_mask);
 
 static int qcom_slim_ngd_probe(struct platform_device *pdev)
 {
@@ -2167,40 +2148,22 @@ static int qcom_slim_ngd_ctrl_probe(struct platform_device *pdev)
 	ctrl->pdr = pdr_handle_alloc(slim_pd_status, ctrl);
 	if (IS_ERR(ctrl->pdr)) {
 		ret = PTR_ERR(ctrl->pdr);
-		dev_err(dev, "Failed to init PDR handle: %d\n", ret);
-		goto err_pdr_alloc;
+		goto err_unregister_ssr;
 	}
 
 	pds = pdr_add_lookup(ctrl->pdr, "avs/audio", "msm/adsp/audio_pd");
 	if (IS_ERR(pds) && PTR_ERR(pds) != -EALREADY) {
 		ret = PTR_ERR(pds);
 		dev_err(dev, "pdr add lookup failed: %d\n", ret);
-		goto err_pdr_lookup;
+		goto err_pdr_release;
 	}
 
-	ret = of_qcom_slim_ngd_register(dev, ctrl);
-	if (ret) {
-		SLIM_ERR(ctrl, "qcom_slim_ngd_register failed ret:%d\n", ret);
-		goto err_pdr_lookup;
-	}
+	return of_qcom_slim_ngd_register(dev, ctrl);
 
-	platform_driver_register(&qcom_slim_ngd_driver);
-	SLIM_INFO(ctrl, "NGD SB controller is up!\n");
-	return 0;
-
-err_pdr_lookup:
-        pdr_handle_release(ctrl->pdr);
-
-err_pdr_alloc:
-        qcom_unregister_ssr_notifier(ctrl->notifier, &ctrl->nb);
-
-remove_ipc_sysfs:
-	if (ctrl->ipc_slimbus_log)
-		ipc_log_context_destroy(ctrl->ipc_slimbus_log);
-
-	if (ctrl->sysfs_created)
-		sysfs_remove_file(&pdev->dev.kobj,
-				  &dev_attr_debug_mask.attr);
+err_pdr_release:
+	pdr_handle_release(ctrl->pdr);
+err_unregister_ssr:
+	qcom_unregister_ssr_notifier(ctrl->notifier, &ctrl->nb);
 
 	return ret;
 }
@@ -2209,13 +2172,10 @@ static int qcom_slim_ngd_ctrl_remove(struct platform_device *pdev)
 {
 	struct qcom_slim_ngd_ctrl *ctrl = platform_get_drvdata(pdev);
 
-	platform_driver_unregister(&qcom_slim_ngd_driver);
-	if (ctrl->sysfs_created)
-		sysfs_remove_file(&pdev->dev.kobj,
-				  &dev_attr_debug_mask.attr);
+	pdr_handle_release(ctrl->pdr);
+	qcom_unregister_ssr_notifier(ctrl->notifier, &ctrl->nb);
 
-	ipc_log_context_destroy(ctrl->ipc_slimbus_log);
-	ctrl->ipc_slimbus_log = NULL;
+	qcom_slim_ngd_unregister(ctrl);
 
 	return 0;
 }
@@ -2225,9 +2185,7 @@ static int qcom_slim_ngd_remove(struct platform_device *pdev)
 	struct qcom_slim_ngd_ctrl *ctrl = platform_get_drvdata(pdev);
 
 	pm_runtime_disable(&pdev->dev);
-	pdr_handle_release(ctrl->pdr);
-	qcom_unregister_ssr_notifier(ctrl->notifier, &ctrl->nb);
-	slim_unregister_controller(&ctrl->ctrl);
+	qcom_slim_ngd_enable(ctrl, false);
 	qcom_slim_ngd_exit_dma(ctrl);
 	qcom_slim_ngd_qmi_svc_event_deinit(&ctrl->qmi);
 	if (ctrl->mwq)
@@ -2311,6 +2269,28 @@ static struct platform_driver qcom_slim_ngd_driver = {
 	},
 };
 
-module_platform_driver(qcom_slim_ngd_ctrl_driver);
+static int qcom_slim_ngd_init(void)
+{
+	int ret;
+
+	ret = platform_driver_register(&qcom_slim_ngd_driver);
+	if (ret)
+		return ret;
+
+	ret = platform_driver_register(&qcom_slim_ngd_ctrl_driver);
+	if (ret)
+		platform_driver_unregister(&qcom_slim_ngd_driver);
+
+	return ret;
+}
+
+static void qcom_slim_ngd_exit(void)
+{
+	platform_driver_unregister(&qcom_slim_ngd_ctrl_driver);
+	platform_driver_unregister(&qcom_slim_ngd_driver);
+}
+
+module_init(qcom_slim_ngd_init);
+module_exit(qcom_slim_ngd_exit);
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Qualcomm SLIMBus NGD controller");
