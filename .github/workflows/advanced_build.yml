@@ -115,22 +115,23 @@ jobs:
          rm -rf .repo
          rm -rf common
 
-         # Download updated Clang r584948 from Android Git repository
-         aria2c -x 16 -s 16 -o prebuilts/clang/host/linux-x86/clang-r584948b.tar.gz "https://github.com/topnotchfreaks/clang/releases/download/v1.0.0/clang-r584948b.tar.gz"
-    
-         mkdir -p prebuilts/clang/host/linux-x86/clang-r584948b
-         tar -xzf prebuilts/clang/host/linux-x86/clang-r584948b.tar.gz -C prebuilts/clang/host/linux-x86/clang-r584948b
-         rm -rf prebuilts/clang/host/linux-x86/clang-r584948b.tar.gz
+         # Replace the synced Clang prebuilts
+         rm -rf prebuilts/clang/host/linux-x86
+         git clone --depth=1 --branch main-kernel \
+           https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 \
+           prebuilts/clang/host/linux-x86
 
-         # Clean up old Clang versions
-         rm -rf prebuilts/clang/host/linux-x86/clang-3289846
-         rm -rf prebuilts/clang/host/linux-x86/clang-r450784e
-         rm -rf prebuilts/clang/host/linux-x86/clang-r547379
-         rm -rf prebuilts/clang/host/linux-x86/clang-stable
-         
+         # Remove any other Clang versions that might have been synced
+         rm -rf prebuilts/clang/host/linux-x86/clang-3289846 \
+           prebuilts/clang/host/linux-x86/clang-r547379 \
+           prebuilts/clang/host/linux-x86/clang-r584948 \
+           prebuilts/clang/host/linux-x86/clang-r596125 \
+           prebuilts/clang/host/linux-x86/claang-r596125 \
+           prebuilts/clang/host/linux-x86/clang-stable
+
          sed -i \
           -e 's/^BRANCH=.*/BRANCH=android13-5.15/' \
-          -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r584948b/' \
+          -e 's/^CLANG_VERSION=.*/CLANG_VERSION=r614650/' \
          ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.constants
     
          sed -i '/^DEFCONFIG=gki_defconfig/d' ${{ env.kernelDir }}/${{ env.kernelName }}/build.config.gki
