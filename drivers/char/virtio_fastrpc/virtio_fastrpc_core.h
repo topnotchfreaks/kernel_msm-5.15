@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only
  *
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __VIRTIO_FASTRPC_CORE_H__
@@ -92,6 +92,7 @@ struct vfastrpc_invoke_ctx {
 	uint32_t handle;
 	/* Unique sequence num inside a process to identify the invoke msg. */
 	s64 seq_num;
+	struct timespec64 invoke_start_time;  /* submission timestamp for async perf */
 	uint32_t *crc;
 	struct fastrpc_perf *perf;
 	uint64_t *perf_kernel;

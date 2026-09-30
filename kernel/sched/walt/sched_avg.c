@@ -260,6 +260,17 @@ int sched_busy_hyst_handler(struct ctl_table *table, int write,
 	return ret;
 }
 
+/* Helper function to handle the reset. */
+void walt_reset_last_time(void)
+{
+	int cpu;
+
+	for_each_possible_cpu(cpu) {
+		per_cpu(last_time, cpu) = 0;
+	}
+}
+
+
 /**
  * sched_update_nr_prod
  * @cpu: The core id of the nr running driver.
@@ -283,9 +294,19 @@ void sched_update_nr_prod(int cpu, int enq)
 	unsigned long flags, nr_running;
 
 	spin_lock_irqsave(&per_cpu(nr_lock, cpu), flags);
-	nr_running = per_cpu(nr, cpu);
 	curr_time = sched_clock();
-	ktime = ktime_get_ns();
+
+	/*
+	 * If last_time was reset in suspend, initialize and skip this update.
+	 */
+	if (unlikely(per_cpu(last_time, cpu) == 0)) {
+		per_cpu(last_time, cpu) = curr_time;
+		per_cpu(nr, cpu) = cpu_rq(cpu)->nr_running;
+		spin_unlock_irqrestore(&per_cpu(nr_lock, cpu), flags);
+		return;
+	}
+
+	nr_running = per_cpu(nr, cpu);
 	diff = curr_time - per_cpu(last_time, cpu);
 	if ((s64)diff < 0) {
 		int i;

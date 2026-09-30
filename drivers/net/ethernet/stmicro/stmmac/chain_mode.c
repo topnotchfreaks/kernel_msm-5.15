@@ -34,7 +34,7 @@ static int jumbo_frm(void *p, struct sk_buff *skb, int csum)
 	buf_len = min_t(unsigned int, nopaged_len, bmax);
 	len = nopaged_len - buf_len;
 
-	des2 = dma_map_single(priv->device, skb->data,
+	des2 = dma_map_single(GET_MEM_PDEV_DEV, skb->data,
 			      buf_len, DMA_TO_DEVICE);
 	desc->des2 = cpu_to_le32(des2);
 	if (dma_mapping_error(GET_MEM_PDEV_DEV, des2))

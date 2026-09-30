@@ -220,12 +220,6 @@ struct eventpoll {
 	struct hlist_head refs;
 	u8 loop_check_depth;
 
-	/*
-	 * usage count, used together with epitem->dying to
-	 * orchestrate the disposal of this struct
-	 */
-	refcount_t refcount;
-
 	/* used to defer freeing past ep_get_upwards_depth_proc() RCU walk */
 	struct rcu_head rcu;
 
@@ -819,9 +813,12 @@ static void ep_clear_and_put(struct eventpoll *ep)
 		cond_resched();
 	}
 
-	mutex_unlock(&ep->mtx);
-	if (ep_refcount_dec_and_test(ep))
-		ep_free(ep);
+	mutex_unlock(&epmutex);
+	mutex_destroy(&ep->mtx);
+	free_uid(ep->user);
+	wakeup_source_unregister(ep->ws);
+	/* ep_get_upwards_depth_proc() may still hold epi->ep under RCU */
+	kfree_rcu(ep, rcu);
 }
 
 static int ep_eventpoll_release(struct inode *inode, struct file *file)

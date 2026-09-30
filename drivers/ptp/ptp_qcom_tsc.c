@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * QCOM TSC PTP : Linux driver for Time Stamp Counter Hardware.
  *
@@ -52,6 +52,8 @@
 #define TSCSS_ETU_SLICE_TIMER_TRIG_PERIOD	0x38
 #define MAX_ETU_SLICE				16
 
+#define ETU_GCTR_HI_SHIFT			24
+#define ETU_GCTR_LO_SHIFT			8
 #define TSC_PRELOAD_POLLING_DELAY_MS		100
 #define NSEC_SHFT				32
 #define NSEC					1000000000ULL
@@ -61,7 +63,7 @@
 
 
 struct qcom_etu_slice {
-	char name[10];
+	char name[20];
 	struct ptp_clock *ptp_clock;
 	void __iomem *etu_baseaddr;
 	u64 etu_tsc_timestamp;
@@ -336,6 +338,15 @@ static int qcom_ptp_settime(struct ptp_clock_info *ptp, const struct timespec64 
 	return 0;
 }
 
+static inline u64 etu_gctr_ts(u32 gctr_sec, u32 gctr_nsec)
+{
+	/* Concatenate GCTR_TS_HI(31:0) and GCTR_TS_LO(31:8) */
+	u64 upper = (u64)gctr_sec << ETU_GCTR_HI_SHIFT;
+	u64 lower = gctr_nsec >> ETU_GCTR_LO_SHIFT;
+
+	return upper | lower;
+}
+
 static irqreturn_t qcom_etu_irq_handler(int irq, void *data)
 {
 	struct qcom_etu_slice *etu = (struct qcom_etu_slice *)data;
@@ -360,21 +371,6 @@ static irqreturn_t qcom_etu_irq_handler(int irq, void *data)
 
 		pr_debug("ts:%llu etu->etu_tsc_timestamp:%llu\n", ts, etu->etu_tsc_timestamp);
 
-		if (ts != etu->etu_tsc_timestamp) {
-			extts_event.type = PTP_CLOCK_EXTTS;
-			extts_event.index = etu->extts_index;
-			extts_event.timestamp = ts;
-
-			pr_debug("type:%d index:%d timestamp:%llu\n", extts_event.type,
-					extts_event.index, extts_event.timestamp);
-
-			ptp_clock_event(etu->ptp_clock, &extts_event);
-		}
-		etu->etu_tsc_timestamp = ts;
-
-		pr_debug("etu_tsc_sec:%u etu_tsc_nsec:%u etu_tsc_timestamp:%llu\n",
-				etu->etu_tsc_sec, etu->etu_tsc_nsec, etu->etu_tsc_timestamp);
-
 		etu->etu_gctr_sec = readl_relaxed(TSCSS_TSC_ETU_SLICE_BASE(etu->etu_baseaddr,
 					etu->extts_slice_num, TSCSS_ETU_SLICE_GCTR_TS_HI));
 
@@ -384,9 +380,32 @@ static irqreturn_t qcom_etu_irq_handler(int irq, void *data)
 		etu->extts_event_type = readl_relaxed(TSCSS_TSC_ETU_SLICE_BASE(etu->etu_baseaddr,
 					etu->extts_slice_num, TSCSS_ETU_SLICE_TS_EVENT_TYPE));
 
-		/* Concatenate GCTR_TS_HI(31:0) & GCTR_TS_LO(31:8) and divide with 19.2MHz */
-		etu->global_qtimer = (((u64)etu->etu_gctr_sec << 24) |
-				(etu->etu_gctr_nsec >> 8)) / XO_MHZ;
+		etu->global_qtimer = etu_gctr_ts(etu->etu_gctr_sec, etu->etu_gctr_nsec);
+
+		if (ts != etu->etu_tsc_timestamp) {
+			extts_event.type = PTP_CLOCK_EXTTS;
+			extts_event.index = etu->extts_index;
+			extts_event.timestamp = ts;
+
+			pr_debug("type:%d index:%d TSC timestamp:%llu\n", extts_event.type,
+					extts_event.index, extts_event.timestamp);
+
+			ptp_clock_event(etu->ptp_clock, &extts_event);
+
+			/* For hardsync_pps need to do clock event for GCTR TS as well */
+			if (etu->extts_index == 2) {
+				extts_event.timestamp = etu->global_qtimer;
+
+				pr_debug("type:%d index:%d GCTR timestamp:%llu\n", extts_event.type,
+						extts_event.index, extts_event.timestamp);
+
+				ptp_clock_event(etu->ptp_clock, &extts_event);
+			}
+		}
+		etu->etu_tsc_timestamp = ts;
+
+		pr_debug("etu_tsc_sec:%u etu_tsc_nsec:%u etu_tsc_timestamp:%llu\n",
+				etu->etu_tsc_sec, etu->etu_tsc_nsec, etu->etu_tsc_timestamp);
 
 		pr_debug("etu_gctr_sec:%u etu_gctr_nsec:%u global_qtimer:%x extts_event_type %d\n",
 				etu->etu_gctr_sec, etu->etu_gctr_nsec,
@@ -451,6 +470,7 @@ static int qcom_ptp_enable(struct ptp_clock_info *ptp,
 {
 	struct qcom_ptp_tsc *timer = container_of(ptp, struct qcom_ptp_tsc,
 							ptp_clock_info);
+	struct pinctrl *pinctrl;
 	struct timespec64 ts;
 	int slice;
 
@@ -475,6 +495,13 @@ static int qcom_ptp_enable(struct ptp_clock_info *ptp,
 			if (rq->extts.index == timer->etu_slice[slice].extts_index) {
 				pr_debug("slice %d, index %d, etu_index %d\n", slice,
 					rq->extts.index, timer->etu_slice[slice].extts_index);
+
+				pinctrl = devm_pinctrl_get_select(timer->dev,
+								timer->etu_slice[slice].name);
+				if (IS_ERR(pinctrl))
+					pr_debug("Failed to configure the pin for %s\n",
+							timer->etu_slice[slice].name);
+
 				qcom_tsc_configure_etu(timer,
 					timer->etu_slice[slice].extts_slice_num);
 				timer->etu_slice[slice].extts_enable = true;
@@ -541,7 +568,6 @@ static int qcom_tsc_etu_get_data(struct platform_device *pdev,
 {
 	struct device *dev = &pdev->dev;
 	struct resource *r_mem;
-	struct pinctrl *pinctrl;
 	int ret, cnt, i;
 
 	r_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
@@ -603,10 +629,6 @@ static int qcom_tsc_etu_get_data(struct platform_device *pdev,
 
 	timer->total_etu_cnt = cnt;
 	timer->ptp_clock_info.n_ext_ts = cnt;
-
-	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-	if (IS_ERR(pinctrl))
-		dev_info(&pdev->dev, "No default pinctrl found\n");
 
 	return 0;
 }
@@ -720,7 +742,7 @@ static const struct of_device_id tsc_of_match[] = {
 	{ .compatible = "qcom,tsc", },
 	{ /* end of table */ }
 };
-MODULE_DEVICE_TABLE(of, timer_tsc_of_match);
+MODULE_DEVICE_TABLE(of, tsc_of_match);
 
 static struct platform_driver qcom_ptp_tsc_driver = {
 	.probe  = qcom_ptp_tsc_probe,

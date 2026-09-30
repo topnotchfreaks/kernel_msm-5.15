@@ -155,6 +155,7 @@ static struct work_struct qrtr_backup_work;
  * @ep: endpoint
  * @ref: reference count for node
  * @nid: node id
+ * @net_id: network cluster identifier
  * @qrtr_tx_flow: xarray of qrtr_tx_flow, keyed by node << 32 | port
  * @qrtr_tx_lock: lock for qrtr_tx_flow inserts
  * @hello_sent: hello packet sent to endpoint
@@ -452,12 +453,19 @@ static void __qrtr_node_release(struct kref *kref)
 	xa_destroy(&node->no_wake_svc);
 
 	/* Free tx flow counters */
-	xa_for_each(&node->qrtr_tx_flow, index, flow)
+	mutex_lock(&node->qrtr_tx_lock);
+	xa_for_each(&node->qrtr_tx_flow, index, flow) {
+		list_for_each_entry_safe(waiter, temp, &flow->waiters, node) {
+			list_del(&waiter->node);
+			sock_put(waiter->sk);
+			kfree(waiter);
+		}
 		kfree(flow);
+	}
 	xa_destroy(&node->qrtr_tx_flow);
+	mutex_unlock(&node->qrtr_tx_lock);
 	kfree(node);
 }
-
 /* Increment reference to node. */
 static struct qrtr_node *qrtr_node_acquire(struct qrtr_node *node)
 {
@@ -495,12 +503,30 @@ static void qrtr_tx_resume(struct qrtr_node *node, struct sk_buff *skb)
 	if (le32_to_cpu(pkt.cmd) != QRTR_TYPE_RESUME_TX)
 		return;
 
+	src.sq_family = AF_QIPCRTR;
+	src.sq_node = le32_to_cpu(pkt.client.node);
+	src.sq_port = le32_to_cpu(pkt.client.port);
+	key = (u64)src.sq_node << 32 | src.sq_port;
+
 	flow = xa_load(&node->qrtr_tx_flow, key);
-	if (flow) {
-		spin_lock(&flow->resume_tx.lock);
-		flow->pending = 0;
-		spin_unlock(&flow->resume_tx.lock);
-		wake_up_interruptible_all(&flow->resume_tx);
+	if (!flow)
+		return;
+
+	spin_lock_irqsave(&flow->lock, flags);
+	flow->pending = 0;
+	wake_up_interruptible_all(&flow->resume_tx);
+
+	list_for_each_entry_safe(waiter, temp, &flow->waiters, node) {
+		list_del(&waiter->node);
+
+		skbn = alloc_skb(0, GFP_ATOMIC);
+		if (skbn) {
+			ipc = qrtr_sk(waiter->sk);
+			qrtr_local_enqueue(NULL, skbn, QRTR_TYPE_RESUME_TX,
+					   &src, &ipc->us, 0);
+		}
+		sock_put(waiter->sk);
+		kfree(waiter);
 	}
 	spin_unlock_irqrestore(&flow->lock, flags);
 
@@ -546,6 +572,7 @@ static int qrtr_tx_wait(struct qrtr_node *node, struct sockaddr_qrtr *to,
 		if (flow) {
 			INIT_LIST_HEAD(&flow->waiters);
 			init_waitqueue_head(&flow->resume_tx);
+			spin_lock_init(&flow->lock);
 			if (xa_err(xa_store(&node->qrtr_tx_flow, key, flow,
 					    GFP_KERNEL))) {
 				kfree(flow);

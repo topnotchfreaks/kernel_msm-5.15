@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <linux/ion.h>
 #include <linux/sched.h>
@@ -1288,6 +1288,14 @@ int vfastrpc_internal_invoke(struct vfastrpc_file *vfl,
 	PERF_END);
 	if (err)
 		goto bail;
+	/*
+	 * Store submission timestamp in ctx before sending to DSP.
+	 * For async invokes, perf->invoke will be updated in the collector
+	 * thread (fastrpc_wait_on_async_queue) where ctx is still valid,
+	 * measuring full end-to-end latency consistent with the sync path.
+	 */
+	if (fl->profile && isasyncinvoke)
+		ctx->invoke_start_time = invoket;
 
 	PERF(fl->profile, GET_COUNTER(perf_counter, PERF_LINK),
 	VERIFY(err, 0 == virt_fastrpc_invoke(vfl, ctx));
@@ -1328,9 +1336,8 @@ bail:
 	}
 
 invoke_end:
-	if (fl->profile && !interrupted && isasyncinvoke)
-		vfastrpc_update_invoke_count(invoke->handle, perf_counter,
-				&invoket);
+
+
 	return err;
 }
 
@@ -1393,9 +1400,19 @@ bail:
 		async_res->result = ierr;
 	if (ctx) {
 		if (ctx->perf && ctx->perf_kernel &&
-				ctx->handle > FASTRPC_STATIC_HANDLE_MAX)
+				ctx->handle > FASTRPC_STATIC_HANDLE_MAX) {
+		/*
+		 * Update invoke/count perf counters here where ctx->perf is
+		 * guaranteed valid. This measures full end-to-end async latency
+		 * (submit → DSP → collect), consistent with the sync path.
+		 * invoke_start_time was stored in ctx before fastrpc_invoke_send
+		 * in fastrpc_internal_invoke.
+		 */
+			vfastrpc_update_invoke_count(ctx->handle, perf_counter,
+				&ctx->invoke_start_time);
 			K_COPY_TO_USER_WITHOUT_ERR(0, ctx->perf_kernel,
 					ctx->perf, M_KERNEL_PERF_LIST * sizeof(uint64_t));
+		}
 		context_free(ctx);
 	}
 	return err;

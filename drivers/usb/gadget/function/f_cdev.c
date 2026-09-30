@@ -963,6 +963,8 @@ static void usb_cser_read_complete(struct usb_ep *ep, struct usb_request *req)
 			ep, ep->name, port, req->status, req->actual);
 	if (!port) {
 		pr_err("port is null\n");
+		list_del_init(&req->list);
+		usb_cser_free_req(ep, &req);
 		return;
 	}
 
@@ -1042,6 +1044,9 @@ static void usb_cser_start_io(struct f_cdev *port)
 	spin_lock_irqsave(&port->port_lock, flags);
 	if (!port->is_connected)
 		goto start_io_out;
+
+	if (!list_empty(&port->read_pool))
+		usb_cser_free_requests(port->port_usb.out, &port->read_pool);
 
 	port->current_rx_req = NULL;
 	port->pending_rx_bytes = 0;

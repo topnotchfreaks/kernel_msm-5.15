@@ -391,10 +391,10 @@ static unsigned int msm_get_clock_mult_for_bus_mode(struct sdhci_host *host)
 	 * uses the faster clock(100/400MHz) for some of its parts and
 	 * send the actual required clock (50/200MHz) to the card.
 	 */
-	if (ios.timing == MMC_TIMING_UHS_DDR50 ||
-	    ios.timing == MMC_TIMING_MMC_DDR52 ||
-	    (ios.timing == MMC_TIMING_MMC_HS400 &&
-	    ios.clock == MMC_HS200_MAX_DTR) ||
+	if (timing == MMC_TIMING_UHS_DDR50 ||
+	    timing == MMC_TIMING_MMC_DDR52 ||
+	    (timing == MMC_TIMING_MMC_HS400 &&
+	    clock == MMC_HS200_MAX_DTR) ||
 	    host->flags & SDHCI_HS400_TUNING)
 		return 2;
 	return 1;
@@ -415,15 +415,14 @@ static void msm_set_clock_rate_for_bus_mode(struct sdhci_host *host,
 	mult = msm_get_clock_mult_for_bus_mode(host);
 	desired_rate = clock * mult;
 
-	if (curr_ios.timing == MMC_TIMING_SD_HS &&
+	if (timing == MMC_TIMING_SD_HS &&
 			msm_host->uses_level_shifter)
 		desired_rate = LEVEL_SHIFTER_HIGH_SPEED_FREQ;
 
 	rc = dev_pm_opp_set_rate(mmc_dev(host->mmc), desired_rate);
 	if (rc) {
 		pr_err("%s: Failed to set clock at rate %u at timing %d\n",
-		       mmc_hostname(host->mmc), desired_rate,
-		       curr_ios.timing);
+		       mmc_hostname(host->mmc), desired_rate, timing);
 		return;
 	}
 
@@ -441,9 +440,9 @@ static void msm_set_clock_rate_for_bus_mode(struct sdhci_host *host,
 
 	pr_debug("%s: Setting clock at rate %lu at timing %d\n",
 		 mmc_hostname(host->mmc), achieved_rate,
-		 curr_ios.timing);
+		 timing);
 	sdhci_msm_log_str(msm_host, "Setting clock at rate %lu at timing %d\n",
-			clk_get_rate(core_clk), curr_ios.timing);
+			clk_get_rate(core_clk), timing);
 }
 
 /* Platform specific tuning */
