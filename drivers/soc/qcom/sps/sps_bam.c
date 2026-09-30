@@ -1003,16 +1003,20 @@ int sps_bam_pipe_connect(struct sps_pipe *bam_pipe,
 			pipe_index, BAM_ID(dev));
 		return SPS_ERROR;
 	}
-
+	/*
+	 * It is currently not clear which HLOS module registers these crypto
+	 * pipes. This sharing violation is treated as non-fatal for now because
+	 * no known use cases are impacted, so ignore and continue.
+	 */
 	if (bam_pipe_is_enabled(&dev->base, pipe_index)) {
 		if (params->options & SPS_O_NO_DISABLE)
 			SPS_DBG2(dev,
 				"sps:BAM %pa pipe %d is already enabled\n",
 				BAM_ID(dev), pipe_index);
 		else {
-			SPS_ERR(dev, "sps:BAM %pa pipe %d sharing violation\n",
-				BAM_ID(dev), pipe_index);
-			return SPS_ERROR;
+			SPS_INFO(dev,
+			 "sps:BAM %pa pipe %d sharing violation: ignore and continue\n",
+			 BAM_ID(dev), pipe_index);
 		}
 	}
 

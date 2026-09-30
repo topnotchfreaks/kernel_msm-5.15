@@ -87,6 +87,24 @@ u64 walt_sched_clock(void)
 
 static void walt_resume(void)
 {
+	int cpu;
+
+	/*
+	 * Reset latest_clock on all CPUs on resume. During s2idle resume,
+	 * timekeeping_resume() fires BEFORE syscore walt_resume(), causing
+	 * android_rvh_try_to_wake_up to call walt_update_task_ravg() with
+	 * a wallclock from timekeeping that is slightly BEHIND the
+	 * pre-suspend latest_clock high-water mark.
+	 *
+	 * Fix: reset each CPU's latest_clock to 0 so the first
+	 * wallclock read post-resume is always accepted as valid.
+	 */
+	for_each_possible_cpu(cpu) {
+		struct rq *rq = cpu_rq(cpu);
+		struct walt_rq *wrq = (struct walt_rq *) rq->android_vendor_data1;
+
+		wrq->latest_clock = 0;
+	}
 	walt_clock_suspended = false;
 }
 
@@ -94,6 +112,14 @@ static int walt_suspend(void)
 {
 	sched_clock_last = sched_clock();
 	walt_clock_suspended = true;
+
+	/*
+	 * Reset last_time for all CPUs. This prevents a negative diff
+	 * when sched_update_nr_prod is called early in the resume path
+	 * (e.g., via timekeeping_resume -> ttwu) before walt_resume runs.
+	 */
+	walt_reset_last_time();
+
 	return 0;
 }
 
@@ -2212,6 +2238,8 @@ update_task_rq_cpu_cycles(struct task_struct *p, struct rq *rq, int event,
 	struct walt_task_struct *wts = (struct walt_task_struct *) p->android_vendor_data1;
 
 	walt_lockdep_assert_rq(rq, p);
+	if (event == IRQ_UPDATE && irqtime && (s64)irqtime < 0)
+		irqtime = 0;
 
 	if (!use_cycle_counter) {
 		wrq->task_exec_scale = DIV64_U64_ROUNDUP(cpu_cur_freq(cpu) *
@@ -2870,7 +2898,7 @@ static void walt_init_cycle_counter(void)
 
 static void transfer_busy_time(struct rq *rq,
 				struct walt_related_thread_group *grp,
-					struct task_struct *p, int event);
+					struct task_struct *p, int event, u64 wallclock);
 
 /*
  * Enable colocation and frequency aggregation for all threads in a process.
@@ -2924,12 +2952,11 @@ void update_best_cluster(struct walt_related_thread_group *grp,
 		grp->downmigrate_ts = 0;
 }
 
-static void _set_preferred_cluster(struct walt_related_thread_group *grp)
+static void _set_preferred_cluster(struct walt_related_thread_group *grp, u64 wallclock)
 {
 	struct task_struct *p;
 	u64 combined_demand = 0;
 	bool group_boost = false;
-	u64 wallclock;
 	bool prev_skip_min = grp->skip_min;
 	struct walt_task_struct *wts;
 
@@ -2942,8 +2969,6 @@ static void _set_preferred_cluster(struct walt_related_thread_group *grp)
 		grp->skip_min = false;
 		goto out;
 	}
-
-	wallclock = walt_sched_clock();
 
 	/*
 	 * wakeup of two or more related tasks could race with each other and
@@ -2987,10 +3012,10 @@ out:
 	}
 }
 
-static void set_preferred_cluster(struct walt_related_thread_group *grp)
+static void set_preferred_cluster(struct walt_related_thread_group *grp, u64 wallclock)
 {
 	raw_spin_lock(&grp->lock);
-	_set_preferred_cluster(grp);
+	_set_preferred_cluster(grp, wallclock);
 	raw_spin_unlock(&grp->lock);
 }
 
@@ -3056,18 +3081,20 @@ static void remove_task_from_group(struct task_struct *p)
 	struct rq *rq;
 	int empty_group = 1;
 	struct rq_flags rf;
+	u64 wallclock;
 
 	raw_spin_lock(&grp->lock);
 
 	rq = __task_rq_lock(p, &rf);
-	transfer_busy_time(rq, wts->grp, p, REM_TASK);
+	wallclock = walt_sched_clock();
+	transfer_busy_time(rq, wts->grp, p, REM_TASK, wallclock);
 	list_del_init(&wts->grp_list);
 	rcu_assign_pointer(wts->grp, NULL);
 	__task_rq_unlock(rq, &rf);
 
 	if (!list_empty(&grp->tasks)) {
 		empty_group = 0;
-		_set_preferred_cluster(grp);
+		_set_preferred_cluster(grp, wallclock);
 	}
 
 	raw_spin_unlock(&grp->lock);
@@ -3087,6 +3114,7 @@ add_task_to_group(struct task_struct *p, struct walt_related_thread_group *grp)
 	struct rq *rq;
 	struct rq_flags rf;
 	struct walt_task_struct *wts = (struct walt_task_struct *) p->android_vendor_data1;
+	u64 wallclock = 0;
 
 	raw_spin_lock(&grp->lock);
 
@@ -3095,12 +3123,13 @@ add_task_to_group(struct task_struct *p, struct walt_related_thread_group *grp)
 	 * reference of wts->grp in various hot-paths
 	 */
 	rq = __task_rq_lock(p, &rf);
-	transfer_busy_time(rq, grp, p, ADD_TASK);
+	wallclock = walt_sched_clock();
+	transfer_busy_time(rq, grp, p, ADD_TASK, wallclock);
 	list_add(&wts->grp_list, &grp->tasks);
 	rcu_assign_pointer(wts->grp, grp);
 	__task_rq_unlock(rq, &rf);
 
-	_set_preferred_cluster(grp);
+	_set_preferred_cluster(grp, wallclock);
 
 	raw_spin_unlock(&grp->lock);
 
@@ -3353,9 +3382,8 @@ static void note_task_waking(struct task_struct *p, u64 wallclock)
  */
 static void transfer_busy_time(struct rq *rq,
 				struct walt_related_thread_group *grp,
-					struct task_struct *p, int event)
+					struct task_struct *p, int event,  u64 wallclock)
 {
-	u64 wallclock;
 	struct group_cpu_time *cpu_time;
 	u64 *src_curr_runnable_sum, *dst_curr_runnable_sum;
 	u64 *src_prev_runnable_sum, *dst_prev_runnable_sum;
@@ -3367,8 +3395,6 @@ static void transfer_busy_time(struct rq *rq,
 	int i;
 	struct walt_rq *wrq = (struct walt_rq *) rq->android_vendor_data1;
 	struct walt_task_struct *wts = (struct walt_task_struct *) p->android_vendor_data1;
-
-	wallclock = walt_sched_clock();
 
 	walt_update_task_ravg(p, rq, TASK_UPDATE, wallclock, 0);
 
@@ -4381,6 +4407,12 @@ static void walt_sched_init_rq(struct rq *rq)
 
 	wrq->walt_stats.cumulative_runnable_avg_scaled = 0;
 	wrq->prev_window_size = sched_ravg_window;
+	/*
+	 * Reset latest_clock to 0 on RQ init. This ensures that on
+	 * secondary CPU bring-up, the local timer proxy is not seen
+	 * as ahead of the system counter before it is synchronized.
+	 */
+	wrq->latest_clock = 0;
 	wrq->window_start = 0;
 	wrq->walt_stats.nr_big_tasks = 0;
 	wrq->walt_stats.nr_32bit_big_tasks = 0;
@@ -4602,6 +4634,7 @@ static void android_rvh_account_irq_end(void *unused, struct task_struct *curr, 
 	struct rq *rq;
 	unsigned long flags;
 	struct walt_rq *wrq;
+	u64 irqtime = delta > 0 ? (u64)delta : 0;
 
 	if (unlikely(walt_disabled))
 		return;
@@ -4613,7 +4646,7 @@ static void android_rvh_account_irq_end(void *unused, struct task_struct *curr, 
 	wrq = (struct walt_rq *) cpu_rq(cpu)->android_vendor_data1;
 
 	raw_spin_lock_irqsave(&rq->__lock, flags);
-	walt_update_task_ravg(curr, rq, IRQ_UPDATE, walt_sched_clock(), delta);
+	walt_update_task_ravg(curr, rq, IRQ_UPDATE, walt_rq_clock(rq), irqtime);
 	raw_spin_unlock_irqrestore(&rq->__lock, flags);
 
 	wrq->last_irq_window = wrq->window_start;
@@ -4798,7 +4831,7 @@ static void android_rvh_try_to_wake_up(void *unused, struct task_struct *p)
 	rcu_read_lock();
 	grp = task_related_thread_group(p);
 	if (update_preferred_cluster(grp, p, old_load, false))
-		set_preferred_cluster(grp);
+		set_preferred_cluster(grp, wallclock);
 	rcu_read_unlock();
 }
 
@@ -4842,7 +4875,7 @@ static void android_vh_scheduler_tick(void *unused, struct rq *rq)
 	rcu_read_lock();
 	grp = task_related_thread_group(rq->curr);
 	if (update_preferred_cluster(grp, rq->curr, old_load, true))
-		set_preferred_cluster(grp);
+		set_preferred_cluster(grp, rq->clock);
 	rcu_read_unlock();
 
 	walt_lb_tick(rq);
@@ -5037,6 +5070,7 @@ static int walt_init_stop_handler(void *data)
 	struct task_struct *g, *p;
 	struct walt_rq *wrq;
 	int level = 0;
+
 
 	read_lock(&tasklist_lock);
 	for_each_possible_cpu(cpu) {

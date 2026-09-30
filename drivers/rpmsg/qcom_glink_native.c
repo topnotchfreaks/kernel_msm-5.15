@@ -1843,7 +1843,6 @@ static void qcom_glink_destroy_ept(struct rpmsg_endpoint *ept)
 
 	qcom_glink_send_close_req(glink, channel);
 }
-
 static int qcom_glink_request_intent(struct qcom_glink *glink,
 				     struct glink_channel *channel,
 				     size_t size)

@@ -359,18 +359,8 @@ static int queue_interrupt(struct fuse_req *req)
 		return -EINVAL;
 	}
 
-	if (test_bit(FR_FINISHED, &req->flags)) {
-		dprintk("Request finished: FR_FINISHED set (req=%p)\n", req);
-		spin_unlock(&fiq->lock);
-		return 0;
-	}
-	if (test_and_set_bit(FR_INTR_QUEUED, &req->flags)) {
-		/* Already queued previously; nothing to do */
-		dprintk("Interrupt already queued: FR_INTR_QUEUED was set (req=%p)\n", req);
-		spin_unlock(&fiq->lock);
-		return 0;
-	}
-
+	if (list_empty(&req->intr_entry)) {
+		list_add_tail(&req->intr_entry, &fiq->interrupts);
 		/*
 		 * Pairs with smp_mb() implied by test_and_set_bit()
 		 * from fuse_request_end().
@@ -381,10 +371,7 @@ static int queue_interrupt(struct fuse_req *req)
 			spin_unlock(&fiq->lock);
 			return 0;
 		}
-
-		if (list_empty(&req->intr_entry)) {
-			list_add_tail(&req->intr_entry, &fiq->interrupts);
-			fiq->ops->wake_interrupt_and_unlock(fiq, false);
+		fiq->ops->wake_interrupt_and_unlock(fiq, false);
 	} else {
 		spin_unlock(&fiq->lock);
 	}

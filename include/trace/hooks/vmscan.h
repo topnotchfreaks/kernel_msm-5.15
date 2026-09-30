@@ -33,6 +33,12 @@ DECLARE_HOOK(android_vh_page_trylock_clear,
 DECLARE_HOOK(android_vh_shrink_node_memcgs,
 	TP_PROTO(struct mem_cgroup *memcg, bool *skip),
 	TP_ARGS(memcg, skip));
+DECLARE_HOOK(android_vh_shrink_page_lock_owner_set,
+	TP_PROTO(struct page *page),
+	TP_ARGS(page));
+DECLARE_HOOK(android_vh_shrink_page_lock_owner_clear,
+	TP_PROTO(struct page *page),
+	TP_ARGS(page));
 DECLARE_HOOK(android_vh_tune_scan_type,
 	TP_PROTO(char *scan_type),
 	TP_ARGS(scan_type));

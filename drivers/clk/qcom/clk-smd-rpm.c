@@ -2,7 +2,7 @@
 /*
  * Copyright (c) 2016, Linaro Limited
  * Copyright (c) 2014, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/clk-provider.h>
@@ -1512,6 +1512,7 @@ static int clk_smd_rpm_pm_notifier(struct notifier_block *nb,
 		if (pm_suspend_via_firmware())
 			return clk_smd_rpm_enable_scaling();
 #endif
+		break;
 	case PM_POST_HIBERNATION:
 		return clk_smd_rpm_enable_scaling();
 	}

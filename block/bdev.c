@@ -29,6 +29,9 @@
 #include "../fs/internal.h"
 #include "blk.h"
 
+#undef CREATE_TRACE_POINTS
+#include <trace/hooks/vmscan.h>
+
 struct bdev_inode {
 	struct block_device bdev;
 	struct inode vfs_inode;
@@ -374,6 +377,7 @@ int bdev_write_page(struct block_device *bdev, sector_t sector,
 		end_page_writeback(page);
 	} else {
 		clean_page_buffers(page);
+		trace_android_vh_shrink_page_lock_owner_clear(page);
 		unlock_page(page);
 	}
 	blk_queue_exit(bdev->bd_disk->queue);

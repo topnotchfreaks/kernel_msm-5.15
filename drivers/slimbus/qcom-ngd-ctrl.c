@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 // Copyright (c) 2011-2017, 2020-2021, The Linux Foundation. All rights reserved.
 // Copyright (c) 2018, Linaro Limited
-// Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+// Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
 
 #include <linux/irq.h>
 #include <linux/kernel.h>
@@ -66,6 +66,8 @@
 #define SLIMBUS_QMI_CHECK_FRAMER_STAT_RESP_MAX_MSG_LEN	7
 /* QMI response timeout of 500ms */
 #define SLIMBUS_QMI_RESP_TOUT	1000
+/* QMI handle ready timeout of 5s during SSR recovery */
+#define SLIM_QMI_HANDLE_TOUT	msecs_to_jiffies(5000)
 
 /* User defined commands */
 #define SLIM_USR_MC_GENERIC_ACK	0x25
@@ -1675,9 +1677,13 @@ static int qcom_slim_ngd_runtime_resume(struct device *dev)
 
 	mutex_lock(&ctrl->suspend_resume_lock);
 	if (!ctrl->qmi.handle) {
-		SLIM_WARN(ctrl, "%s QMI handle is NULL\n", __func__);
+		SLIM_WARN(ctrl, "%s QMI handle is NULL, wait for QMI ready\n", __func__);
 		mutex_unlock(&ctrl->suspend_resume_lock);
-		return 0;
+		ret = wait_for_completion_interruptible_timeout(&ctrl->qmi_up,
+								SLIM_QMI_HANDLE_TOUT);
+		if (ret <= 0)
+			return -ETIMEDOUT;
+		mutex_lock(&ctrl->suspend_resume_lock);
 	}
 
 	qcom_slim_ngd_enable_irq(ctrl);
@@ -1749,7 +1755,7 @@ static int qcom_slim_ngd_qmi_new_server(struct qmi_handle *hdl,
 	qmi->svc_info.sq_node = service->node;
 	qmi->svc_info.sq_port = service->port;
 
-	complete(&ctrl->qmi_up);
+	complete_all(&ctrl->qmi_up);
 
 	return 0;
 }

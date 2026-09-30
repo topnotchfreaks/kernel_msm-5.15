@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/bitops.h>
@@ -1095,6 +1095,11 @@ static int adc5_get_dt_channel_data(struct adc5_chip *adc,
 		prop->avg_samples = VADC_DEF_AVG_SAMPLES;
 	}
 
+	prop->scale_fn_type = -EINVAL;
+	ret = of_property_read_u32(node, "qcom,scale-fn-type", &value);
+	if (!ret && value < SCALE_HW_CALIB_INVALID)
+		prop->scale_fn_type = value;
+
 	if (of_property_read_bool(node, "qcom,ratiometric"))
 		prop->cal_method = ADC5_RATIOMETRIC_CAL;
 	else if (of_property_read_bool(node, "qcom,no-cal"))
@@ -1244,8 +1249,9 @@ static int adc5_get_dt_data(struct adc5_chip *adc, struct device_node *node)
 			return ret;
 		}
 
-		prop.scale_fn_type =
-			adc->data->adc_chans[prop.channel].scale_fn_type;
+		if (prop.scale_fn_type == -EINVAL)
+			prop.scale_fn_type =
+				adc->data->adc_chans[prop.channel].scale_fn_type;
 		*chan_props = prop;
 		adc_chan = &adc->data->adc_chans[prop.channel];
 

@@ -3639,7 +3639,7 @@ static void msm_dwc3_perf_vote_enable(struct dwc3_msm *mdwc, bool enable);
 static void configure_usb_wakeup_interrupt(struct dwc3_msm *mdwc,
 	struct usb_irq *uirq, unsigned int polarity, bool enable)
 {
-	if (uirq && enable && !uirq->enable) {
+	if (uirq && uirq->irq && enable && !uirq->enable) {
 		dbg_event(0xFF, "PDC_IRQ_EN", uirq->irq);
 		dbg_event(0xFF, "PDC_IRQ_POL", polarity);
 		/* clear any pending interrupt */
@@ -3650,7 +3650,7 @@ static void configure_usb_wakeup_interrupt(struct dwc3_msm *mdwc,
 		uirq->enable = true;
 	}
 
-	if (uirq && !enable && uirq->enable) {
+	if (uirq && uirq->irq && !enable && uirq->enable) {
 		dbg_event(0xFF, "PDC_IRQ_DIS", uirq->irq);
 		disable_irq_wake(uirq->irq);
 		disable_irq_nosync(uirq->irq);
