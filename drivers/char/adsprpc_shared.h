@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #ifndef ADSPRPC_SHARED_H
 #define ADSPRPC_SHARED_H
@@ -886,6 +886,7 @@ struct smq_invoke_ctx {
 	uint32_t sc_interrupted;
 	struct fastrpc_file *fl_interrupted;
 	uint32_t handle_interrupted;
+	struct timespec64 invoke_start_time;  /* submission timestamp for async perf */
 };
 
 struct fastrpc_ctx_lst {

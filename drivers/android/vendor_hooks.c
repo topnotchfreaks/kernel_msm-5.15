@@ -115,6 +115,7 @@
 #include <trace/hooks/delayacct.h>
 #include <trace/hooks/tmpfile.h>
 #include <trace/hooks/fuse.h>
+#include <trace/hooks/asoc.h>
 
 /*
  * Export tracepoints that act as a bare tracehook (ie: have no trace event
@@ -548,10 +549,12 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_keep_reclaimed_page);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_clear_reclaimed_page);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_evict_pages_bypass);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_mglru_should_abort_scan);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_lru_cache_add);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_lru_cache_add_page_activate);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_filemap_fault_pre_page_locked);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_filemap_page_mapped);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_zap_pte_range_page_remove_rmap);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_put_volsw);
 /*
  * For type visibility
  */
@@ -571,3 +574,4 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_do_read_fault);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_filemap_read);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_filemap_map_pages);
 EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_set_tsk_need_resched_lazy);
+EXPORT_TRACEPOINT_SYMBOL_GPL(android_vh_init_adjust_zone_wmark);

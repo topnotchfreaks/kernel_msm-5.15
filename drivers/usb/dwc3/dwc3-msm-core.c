@@ -76,6 +76,9 @@
 #define GEN1_U3_EXIT_RSP_RX_CLK(n)	(n)
 #define GEN1_U3_EXIT_RSP_RX_CLK_MASK	GEN1_U3_EXIT_RSP_RX_CLK(0xff)
 
+/* Global USB2 PHY Configuration Register */
+#define DWC3_GUSB2PHYCFG_EUSB2OPMODE	BIT(14)
+
 /* AHB2PHY register offsets */
 #define PERIPH_SS_AHB2PHY_TOP_CFG 0x10
 
@@ -7044,6 +7047,17 @@ static int dwc3_otg_start_host(struct dwc3_msm *mdwc, int on)
 			dev_dbg(mdwc->dev, "LU3:%08x\n",
 				dwc3_msm_read_reg(mdwc->base,
 					DWC31_LINK_LU3LFPSRXTIM(0)));
+		}
+
+		/*
+		 * Writing "GUSB2PHYCFG.eUSB2OPMODE = 1" addresses a USB2 host compliance
+		 * failure where TEST_J / TEST_K commands issued to the controller do not
+		 * result in proper D+ high / D- high signals.
+		 */
+		if (mdwc->use_eusb2_phy) {
+			reg = dwc3_msm_read_reg(mdwc->base, DWC3_GUSB2PHYCFG(0));
+			dwc3_msm_write_reg(mdwc->base, DWC3_GUSB2PHYCFG(0),
+				reg | DWC3_GUSB2PHYCFG_EUSB2OPMODE);
 		}
 
 		/* xHCI should have incremented child count as necessary */

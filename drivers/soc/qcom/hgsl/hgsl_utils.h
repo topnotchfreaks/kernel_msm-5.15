@@ -95,6 +95,8 @@ static inline void hgsl_log(unsigned int level, const char * const fun,
 	va_end(arglist);
 
 	pr_err("%s\n", buffer);
+	if (task)
+		put_task_struct(task);
 }
 
 static inline int hgsl_check_userparams(

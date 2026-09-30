@@ -486,6 +486,7 @@ void lru_cache_add(struct page *page)
 	VM_BUG_ON_PAGE(PageActive(page) && PageUnevictable(page), page);
 	VM_BUG_ON_PAGE(PageLRU(page), page);
 
+	trace_android_vh_lru_cache_add(page);
 	/* see the comment in lru_gen_add_page() */
 	if (lru_gen_enabled() && !PageUnevictable(page) &&
 	    lru_gen_in_fault() && !(current->flags & PF_MEMALLOC)) {

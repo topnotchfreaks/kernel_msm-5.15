@@ -3480,6 +3480,7 @@ out:
 	else
 		filep->private_data = priv;
 	mutex_unlock(&hgsl->mutex);
+	put_task_struct(task);
 	return ret;
 }
 

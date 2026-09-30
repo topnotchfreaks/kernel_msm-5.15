@@ -9,7 +9,6 @@ blocklist can-gw
 blocklist can-raw
 blocklist dummy-cpufreq
 blocklist dummy_hcd
-blocklist dummy_hcd
 blocklist e4000
 blocklist failover
 blocklist fc0011
